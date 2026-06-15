@@ -1,10 +1,3 @@
-//
-//  JustTwoApp.swift
-//  JustTwo
-//
-//  Created by Dmitrii on 21.05.2026.
-//
-
 import SwiftUI
 import SwiftData
 
@@ -14,10 +7,17 @@ struct JustTwoApp: App {
         let schema = Schema([
             Item.self,
         ])
-        let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
+
+        let modelConfiguration = ModelConfiguration(
+            schema: schema,
+            isStoredInMemoryOnly: false
+        )
 
         do {
-            return try ModelContainer(for: schema, configurations: [modelConfiguration])
+            return try ModelContainer(
+                for: schema,
+                configurations: [modelConfiguration]
+            )
         } catch {
             fatalError("Could not create ModelContainer: \(error)")
         }
@@ -25,7 +25,7 @@ struct JustTwoApp: App {
 
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            DiscoverView()
         }
         .modelContainer(sharedModelContainer)
     }
