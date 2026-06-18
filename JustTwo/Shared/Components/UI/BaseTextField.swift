@@ -49,7 +49,7 @@ struct BaseTextField: View {
                             .foregroundStyle(isFocused ? Color.discoverViolet : Color.discoverSecondaryText)
                             .scaleEffect(showPassword ? 1.08 : 1)
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.spring(pressedScale: 0.88))
                 }
             }
             .padding(.horizontal, 14)
@@ -63,19 +63,21 @@ struct BaseTextField: View {
                     .strokeBorder(borderColor, lineWidth: isFocused ? 1.5 : 1)
             }
             .shadow(
-                color: isFocused ? Color.discoverViolet.opacity(0.22) : Color.clear,
-                radius: 14,
+                color: isFocused ? Color.discoverViolet.opacity(0.14) : Color.clear,
+                radius: 8,
                 x: 0,
-                y: 6
+                y: 3
             )
             .overlay {
                 if isFocused {
                     RoundedRectangle(cornerRadius: 16, style: .continuous)
-                        .stroke(Color.discoverViolet.opacity(0.5), lineWidth: 4)
-                        .blur(radius: 4)
+                        .stroke(Color.discoverViolet.opacity(0.34), lineWidth: 2)
+                        .blur(radius: 2)
                         .allowsHitTesting(false)
                 }
             }
+            .animation(.easeInOut(duration: 0.16), value: isFocused)
+            .animation(.easeInOut(duration: 0.16), value: errorMessage)
 
             if let errorMessage {
                 Text(errorMessage)

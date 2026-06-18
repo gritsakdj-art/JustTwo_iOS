@@ -145,6 +145,27 @@ extension Color {
         )
     }
 
+    static var authBackgroundGradient: LinearGradient {
+        LinearGradient(
+            stops: [
+                .init(
+                    color: dynamic(light: lightDiscoverBackgroundTop, dark: darkDiscoverBackgroundTop),
+                    location: 0
+                ),
+                .init(
+                    color: dynamic(light: lightDiscoverBackgroundBottom, dark: darkDiscoverBackgroundMiddle),
+                    location: 0.46
+                ),
+                .init(
+                    color: dynamic(light: lightDiscoverBackgroundMiddle, dark: darkDiscoverBackgroundBottom),
+                    location: 1
+                )
+            ],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+    }
+
     static var discoverSelectedGradient: LinearGradient {
         LinearGradient(
             colors: [.discoverViolet, .discoverVioletLight],

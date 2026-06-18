@@ -26,8 +26,10 @@ struct ProfileView: View {
                 .padding(.bottom, AppSpacing.lg)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(Color.discoverBackgroundGradient.ignoresSafeArea())
             .navigationTitle(Text("tab.profile"))
             .navigationBarTitleDisplayMode(.inline)
+            .toolbarBackground(.hidden, for: .navigationBar)
         }
     }
 
@@ -142,25 +144,23 @@ private struct ProfileMenuRowContent: View {
 private struct ProfileMenuRowStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .scaleEffect(configuration.isPressed ? 0.98 : 1)
-            .opacity(configuration.isPressed ? 0.86 : 1)
-            .animation(.spring(response: 0.2, dampingFraction: 0.75), value: configuration.isPressed)
+            .springButtonEffect(
+                isPressed: configuration.isPressed,
+                pressedScale: 0.98,
+                pressedOpacity: 0.86,
+                response: 0.2,
+                dampingFraction: 0.75
+            )
     }
 }
 
 #Preview {
-    ZStack {
-        Color.discoverBackgroundGradient.ignoresSafeArea()
-        ProfileView()
-    }
+    ProfileView()
     .environment(SessionStore.shared)
 }
 
 #Preview("Arabic RTL") {
-    ZStack {
-        Color.discoverBackgroundGradient.ignoresSafeArea()
-        ProfileView()
-    }
+    ProfileView()
     .environment(\.locale, Locale(identifier: "ar"))
     .environment(\.layoutDirection, .rightToLeft)
 }

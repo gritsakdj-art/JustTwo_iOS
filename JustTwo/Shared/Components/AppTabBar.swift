@@ -106,15 +106,13 @@ private struct AppTabBarItem: View {
                     .tracking(-0.1)
             }
         }
-        .buttonStyle(AppTabBarButtonStyle())
-    }
-}
-
-private struct AppTabBarButtonStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .scaleEffect(configuration.isPressed ? 0.92 : 1)
-            .animation(.spring(response: 0.2, dampingFraction: 0.6), value: configuration.isPressed)
+        .buttonStyle(
+            .spring(
+                pressedScale: 0.92,
+                response: 0.2,
+                dampingFraction: 0.6
+            )
+        )
     }
 }
 

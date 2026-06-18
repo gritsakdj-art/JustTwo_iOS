@@ -24,7 +24,7 @@ struct GeneralSettingsView: View {
                                 isSelected: selectedTheme == theme
                             )
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(.spring(pressedScale: 0.98, pressedOpacity: 0.88))
 
                         if index < AppTheme.allCases.count - 1 {
                             Divider()

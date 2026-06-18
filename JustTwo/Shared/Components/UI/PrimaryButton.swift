@@ -66,8 +66,12 @@ private struct PrimaryButtonStyle: ButtonStyle {
                 Color.brandPrimaryPressedGradient.opacity(configuration.isPressed && !isDisabled ? 1 : 0),
                 in: RoundedRectangle(cornerRadius: 16)
             )
-            .scaleEffect(configuration.isPressed && !isDisabled ? 0.98 : 1)
-            .animation(.spring(response: 0.2, dampingFraction: 0.75), value: configuration.isPressed)
+            .springButtonEffect(
+                isPressed: configuration.isPressed && !isDisabled,
+                pressedScale: 0.98,
+                response: 0.2,
+                dampingFraction: 0.75
+            )
     }
 }
 

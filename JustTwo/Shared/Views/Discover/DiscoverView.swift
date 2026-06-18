@@ -216,7 +216,7 @@ struct DiscoverView: View {
                             }
                         }
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.spring(pressedScale: 0.96))
             }
         }
         .padding(4)
@@ -260,7 +260,7 @@ struct DiscoverView: View {
                                 }
                             }
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.spring(pressedScale: 0.94))
                 }
             }
             .padding(.horizontal, 24)
@@ -561,7 +561,13 @@ struct ActionButton: View {
                 .clipShape(Circle())
                 .shadow(color: shadowColor, radius: 16, x: 0, y: 8)
         }
-        .buttonStyle(ScaleButtonStyle())
+        .buttonStyle(
+            .spring(
+                pressedScale: 0.92,
+                response: 0.2,
+                dampingFraction: 0.6
+            )
+        )
         .accessibilityLabel(Text(accessibilityLabel))
     }
 
@@ -590,14 +596,6 @@ struct ActionButton: View {
         case .gradient(_, let shadowColor): return shadowColor
         case .outlined: return Color.discoverViolet.opacity(0.10)
         }
-    }
-}
-
-struct ScaleButtonStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .scaleEffect(configuration.isPressed ? 0.92 : 1)
-            .animation(.spring(response: 0.2, dampingFraction: 0.6), value: configuration.isPressed)
     }
 }
 
