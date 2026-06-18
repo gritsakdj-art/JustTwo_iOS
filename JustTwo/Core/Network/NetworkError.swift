@@ -33,7 +33,7 @@ enum NetworkError: LocalizedError, Identifiable, Sendable {
         case .unauthorized:
             return "Authorization required"
         case .httpError(_, let response):
-            return response?.message ?? "Request failed"
+            return response?.userFriendlyMessage ?? "Request failed"
         case .decodingError(let message):
             return "Failed to decode response: \(message)"
         case .invalidResponse:
@@ -151,7 +151,27 @@ extension NetworkError {
         apiErrorCode == "profile_not_found"
     }
 
+    var isUnauthorized: Bool {
+        switch self {
+        case .unauthorized:
+            return true
+        case .httpError(let statusCode, let response):
+            guard statusCode == 401 else { return false }
+            let code = response?.errorCode
+            return code == nil || code == .missingToken || code == .invalidToken
+        default:
+            return false
+        }
+    }
+
+    var shouldClearSession: Bool {
+        isUnauthorized
+    }
+
     var userMessage: String {
-        apiErrorMessage ?? localizedDescription
+        if case .httpError(_, let response) = self {
+            return response?.userFriendlyMessage ?? localizedDescription
+        }
+        return localizedDescription
     }
 }

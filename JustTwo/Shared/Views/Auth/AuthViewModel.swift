@@ -14,8 +14,36 @@ final class AuthViewModel {
     var isLoading = false
     var errorMessage: String?
 
+    var emailValidationMessage: String? {
+        let trimmedEmail = email.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedEmail.isEmpty else { return nil }
+        return isValidEmail(trimmedEmail) ? nil : String(localized: "auth.error.invalid_email")
+    }
+
+    var passwordValidationMessage: String? {
+        guard !password.isEmpty else { return nil }
+
+        switch mode {
+        case .login:
+            return nil
+        case .register:
+            return isValidPassword(password) ? nil : String(localized: "auth.error.weak_password")
+        }
+    }
+
     var isValid: Bool {
-        isValidEmail(email) && isValidPassword(password)
+        let trimmedEmail = email.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedEmail.isEmpty,
+              !password.isEmpty,
+              isValidEmail(trimmedEmail)
+        else { return false }
+
+        switch mode {
+        case .login:
+            return true
+        case .register:
+            return isValidEmail(trimmedEmail) && isValidPassword(password)
+        }
     }
 
     func submit(using session: SessionStore) {
@@ -46,7 +74,7 @@ final class AuthViewModel {
                     )
                 }
 
-                await session.handleAuthSuccess(
+                try await session.handleAuthSuccess(
                     response,
                     isRegistration: mode == .register
                 )

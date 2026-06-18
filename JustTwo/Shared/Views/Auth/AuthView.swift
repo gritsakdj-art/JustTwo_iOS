@@ -14,14 +14,16 @@ struct AuthView: View {
                         title: "auth.email",
                         text: $viewModel.email,
                         keyboardType: .emailAddress,
-                        textContentType: .emailAddress
+                        textContentType: .emailAddress,
+                        errorMessage: viewModel.emailValidationMessage
                     )
 
                     BaseTextField(
                         title: "auth.password",
                         text: $viewModel.password,
                         isSecure: true,
-                        textContentType: viewModel.mode == .register ? .newPassword : .password
+                        textContentType: viewModel.mode == .register ? .newPassword : .password,
+                        errorMessage: viewModel.passwordValidationMessage
                     )
                 }
 

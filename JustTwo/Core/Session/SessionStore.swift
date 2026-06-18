@@ -11,16 +11,25 @@ final class SessionStore {
         case auth
         case profileSetup
         case main
+        case sessionRecoveryFailed
     }
 
     private(set) var phase: Phase = .loading
     private(set) var currentUser: UserResponse?
     private(set) var currentProfile: UserProfileDTO?
+    private(set) var recoveryErrorMessage: String?
 
     private init() {}
 
     func bootstrap() async {
-        APIAuth.restorePersistedSession()
+        do {
+            try APIAuth.restorePersistedSession()
+        } catch {
+            NetworkDebug.logError(error, prefix: "keychain")
+            APIAuth.clear()
+            phase = .auth
+            return
+        }
 
         guard APIAuth.accessToken != nil else {
             phase = .auth
@@ -30,10 +39,10 @@ final class SessionStore {
         await resolveDestinationAfterAuth()
     }
 
-    func handleAuthSuccess(_ response: AuthResponse, isRegistration: Bool) async {
-        APIAuth.accessToken = response.token
-        APIAuth.persist(user: response.user)
+    func handleAuthSuccess(_ response: AuthResponse, isRegistration: Bool) async throws {
+        try APIAuth.save(token: response.token)
         currentUser = response.user
+        recoveryErrorMessage = nil
 
         if isRegistration {
             currentProfile = nil
@@ -55,6 +64,7 @@ final class SessionStore {
         APIAuth.clear()
         currentUser = nil
         currentProfile = nil
+        recoveryErrorMessage = nil
         phase = .auth
     }
 
@@ -62,21 +72,23 @@ final class SessionStore {
         phase = .loading
 
         do {
-            if let user = try? await AuthService.currentUser() {
-                currentUser = user
-            } else if let email = APIAuth.persistedUserEmail, let id = APIAuth.persistedUserID {
-                currentUser = UserResponse(id: id, email: email, createdAt: nil, updatedAt: nil)
-            }
+            currentUser = try await AuthService.currentUser()
 
             let profile = try await ProfileService.fetchMyProfile()
             currentProfile = profile
+            recoveryErrorMessage = nil
             phase = profile == nil ? .profileSetup : .main
-        } catch {
+        } catch let error as NetworkError where error.shouldClearSession {
             NetworkDebug.logError(error)
             APIAuth.clear()
             currentUser = nil
             currentProfile = nil
+            recoveryErrorMessage = nil
             phase = .auth
+        } catch {
+            NetworkDebug.logError(error)
+            recoveryErrorMessage = NetworkError.map(error).userMessage
+            phase = .sessionRecoveryFailed
         }
     }
 }

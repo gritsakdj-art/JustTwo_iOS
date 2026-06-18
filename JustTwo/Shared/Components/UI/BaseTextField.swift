@@ -10,6 +10,7 @@ struct BaseTextField: View {
     var keyboardType: UIKeyboardType = .default
     var textContentType: UITextContentType? = nil
     var autocapitalization: TextInputAutocapitalization = .never
+    var errorMessage: String? = nil
 
     @FocusState private var isFocused: Bool
     @State private var showPassword = false
@@ -75,11 +76,21 @@ struct BaseTextField: View {
                         .allowsHitTesting(false)
                 }
             }
+
+            if let errorMessage {
+                Text(errorMessage)
+                    .font(.footnote)
+                    .foregroundStyle(Color.discoverPink)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
     }
 
     private var borderColor: Color {
-        isFocused ? Color.discoverViolet : Color.discoverSecondaryText.opacity(0.22)
+        if errorMessage != nil {
+            return Color.discoverPink
+        }
+        return isFocused ? Color.discoverViolet : Color.discoverSecondaryText.opacity(0.22)
     }
 }
 

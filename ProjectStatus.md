@@ -29,6 +29,28 @@
 - Added persisted app theme selection with System, Light, and Dark options.
 - Applied the selected theme globally through `preferredColorScheme`.
 
+## 2026-06-18
+
+- Added staging API configuration for `https://api.jtwo.online`.
+- Added the shared networking foundation with request building, URLSession execution, API decoding, and structured network errors.
+- Added auth API requests and response models for register, login, and current user/profile loading.
+- Added session state management for app startup, authenticated routing, unauthenticated routing, and profile loading.
+- Added token persistence through Keychain-backed `TokenStorage`.
+- Removed JWT token persistence from `UserDefaults`.
+- Added session recovery handling when a saved token cannot load the current user.
+- Added localized session recovery UI with retry support.
+- Added robust ISO-8601 date decoding with and without fractional seconds.
+- Added typed API error response decoding and localized user-facing server error messages.
+- Added localized handling for auth, profile, validation, and session errors.
+- Added reactive email validation on the auth screen.
+- Added reactive registration password validation on the auth screen.
+- Updated `BaseTextField` to display localized inline validation errors and error styling.
+- Updated auth submit validation so invalid email formats cannot be submitted.
+- Added localized strings for the new validation, server error, retry, and session recovery messages.
+- Added `.gitignore` entries for Xcode user data, DerivedData, SwiftPM artifacts, and macOS metadata.
+- Verified the iOS app builds successfully with `xcodebuild`.
+- Confirmed there is currently no separate test target in the Xcode project.
+
 ## Notes
 
 - Continue adding completed changes here after each meaningful update.

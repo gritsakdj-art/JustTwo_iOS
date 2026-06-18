@@ -3,45 +3,26 @@ import Foundation
 enum APIAuth {
     private static let lock = NSLock()
     private nonisolated(unsafe) static var _accessToken: String?
-
-    private enum StorageKey {
-        static let accessToken = "session.accessToken"
-        static let userID = "session.userID"
-        static let userEmail = "session.userEmail"
-    }
+    private nonisolated(unsafe) static var tokenStorage: TokenStorage = KeychainTokenStorage()
 
     static var accessToken: String? {
-        get {
-            lock.lock()
-            defer { lock.unlock() }
-            return _accessToken
-        }
-        set {
-            lock.lock()
-            defer { lock.unlock() }
-            _accessToken = newValue
-            UserDefaults.standard.set(newValue, forKey: StorageKey.accessToken)
-        }
-    }
-
-    static var persistedUserID: UUID? {
-        guard let rawValue = UserDefaults.standard.string(forKey: StorageKey.userID) else { return nil }
-        return UUID(uuidString: rawValue)
-    }
-
-    static var persistedUserEmail: String? {
-        UserDefaults.standard.string(forKey: StorageKey.userEmail)
-    }
-
-    static func restorePersistedSession() {
         lock.lock()
         defer { lock.unlock() }
-        _accessToken = UserDefaults.standard.string(forKey: StorageKey.accessToken)
+        return _accessToken
     }
 
-    static func persist(user: UserResponse) {
-        UserDefaults.standard.set(user.id.uuidString, forKey: StorageKey.userID)
-        UserDefaults.standard.set(user.email, forKey: StorageKey.userEmail)
+    static func restorePersistedSession() throws {
+        let token = try tokenStorage.loadToken()
+        lock.lock()
+        _accessToken = token
+        lock.unlock()
+    }
+
+    static func save(token: String) throws {
+        try tokenStorage.saveToken(token)
+        lock.lock()
+        _accessToken = token
+        lock.unlock()
     }
 
     static func clear() {
@@ -49,8 +30,6 @@ enum APIAuth {
         _accessToken = nil
         lock.unlock()
 
-        UserDefaults.standard.removeObject(forKey: StorageKey.accessToken)
-        UserDefaults.standard.removeObject(forKey: StorageKey.userID)
-        UserDefaults.standard.removeObject(forKey: StorageKey.userEmail)
+        try? tokenStorage.deleteToken()
     }
 }

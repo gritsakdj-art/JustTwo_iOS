@@ -46,18 +46,95 @@ enum JSONCoding {
         return encoder
     }()
 
-    static let decoder: JSONDecoder = {
+    static let decoder = JSONDecoder.justTwoAPI
+}
+
+extension JSONDecoder {
+    static var justTwoAPI: JSONDecoder {
         let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
+        decoder.dateDecodingStrategy = .custom { decoder in
+            let container = try decoder.singleValueContainer()
+            let string = try container.decode(String.self)
+
+            if let date = ISO8601DateFormatter.withFractionalSeconds.date(from: string) {
+                return date
+            }
+
+            if let date = ISO8601DateFormatter.standard.date(from: string) {
+                return date
+            }
+
+            throw DecodingError.dataCorruptedError(
+                in: container,
+                debugDescription: "Invalid ISO8601 date: \(string)"
+            )
+        }
         return decoder
+    }
+}
+
+private extension ISO8601DateFormatter {
+    static let standard: ISO8601DateFormatter = {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime]
+        return formatter
+    }()
+
+    static let withFractionalSeconds: ISO8601DateFormatter = {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return formatter
     }()
 }
 
-struct APIErrorResponse: Decodable {
+enum APIErrorCode: String {
+    case emailAlreadyExists = "email_already_exists"
+    case invalidEmail = "invalid_email"
+    case weakPassword = "weak_password"
+    case invalidCredentials = "invalid_credentials"
+    case missingToken = "missing_token"
+    case invalidToken = "invalid_token"
+    case profileNotFound = "profile_not_found"
+    case invalidGender = "invalid_gender"
+    case ageRestricted = "age_restricted"
+    case validationFailed = "validation_failed"
+    case invalidProfileModes = "invalid_profile_modes"
+}
+
+struct APIErrorResponse: Decodable, Error {
     let success: Bool
     let code: String
     let message: String
     let field: String?
+
+    var errorCode: APIErrorCode? {
+        APIErrorCode(rawValue: code)
+    }
+
+    var userFriendlyMessage: String {
+        switch errorCode {
+        case .emailAlreadyExists:
+            return String(localized: "auth.error.email_already_exists")
+        case .invalidEmail:
+            return String(localized: "auth.error.invalid_email")
+        case .weakPassword:
+            return String(localized: "auth.error.weak_password")
+        case .invalidCredentials:
+            return String(localized: "auth.error.invalid_credentials")
+        case .missingToken, .invalidToken:
+            return String(localized: "auth.error.session_expired")
+        case .profileNotFound:
+            return String(localized: "profile.error.not_found")
+        case .invalidGender:
+            return String(localized: "profile.error.invalid_gender")
+        case .ageRestricted:
+            return String(localized: "profile.error.age_restricted")
+        case .invalidProfileModes:
+            return String(localized: "profile.error.invalid_modes")
+        case .validationFailed, .none:
+            return errorCode == .validationFailed ? String(localized: "common.error.validation_failed") : message
+        }
+    }
 }
 
 struct HealthResponse: Decodable {

@@ -11,6 +11,8 @@ struct RootView: View {
                 loadingView
             case .auth:
                 AuthView()
+            case .sessionRecoveryFailed:
+                recoveryFailedView
             case .profileSetup:
                 NavigationStack {
                     ProfileSettingsView(context: .onboarding)
@@ -31,6 +33,19 @@ struct RootView: View {
             Color.discoverBackgroundGradient.ignoresSafeArea()
             ProgressView()
                 .tint(Color.brandPrimary)
+        }
+    }
+
+    private var recoveryFailedView: some View {
+        StatePlaceholderView(
+            title: String(localized: "session.recovery.title"),
+            subtitle: session.recoveryErrorMessage ?? String(localized: "session.recovery.subtitle"),
+            systemImage: "wifi.exclamationmark",
+            actionTitle: "common.retry"
+        ) {
+            Task {
+                await session.bootstrap()
+            }
         }
     }
 
