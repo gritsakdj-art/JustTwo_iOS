@@ -4,7 +4,7 @@ enum APIEnvironment: Sendable {
     case staging
     case production
 
-    var baseURL: URL {
+    nonisolated var baseURL: URL {
         switch self {
         case .staging, .production:
             return URL(string: "https://api.jtwo.online")!
@@ -13,11 +13,11 @@ enum APIEnvironment: Sendable {
 }
 
 struct APIConfiguration: Sendable {
-    static var current = APIConfiguration(environment: .staging)
+    nonisolated static let current = APIConfiguration(environment: .staging)
 
     let environment: APIEnvironment
 
-    var baseURL: URL { environment.baseURL }
-    var requestTimeout: TimeInterval { 20 }
-    var resourceTimeout: TimeInterval { 60 }
+    nonisolated var baseURL: URL { environment.baseURL }
+    nonisolated var requestTimeout: TimeInterval { 20 }
+    nonisolated var resourceTimeout: TimeInterval { 60 }
 }

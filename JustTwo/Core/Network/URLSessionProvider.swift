@@ -1,50 +1,50 @@
 import Foundation
 
-enum URLSessionProvider {
+enum URLSessionProvider: Sendable {
 
-    private static let lock = NSLock()
+    private nonisolated static let lock = NSLock()
     private nonisolated(unsafe) static var generation = 0
 
     private final class SessionStore: @unchecked Sendable {
         private let lock = NSLock()
 
-        private var primary: URLSession
-        private var ephemeral: URLSession
-        private var forcedFresh: URLSession
-        private var lastResort: URLSession
+        nonisolated(unsafe) private var primary: URLSession
+        nonisolated(unsafe) private var ephemeral: URLSession
+        nonisolated(unsafe) private var forcedFresh: URLSession
+        nonisolated(unsafe) private var lastResort: URLSession
 
-        init() {
+        nonisolated init() {
             primary = URLSessionProvider.makePrimarySession(label: "primary")
             ephemeral = URLSessionProvider.makeEphemeralSession(label: "ephemeral")
             forcedFresh = URLSessionProvider.makeForcedFreshSession(label: "forcedFresh")
             lastResort = URLSessionProvider.makeLastResortSession(label: "lastResort")
         }
 
-        func getPrimary() -> URLSession {
+        nonisolated func getPrimary() -> URLSession {
             lock.lock()
             defer { lock.unlock() }
             return primary
         }
 
-        func getEphemeral() -> URLSession {
+        nonisolated func getEphemeral() -> URLSession {
             lock.lock()
             defer { lock.unlock() }
             return ephemeral
         }
 
-        func getForcedFresh() -> URLSession {
+        nonisolated func getForcedFresh() -> URLSession {
             lock.lock()
             defer { lock.unlock() }
             return forcedFresh
         }
 
-        func getLastResort() -> URLSession {
+        nonisolated func getLastResort() -> URLSession {
             lock.lock()
             defer { lock.unlock() }
             return lastResort
         }
 
-        func resetAll() {
+        nonisolated func resetAll() {
             lock.lock()
             let oldPrimary = primary
             let oldEphemeral = ephemeral
@@ -83,7 +83,7 @@ enum URLSessionProvider {
 
 private extension URLSessionProvider {
 
-    static func makePrimarySession(label: String) -> URLSession {
+    nonisolated static func makePrimarySession(label: String) -> URLSession {
         let configuration = URLSessionConfiguration.default
         configuration.waitsForConnectivity = true
         configuration.timeoutIntervalForRequest = APIConfiguration.current.requestTimeout
@@ -93,7 +93,7 @@ private extension URLSessionProvider {
         return URLSession(configuration: configuration)
     }
 
-    static func makeEphemeralSession(label: String) -> URLSession {
+    nonisolated static func makeEphemeralSession(label: String) -> URLSession {
         let configuration = URLSessionConfiguration.ephemeral
         configuration.waitsForConnectivity = true
         configuration.timeoutIntervalForRequest = APIConfiguration.current.requestTimeout
@@ -103,7 +103,7 @@ private extension URLSessionProvider {
         return URLSession(configuration: configuration)
     }
 
-    static func makeForcedFreshSession(label: String) -> URLSession {
+    nonisolated static func makeForcedFreshSession(label: String) -> URLSession {
         let configuration = URLSessionConfiguration.default
         configuration.waitsForConnectivity = true
         configuration.timeoutIntervalForRequest = 15
@@ -114,7 +114,7 @@ private extension URLSessionProvider {
         return URLSession(configuration: configuration)
     }
 
-    static func makeLastResortSession(label: String) -> URLSession {
+    nonisolated static func makeLastResortSession(label: String) -> URLSession {
         let configuration = URLSessionConfiguration.ephemeral
         configuration.waitsForConnectivity = true
         configuration.timeoutIntervalForRequest = 15
