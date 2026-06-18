@@ -1,11 +1,26 @@
 import SwiftUI
 
-enum AppTab: String, CaseIterable {
-    case discover = "Discover"
-    case matches = "Matches"
-    case chats = "Chats"
-    case plans = "Plans"
-    case profile = "Profile"
+enum AppTab: CaseIterable {
+    case discover
+    case matches
+    case chats
+    case plans
+    case profile
+
+    var title: LocalizedStringResource {
+        switch self {
+        case .discover:
+            return "tab.discover"
+        case .matches:
+            return "tab.matches"
+        case .chats:
+            return "tab.chats"
+        case .plans:
+            return "tab.plans"
+        case .profile:
+            return "tab.profile"
+        }
+    }
 
     var icon: String {
         switch self {
@@ -85,7 +100,7 @@ private struct AppTabBarItem: View {
                         }
                     }
 
-                Text(tab.rawValue)
+                Text(tab.title)
                     .font(.system(size: 10, weight: isSelected ? .bold : .medium))
                     .foregroundStyle(isSelected ? Color.discoverViolet : Color.discoverSecondaryText)
                     .tracking(-0.1)
@@ -105,4 +120,10 @@ private struct AppTabBarButtonStyle: ButtonStyle {
 
 #Preview {
     AppTabBar(selection: .constant(.discover))
+}
+
+#Preview("Arabic RTL") {
+    AppTabBar(selection: .constant(.discover))
+        .environment(\.locale, Locale(identifier: "ar"))
+        .environment(\.layoutDirection, .rightToLeft)
 }

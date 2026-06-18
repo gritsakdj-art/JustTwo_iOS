@@ -17,6 +17,12 @@ extension Color {
     private static let lightOnAccentText = Color(hex: "#FFFFFF")
     private static let darkOnAccentText = Color(hex: "#FFFFFF")
 
+    private static let lightBrandPrimary = Color(hex: "#7C4DDB")
+    private static let darkBrandPrimary = Color(hex: "#A47CFF")
+
+    private static let lightBrandPrimaryPressed = Color(hex: "#6738C8")
+    private static let darkBrandPrimaryPressed = Color(hex: "#8F63F2")
+
     // MARK: Discover
 
     private static let lightDiscoverBackgroundTop = Color(hex: "#F0EBFF")
@@ -66,6 +72,14 @@ extension Color {
 
     static var onAccentText: Color {
         dynamic(light: lightOnAccentText, dark: darkOnAccentText)
+    }
+
+    static var brandPrimary: Color {
+        dynamic(light: lightBrandPrimary, dark: darkBrandPrimary)
+    }
+
+    static var brandPrimaryPressed: Color {
+        dynamic(light: lightBrandPrimaryPressed, dark: darkBrandPrimaryPressed)
     }
 
     static var discoverPrimaryText: Color {
@@ -172,6 +186,22 @@ extension Color {
             colors: [discoverPrimaryText.opacity(0.18), .clear],
             startPoint: .top,
             endPoint: .bottom
+        )
+    }
+
+    static var brandPrimaryGradient: LinearGradient {
+        LinearGradient(
+            colors: [.brandPrimary, .discoverVioletLight],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+    }
+
+    static var brandPrimaryPressedGradient: LinearGradient {
+        LinearGradient(
+            colors: [.brandPrimaryPressed, .brandPrimary],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
         )
     }
 

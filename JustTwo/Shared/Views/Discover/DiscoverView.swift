@@ -3,40 +3,75 @@ import SwiftUI
 // MARK: - Models
 
 struct Profile {
-    let name: String
+    let name: LocalizedStringResource
     let age: Int
     let distanceKm: Double
-    let moodTag: String
-    let bio: String
+    let moodTag: LocalizedStringResource
+    let bio: LocalizedStringResource
     let matchPercent: Int
     let imageName: String // asset name or SF symbol fallback
 }
 
 extension Profile {
     static let mockEmma = Profile(
-        name: "Emma",
+        name: "profile.emma.name",
         age: 27,
         distanceKm: 2.4,
-        moodTag: "Open to coffee",
-        bio: "Slow walks, deep talks, spontaneous plans.",
+        moodTag: "profile.emma.mood",
+        bio: "profile.emma.bio",
         matchPercent: 94,
         imageName: "emma_profile"
     )
 
     static let mockMaya = Profile(
-        name: "Maya",
+        name: "profile.maya.name",
         age: 29,
         distanceKm: 1.8,
-        moodTag: "Gallery walk",
-        bio: "Modern art, matcha, and finding tiny streets with warm lights.",
+        moodTag: "profile.maya.mood",
+        bio: "profile.maya.bio",
         matchPercent: 88,
         imageName: ""
     )
 }
 
-enum DiscoverMode: String, CaseIterable {
-    case vibe = "Vibe"
-    case activity = "Activity"
+enum DiscoverMode: CaseIterable {
+    case vibe
+    case activity
+
+    var title: LocalizedStringResource {
+        switch self {
+        case .vibe:
+            return "discover.mode.vibe"
+        case .activity:
+            return "discover.mode.activity"
+        }
+    }
+}
+
+enum DiscoverMood: CaseIterable {
+    case talk
+    case flirt
+    case coffee
+    case walk
+    case movie
+    case bar
+
+    var title: LocalizedStringResource {
+        switch self {
+        case .talk:
+            return "discover.mood.talk"
+        case .flirt:
+            return "discover.mood.flirt"
+        case .coffee:
+            return "discover.mood.coffee"
+        case .walk:
+            return "discover.mood.walk"
+        case .movie:
+            return "discover.mood.movie"
+        case .bar:
+            return "discover.mood.bar"
+        }
+    }
 }
 
 // MARK: - Discover Screen
@@ -44,14 +79,12 @@ enum DiscoverMode: String, CaseIterable {
 struct DiscoverView: View {
 
     @State private var selectedMode: DiscoverMode = .vibe
-    @State private var selectedMood: String = "Coffee"
+    @State private var selectedMood: DiscoverMood = .coffee
     @State private var selectedTab: AppTab = .discover
     @State private var cardOffset: CGSize = .zero
     @State private var cardRotation: Double = 0
     @State private var isLiked: Bool = false
     @State private var isPassed: Bool = false
-
-    let moods = ["Talk", "Flirt", "Coffee", "Walk", "Movie", "Bar"]
 
     let profile: Profile
     let usesRemotePhoto: Bool
@@ -60,7 +93,7 @@ struct DiscoverView: View {
         profile: Profile = .mockEmma,
         usesRemotePhoto: Bool = true,
         selectedMode: DiscoverMode = .vibe,
-        selectedMood: String = "Coffee"
+        selectedMood: DiscoverMood = .coffee
     ) {
         self.profile = profile
         self.usesRemotePhoto = usesRemotePhoto
@@ -116,7 +149,7 @@ struct DiscoverView: View {
     private var headerView: some View {
         HStack(alignment: .center) {
             VStack(alignment: .leading, spacing: 2) {
-                Text("JustTwo")
+                Text("app.name")
                     .font(.system(size: 28, weight: .bold, design: .rounded))
                     .foregroundStyle(Color.discoverPrimaryText)
                     .tracking(-0.8)
@@ -125,7 +158,7 @@ struct DiscoverView: View {
                     Image(systemName: "location.fill")
                         .font(.system(size: 11, weight: .semibold))
                         .foregroundStyle(Color.discoverViolet)
-                    Text("Amsterdam")
+                    Text("location.amsterdam")
                         .font(.system(size: 13, weight: .medium))
                         .foregroundStyle(Color.discoverSecondaryText)
                 }
@@ -150,6 +183,7 @@ struct DiscoverView: View {
                         .stroke(Color.discoverViolet.opacity(0.15), lineWidth: 1)
                 )
                 .shadow(color: Color.discoverViolet.opacity(0.10), radius: 12, x: 0, y: 2)
+                .accessibilityLabel(Text("accessibility.notifications"))
 
             Circle()
                 .fill(Color.discoverPink)
@@ -169,7 +203,7 @@ struct DiscoverView: View {
                         selectedMode = mode
                     }
                 } label: {
-                    Text(mode.rawValue)
+                    Text(mode.title)
                         .font(.system(size: 14, weight: selectedMode == mode ? .bold : .medium))
                         .foregroundStyle(selectedMode == mode ? Color.onAccentText : Color.discoverSecondaryText)
                         .frame(maxWidth: .infinity)
@@ -200,13 +234,13 @@ struct DiscoverView: View {
     private var moodChips: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {
-                ForEach(moods, id: \.self) { mood in
+                ForEach(DiscoverMood.allCases, id: \.self) { mood in
                     Button {
                         withAnimation(.spring(response: 0.25, dampingFraction: 0.7)) {
                             selectedMood = mood
                         }
                     } label: {
-                        Text(mood)
+                        Text(mood.title)
                             .font(.system(size: 13, weight: selectedMood == mood ? .bold : .medium))
                             .foregroundStyle(selectedMood == mood ? Color.onAccentText : Color.discoverViolet)
                             .padding(.horizontal, 16)
@@ -308,7 +342,7 @@ struct DiscoverView: View {
                     .font(.system(size: 112, weight: .regular))
                     .foregroundStyle(Color.onAccentText.opacity(0.82))
 
-                Text(String(profile.name.prefix(1)))
+                Text(profileInitial)
                     .font(.system(size: 52, weight: .bold, design: .rounded))
                     .foregroundStyle(Color.onAccentText.opacity(0.72))
                     .frame(width: 86, height: 86)
@@ -320,7 +354,7 @@ struct DiscoverView: View {
     }
 
     private var moodPill: some View {
-        Text(profile.moodTag.uppercased())
+        Text(localizedUppercase(profile.moodTag))
             .font(.system(size: 10, weight: .semibold))
             .foregroundStyle(Color.onAccentText)
             .padding(.horizontal, 12)
@@ -333,7 +367,7 @@ struct DiscoverView: View {
     private var cardInfo: some View {
         HStack(alignment: .bottom) {
             VStack(alignment: .leading, spacing: 6) {
-                Text("\(profile.name), \(profile.age)")
+                Text(profileTitle)
                     .font(.system(size: 26, weight: .bold, design: .rounded))
                     .foregroundStyle(Color.onAccentText)
                     .tracking(-0.6)
@@ -343,7 +377,7 @@ struct DiscoverView: View {
                         .fill(Color.discoverOnline)
                         .frame(width: 7, height: 7)
                         .shadow(color: Color.discoverOnline, radius: 4)
-                    Text(String(format: "%.1f km away", profile.distanceKm))
+                    Text(distanceText)
                         .font(.system(size: 13, weight: .medium))
                         .foregroundStyle(Color.onAccentText.opacity(0.75))
                 }
@@ -419,6 +453,31 @@ struct DiscoverView: View {
         isPassed = false
     }
 
+    private var profileInitial: String {
+        String(localized: profile.name).prefix(1).description
+    }
+
+    private var profileTitle: String {
+        String(
+            format: String(localized: "profile.title.format"),
+            locale: Locale.current,
+            String(localized: profile.name),
+            profile.age
+        )
+    }
+
+    private var distanceText: String {
+        String(
+            format: String(localized: "profile.distance.km.format"),
+            locale: Locale.current,
+            profile.distanceKm
+        )
+    }
+
+    private func localizedUppercase(_ resource: LocalizedStringResource) -> String {
+        String(localized: resource).uppercased(with: Locale.current)
+    }
+
     // MARK: Action Buttons
 
     private var actionButtons: some View {
@@ -426,6 +485,7 @@ struct DiscoverView: View {
             // Pass
             ActionButton(
                 icon: "xmark",
+                accessibilityLabel: "accessibility.pass",
                 size: 60,
                 iconSize: 22,
                 style: .outlined(
@@ -442,6 +502,7 @@ struct DiscoverView: View {
             // Like
             ActionButton(
                 icon: "heart.fill",
+                accessibilityLabel: "accessibility.like",
                 size: 72,
                 iconSize: 26,
                 style: .gradient(
@@ -461,6 +522,7 @@ struct DiscoverView: View {
             // Invite
             ActionButton(
                 icon: "paperplane",
+                accessibilityLabel: "accessibility.invite",
                 size: 60,
                 iconSize: 20,
                 style: .outlined(
@@ -483,6 +545,7 @@ enum ActionButtonStyle {
 
 struct ActionButton: View {
     let icon: String
+    let accessibilityLabel: LocalizedStringResource
     let size: CGFloat
     let iconSize: CGFloat
     let style: ActionButtonStyle
@@ -499,6 +562,7 @@ struct ActionButton: View {
                 .shadow(color: shadowColor, radius: 16, x: 0, y: 8)
         }
         .buttonStyle(ScaleButtonStyle())
+        .accessibilityLabel(Text(accessibilityLabel))
     }
 
     @ViewBuilder
@@ -546,7 +610,7 @@ struct ScaleButtonStyle: ButtonStyle {
         profile: .mockMaya,
         usesRemotePhoto: false,
         selectedMode: .activity,
-        selectedMood: "Walk"
+        selectedMood: .walk
     )
 }
 
@@ -555,7 +619,13 @@ struct ScaleButtonStyle: ButtonStyle {
         profile: .mockMaya,
         usesRemotePhoto: false,
         selectedMode: .activity,
-        selectedMood: "Movie"
+        selectedMood: .movie
     )
         .preferredColorScheme(.dark)
+}
+
+#Preview("Discover - Arabic RTL") {
+    DiscoverView(profile: .mockEmma, usesRemotePhoto: false)
+        .environment(\.locale, Locale(identifier: "ar"))
+        .environment(\.layoutDirection, .rightToLeft)
 }

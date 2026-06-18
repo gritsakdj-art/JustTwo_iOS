@@ -4,8 +4,8 @@ struct PlansView: View {
     var body: some View {
         PlaceholderTabScreen(
             iconName: "calendar.badge.clock",
-            title: "Plans",
-            subtitle: "Upcoming dates, invites, and saved ideas will appear here."
+            title: "tab.plans",
+            subtitle: "placeholder.plans.subtitle"
         )
     }
 }

@@ -25,7 +25,7 @@ struct JustTwoApp: App {
 
     var body: some Scene {
         WindowGroup {
-            DiscoverView()
+            RootView()
         }
         .modelContainer(sharedModelContainer)
     }

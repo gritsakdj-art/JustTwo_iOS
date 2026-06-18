@@ -2,8 +2,8 @@ import SwiftUI
 
 struct PlaceholderTabScreen: View {
     let iconName: String
-    let title: String
-    let subtitle: String
+    let title: LocalizedStringResource
+    let subtitle: LocalizedStringResource
 
     var body: some View {
         VStack(spacing: AppSpacing.lg) {
@@ -47,8 +47,8 @@ struct PlaceholderTabScreen: View {
         Color.discoverBackgroundGradient.ignoresSafeArea()
         PlaceholderTabScreen(
             iconName: "heart.fill",
-            title: "Matches",
-            subtitle: "People you liked and mutual matches will appear here."
+            title: "tab.matches",
+            subtitle: "placeholder.matches.subtitle"
         )
     }
 }
