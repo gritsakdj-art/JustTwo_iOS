@@ -71,6 +71,10 @@ struct ResendVerificationRequestBody: Encodable {
     let email: String
 }
 
+struct VerifyEmailSessionRequestBody: Encodable {
+    let token: String
+}
+
 struct MessageResponse: Decodable {
     let success: Bool
     let message: String

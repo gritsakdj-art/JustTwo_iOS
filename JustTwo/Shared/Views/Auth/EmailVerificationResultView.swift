@@ -229,7 +229,7 @@ struct EmailVerificationResultView: View {
     private var primaryTitle: LocalizedStringResource {
         switch state {
         case .success:
-            return session.hasActiveSession ? "email_verification.result.continue" : "email_verification.result.go_to_login"
+            return session.isFullyAuthenticated ? "email_verification.result.continue" : "email_verification.result.go_to_login"
         case .loading:
             return "email_verification.result.verifying"
         case .invalidOrExpired, .networkError, .genericError:
@@ -240,7 +240,7 @@ struct EmailVerificationResultView: View {
     private var primaryIcon: String {
         switch state {
         case .success:
-            return session.hasActiveSession ? "arrow.right" : "person.crop.circle"
+            return session.isFullyAuthenticated ? "arrow.right" : "person.crop.circle"
         case .loading:
             return "hourglass"
         case .invalidOrExpired, .networkError, .genericError:
@@ -294,7 +294,7 @@ struct EmailVerificationResultView: View {
     private func primaryAction() {
         switch state {
         case .success:
-            if session.hasActiveSession {
+            if session.isFullyAuthenticated {
                 router.retrySplash()
             } else {
                 router.resetTo(.auth)
@@ -315,13 +315,12 @@ struct EmailVerificationResultView: View {
 
         Task {
             do {
-                _ = try await AuthService.verifyEmail(token: token)
+                let response = try await AuthService.verifyEmailSession(token: token)
 
-                if session.hasActiveSession {
-                    let user = try? await AuthService.refreshCurrentUser()
-                    if let user {
-                        session.setCurrentUser(user)
-                    }
+                do {
+                    try session.signIn(response)
+                } catch {
+                    session.clearSession()
                 }
 
                 state = .success

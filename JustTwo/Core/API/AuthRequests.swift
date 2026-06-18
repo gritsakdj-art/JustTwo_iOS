@@ -57,3 +57,15 @@ struct VerifyEmailRequest: APIRequest {
         [URLQueryItem(name: "token", value: token)]
     }
 }
+
+struct VerifyEmailSessionRequest: EncodableAPIRequest {
+    typealias Response = AuthResponse
+
+    let token: String
+
+    var path: String { "auth/verify-email-session" }
+    var method: HTTPMethod { .post }
+    var bodyValue: VerifyEmailSessionRequestBody? {
+        VerifyEmailSessionRequestBody(token: token)
+    }
+}

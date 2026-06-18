@@ -37,4 +37,11 @@ enum AuthService {
             strategies: NetworkStrategy.defaultFlow
         )
     }
+
+    static func verifyEmailSession(token: String) async throws -> AuthResponse {
+        try await NetworkExecutor.shared.send(
+            VerifyEmailSessionRequest(token: token),
+            strategies: NetworkStrategy.defaultFlow
+        )
+    }
 }
