@@ -19,25 +19,28 @@ enum NetworkError: LocalizedError, Identifiable, Sendable {
     var errorDescription: String? {
         switch self {
         case .noInternet:
-            return "No internet connection"
+            return String(localized: "network.error.no_internet")
         case .tlsFailure:
-            return "Secure connection failed"
+            return String(localized: "network.error.tls_failure")
         case .timeout:
-            return "Request timed out"
+            return String(localized: "network.error.timeout")
         case .connectionLost:
-            return "Network connection was lost"
+            return String(localized: "network.error.connection_lost")
         case .serverUnavailable:
-            return "Server is temporarily unavailable"
+            return String(localized: "network.error.server_unavailable")
         case .cancelled:
-            return "Request cancelled"
+            return String(localized: "network.error.cancelled")
         case .unauthorized:
-            return "Authorization required"
+            return String(localized: "network.error.unauthorized")
         case .httpError(_, let response):
-            return response?.userFriendlyMessage ?? "Request failed"
+            return response?.userFriendlyMessage ?? String(localized: "network.error.request_failed")
         case .decodingError(let message):
-            return "Failed to decode response: \(message)"
+            return String.localizedStringWithFormat(
+                String(localized: "network.error.decoding_format"),
+                message
+            )
         case .invalidResponse:
-            return "Invalid server response"
+            return String(localized: "network.error.invalid_response")
         case .unknown(let error):
             return error.localizedDescription
         }
@@ -111,9 +114,9 @@ extension NetworkError {
     var actionTitle: String? {
         switch self {
         case .noInternet, .tlsFailure, .timeout, .connectionLost, .serverUnavailable, .httpError:
-            return "Retry"
+            return String(localized: "common.retry")
         case .unauthorized:
-            return "Sign in"
+            return String(localized: "auth.login")
         case .cancelled, .unknown, .decodingError, .invalidResponse:
             return nil
         }

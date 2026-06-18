@@ -32,6 +32,33 @@ extension Profile {
         matchPercent: 88,
         imageName: ""
     )
+
+    static let mockMark = Profile(
+        name: "profile.mark.name",
+        age: 31,
+        distanceKm: 3.1,
+        moodTag: "profile.mark.mood",
+        bio: "profile.mark.bio",
+        matchPercent: 91,
+        imageName: "mark_profile"
+    )
+
+    static let mockElizabeth = Profile(
+        name: "profile.elizabeth.name",
+        age: 26,
+        distanceKm: 1.2,
+        moodTag: "profile.elizabeth.mood",
+        bio: "profile.elizabeth.bio",
+        matchPercent: 89,
+        imageName: "elizabeth_profile"
+    )
+
+    static let mockDiscoverDeck: [Profile] = [
+        .mockEmma,
+        .mockMark,
+        .mockElizabeth,
+        .mockMaya
+    ]
 }
 
 enum DiscoverMode: CaseIterable {
@@ -81,24 +108,29 @@ struct DiscoverView: View {
     @State private var selectedMode: DiscoverMode = .vibe
     @State private var selectedMood: DiscoverMood = .coffee
     @State private var selectedTab: AppTab = .discover
+    @State private var profileIndex = 0
     @State private var cardOffset: CGSize = .zero
     @State private var cardRotation: Double = 0
     @State private var isLiked: Bool = false
     @State private var isPassed: Bool = false
 
-    let profile: Profile
+    let profiles: [Profile]
     let usesRemotePhoto: Bool
 
     init(
-        profile: Profile = .mockEmma,
+        profiles: [Profile] = Profile.mockDiscoverDeck,
         usesRemotePhoto: Bool = true,
         selectedMode: DiscoverMode = .vibe,
         selectedMood: DiscoverMood = .coffee
     ) {
-        self.profile = profile
+        self.profiles = profiles
         self.usesRemotePhoto = usesRemotePhoto
         _selectedMode = State(initialValue: selectedMode)
         _selectedMood = State(initialValue: selectedMood)
+    }
+
+    private var profile: Profile {
+        profiles[profileIndex % profiles.count]
     }
 
     var body: some View {
@@ -306,6 +338,7 @@ struct DiscoverView: View {
             .rotationEffect(.degrees(cardRotation))
             .gesture(swipeGesture)
             .animation(.interactiveSpring(response: 0.35, dampingFraction: 0.85), value: cardOffset)
+            .id(profileIndex)
         }
     }
 
@@ -451,6 +484,7 @@ struct DiscoverView: View {
         cardRotation = 0
         isLiked = false
         isPassed = false
+        profileIndex = (profileIndex + 1) % profiles.count
     }
 
     private var profileInitial: String {
@@ -600,12 +634,12 @@ struct ActionButton: View {
 }
 
 #Preview("Discover - Vibe") {
-    DiscoverView(profile: .mockEmma, usesRemotePhoto: false)
+    DiscoverView(usesRemotePhoto: false)
 }
 
 #Preview("Discover - Activity") {
     DiscoverView(
-        profile: .mockMaya,
+        profiles: [.mockMaya],
         usesRemotePhoto: false,
         selectedMode: .activity,
         selectedMood: .walk
@@ -614,7 +648,7 @@ struct ActionButton: View {
 
 #Preview("Discover - Dark") {
     DiscoverView(
-        profile: .mockMaya,
+        profiles: [.mockMark, .mockElizabeth],
         usesRemotePhoto: false,
         selectedMode: .activity,
         selectedMood: .movie
@@ -623,7 +657,7 @@ struct ActionButton: View {
 }
 
 #Preview("Discover - Arabic RTL") {
-    DiscoverView(profile: .mockEmma, usesRemotePhoto: false)
+    DiscoverView(usesRemotePhoto: false)
         .environment(\.locale, Locale(identifier: "ar"))
         .environment(\.layoutDirection, .rightToLeft)
 }

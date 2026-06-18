@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ProfileView: View {
     @Environment(SessionStore.self) private var session
+    @Environment(AppRouter.self) private var router
 
     var body: some View {
         NavigationStack {
@@ -21,6 +22,7 @@ struct ProfileView: View {
                     systemImage: "rectangle.portrait.and.arrow.right"
                 ) {
                     session.signOut()
+                    router.resetTo(.auth)
                 }
                 .padding(.horizontal, AppSpacing.xl)
                 .padding(.bottom, AppSpacing.lg)
@@ -157,6 +159,7 @@ private struct ProfileMenuRowStyle: ButtonStyle {
 #Preview {
     ProfileView()
     .environment(SessionStore.shared)
+    .environment(AppRouter.shared)
 }
 
 #Preview("Arabic RTL") {

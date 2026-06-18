@@ -2,6 +2,7 @@ import SwiftUI
 
 struct AuthView: View {
     @Environment(SessionStore.self) private var session
+    @Environment(AppRouter.self) private var router
     @State private var viewModel = AuthViewModel()
 
     var body: some View {
@@ -86,7 +87,7 @@ struct AuthView: View {
                 isLoading: viewModel.isLoading,
                 isDisabled: !viewModel.isValid
             ) {
-                viewModel.submit(using: session)
+                viewModel.submit(using: session, router: router)
             }
 
             HStack(spacing: 6) {
@@ -137,4 +138,5 @@ struct AuthView: View {
 #Preview {
     AuthView()
         .environment(SessionStore.shared)
+        .environment(AppRouter.shared)
 }

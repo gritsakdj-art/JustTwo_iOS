@@ -7,6 +7,7 @@ enum ProfileSettingsContext {
 
 struct ProfileSettingsView: View {
     @Environment(SessionStore.self) private var session
+    @Environment(AppRouter.self) private var router
     @Environment(\.dismiss) private var dismiss
 
     let context: ProfileSettingsContext
@@ -304,7 +305,7 @@ struct ProfileSettingsView: View {
                     .strokeBorder(Color.discoverSecondaryText.opacity(0.22), lineWidth: 1)
             }
 
-            Text("\(bio.count)/\(bioLimit)")
+            Text(bioCounterText)
                 .font(.caption)
                 .foregroundStyle(Color.discoverSecondaryText)
                 .frame(maxWidth: .infinity, alignment: .trailing)
@@ -376,6 +377,14 @@ struct ProfileSettingsView: View {
         return String.localizedStringWithFormat(String(localized: "profile.settings.age_value"), max(age, 0))
     }
 
+    private var bioCounterText: String {
+        String.localizedStringWithFormat(
+            String(localized: "profile.settings.bio_counter"),
+            bio.count,
+            bioLimit
+        )
+    }
+
     private func sectionTitle(_ title: LocalizedStringResource) -> some View {
         Text(title)
             .font(.system(size: 13, weight: .bold, design: .rounded))
@@ -431,13 +440,12 @@ struct ProfileSettingsView: View {
         Task {
             do {
                 let profile = try await ProfileService.upsertProfile(body)
+                session.updateCurrentProfile(profile)
 
                 switch context {
-                case .onboarding, .settings:
-                    session.updateCurrentProfile(profile)
-                }
-
-                if context == .settings {
+                case .onboarding:
+                    router.resetTo(.main)
+                case .settings:
                     dismiss()
                 }
             } catch let error as NetworkError {
@@ -456,6 +464,7 @@ struct ProfileSettingsView: View {
         ProfileSettingsView(context: .onboarding)
     }
     .environment(SessionStore.shared)
+    .environment(AppRouter.shared)
 }
 
 #Preview("Settings") {
@@ -463,4 +472,5 @@ struct ProfileSettingsView: View {
         ProfileSettingsView(context: .settings)
     }
     .environment(SessionStore.shared)
+    .environment(AppRouter.shared)
 }

@@ -79,9 +79,9 @@ private struct PrimaryButtonStyle: ButtonStyle {
     ZStack {
         Color.discoverBackgroundGradient.ignoresSafeArea()
         VStack(spacing: 16) {
-            PrimaryButton("Continue", systemImage: "arrow.right") { }
-            PrimaryButton("Loading", isLoading: true) { }
-            PrimaryButton("Unavailable", isDisabled: true) { }
+            PrimaryButton("auth.login", systemImage: "arrow.right") { }
+            PrimaryButton("auth.register", isLoading: true) { }
+            PrimaryButton("common.done", isDisabled: true) { }
         }
         .padding(24)
     }

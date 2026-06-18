@@ -46,7 +46,7 @@ final class AuthViewModel {
         }
     }
 
-    func submit(using session: SessionStore) {
+    func submit(using session: SessionStore, router: AppRouter) {
         guard isValid, !isLoading else { return }
 
         isLoading = true
@@ -74,10 +74,15 @@ final class AuthViewModel {
                     )
                 }
 
-                try await session.handleAuthSuccess(
-                    response,
-                    isRegistration: mode == .register
-                )
+                try session.signIn(response)
+
+                switch mode {
+                case .register:
+                    session.updateCurrentProfile(nil)
+                    router.resetTo(.profileSetup)
+                case .login:
+                    router.retrySplash()
+                }
             } catch let error as NetworkError {
                 errorMessage = error.userMessage
             } catch {

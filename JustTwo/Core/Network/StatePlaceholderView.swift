@@ -37,20 +37,20 @@ struct StatePlaceholderView: View {
 
 #Preview("Unauthorized") {
     StatePlaceholderView(
-        title: "Authorization required",
-        subtitle: "Please sign in again.",
+        title: String(localized: "network.error.unauthorized"),
+        subtitle: String(localized: "splash.error.unauthorized"),
         systemImage: NetworkError.unauthorized.systemImage,
-        actionTitle: "Sign in",
+        actionTitle: "auth.login",
         action: {}
     )
 }
 
 #Preview("TLS Failure") {
     StatePlaceholderView(
-        title: "Secure connection failed",
-        subtitle: "VPN may be blocking the connection. Try disabling it.",
+        title: String(localized: "network.error.tls_failure"),
+        subtitle: String(localized: "splash.error.tls"),
         systemImage: NetworkError.tlsFailure.systemImage,
-        actionTitle: "Retry",
+        actionTitle: "common.retry",
         action: {}
     )
 }
