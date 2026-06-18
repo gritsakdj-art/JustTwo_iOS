@@ -49,4 +49,16 @@ final class AppRouter {
         reloadID = UUID()
         screen = .splash
     }
+
+    func showCheckEmail(email: String, message: String? = nil) {
+        resetTo(.checkEmail(email: email, message: message))
+    }
+
+    func showEmailVerificationResult(token: String) {
+        resetTo(.emailVerificationResult(token: token))
+    }
+
+    func showEmailVerificationError(_ message: String) {
+        resetTo(.emailVerificationError(message: message))
+    }
 }

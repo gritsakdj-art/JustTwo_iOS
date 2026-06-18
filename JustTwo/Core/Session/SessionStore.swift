@@ -8,29 +8,59 @@ final class SessionStore {
 
     private(set) var currentUser: UserResponse?
     private(set) var currentProfile: UserProfileDTO?
+    private(set) var pendingVerificationEmail: String?
+
+    var isEmailVerified: Bool {
+        currentUser?.emailVerified == true
+    }
+
+    var hasActiveSession: Bool {
+        APIAuth.accessToken != nil
+    }
 
     private init() {}
 
     func signIn(_ response: AuthResponse) throws {
-        try APIAuth.save(token: response.token)
-        currentUser = response.user
+        guard let token = response.token, let user = response.user else {
+            throw AuthSessionError.missingTokenOrUser
+        }
+
+        try APIAuth.save(token: token)
+        currentUser = user
+        pendingVerificationEmail = user.emailVerified ? nil : user.email
     }
 
     func setCurrentUser(_ user: UserResponse) {
         currentUser = user
+        if user.emailVerified {
+            pendingVerificationEmail = nil
+        }
     }
 
     func updateCurrentProfile(_ profile: UserProfileDTO?) {
         currentProfile = profile
     }
 
+    func setPendingVerificationEmail(_ email: String?) {
+        pendingVerificationEmail = email
+    }
+
     func clearSession() {
         APIAuth.clear()
         currentUser = nil
         currentProfile = nil
+        pendingVerificationEmail = nil
     }
 
     func signOut() {
         clearSession()
+    }
+}
+
+enum AuthSessionError: LocalizedError {
+    case missingTokenOrUser
+
+    var errorDescription: String? {
+        String(localized: "auth.error.missing_session_payload")
     }
 }

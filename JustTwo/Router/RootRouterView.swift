@@ -26,6 +26,15 @@ struct RootRouterView: View {
         case .auth:
             AuthView()
 
+        case .checkEmail(let email, let message):
+            CheckEmailView(email: email, initialMessage: message)
+
+        case .emailVerificationResult(let token):
+            EmailVerificationResultView(token: token)
+
+        case .emailVerificationError(let message):
+            EmailVerificationResultView(initialState: .genericError(message))
+
         case .profileSetup:
             ProfileSettingsView(context: .onboarding)
 

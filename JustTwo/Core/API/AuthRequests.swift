@@ -33,3 +33,27 @@ struct CurrentUserRequest: APIRequest {
     var method: HTTPMethod { .get }
     var requiresAuth: Bool { true }
 }
+
+struct ResendVerificationRequest: EncodableAPIRequest {
+    typealias Response = MessageResponse
+
+    let email: String
+
+    var path: String { "auth/resend-verification" }
+    var method: HTTPMethod { .post }
+    var bodyValue: ResendVerificationRequestBody? {
+        ResendVerificationRequestBody(email: email)
+    }
+}
+
+struct VerifyEmailRequest: APIRequest {
+    typealias Response = MessageResponse
+
+    let token: String
+
+    var path: String { "auth/verify-email" }
+    var method: HTTPMethod { .get }
+    var queryItems: [URLQueryItem] {
+        [URLQueryItem(name: "token", value: token)]
+    }
+}

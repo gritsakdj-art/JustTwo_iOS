@@ -50,6 +50,15 @@
 - Added `.gitignore` entries for Xcode user data, DerivedData, SwiftPM artifacts, and macOS metadata.
 - Verified the iOS app builds successfully with `xcodebuild`.
 - Confirmed there is currently no separate test target in the Xcode project.
+- Added email verification DTO support for `emailVerified`, `emailVerifiedAt`, and future register responses without JWT.
+- Added client API requests for resend verification and verify-email.
+- Added soft email verification state to the session without blocking the current backend compatibility mode.
+- Added `CheckEmailView` with resend cooldown, refresh-current-user check, loading, success, and error states.
+- Added `EmailVerificationResultView` for magic link success, invalid/expired link, network error, and generic error states.
+- Added email verification deep link parsing for `https://api.jtwo.online/auth/verify-email?token=...`.
+- Added redacted network URL logging so verification tokens are not printed in debug logs.
+- Added localized strings for email verification flow and new backend error codes.
+- Added `Docs/EmailVerification.md` with backend endpoint notes, universal links checklist, AASA examples, and current staging compatibility mode.
 
 ## Notes
 

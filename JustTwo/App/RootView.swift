@@ -11,6 +11,9 @@ struct RootView: View {
             .environment(router)
             .environment(session)
             .preferredColorScheme(selectedTheme.colorScheme)
+            .onOpenURL { url in
+                EmailVerificationDeepLinkHandler.handle(url, router: router)
+            }
     }
 
     private var selectedTheme: AppTheme {

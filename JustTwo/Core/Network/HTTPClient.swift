@@ -7,7 +7,7 @@ struct HTTPClient: Sendable {
 
     func send<R: APIRequest>(_ request: R) async throws -> R.Response where R.Response: Decodable {
         let urlRequest = try makeURLRequest(for: request)
-        NetworkDebug.log("➡️ \(urlRequest.httpMethod ?? "GET") \(urlRequest.url?.absoluteString ?? request.path)")
+        NetworkDebug.log("➡️ \(urlRequest.httpMethod ?? "GET") \(redactedURLDescription(urlRequest.url, fallback: request.path))")
 
         let (data, response) = try await session.data(for: urlRequest)
 
@@ -79,5 +79,19 @@ struct HTTPClient: Sendable {
             "Accept": "application/json",
             "Content-Type": "application/json"
         ]
+    }
+
+    private func redactedURLDescription(_ url: URL?, fallback: String) -> String {
+        guard let url else { return fallback }
+        guard var components = URLComponents(url: url, resolvingAgainstBaseURL: false) else {
+            return fallback
+        }
+
+        components.queryItems = components.queryItems?.map { item in
+            guard item.name.lowercased() == "token" else { return item }
+            return URLQueryItem(name: item.name, value: "<redacted>")
+        }
+
+        return components.url?.absoluteString ?? fallback
     }
 }

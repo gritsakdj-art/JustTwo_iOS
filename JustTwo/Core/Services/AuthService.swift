@@ -19,4 +19,22 @@ enum AuthService {
     static func currentUser() async throws -> UserResponse {
         try await NetworkExecutor.shared.send(CurrentUserRequest())
     }
+
+    static func refreshCurrentUser() async throws -> UserResponse {
+        try await currentUser()
+    }
+
+    static func resendVerification(email: String) async throws -> MessageResponse {
+        try await NetworkExecutor.shared.send(
+            ResendVerificationRequest(email: email),
+            strategies: NetworkStrategy.defaultFlow
+        )
+    }
+
+    static func verifyEmail(token: String) async throws -> MessageResponse {
+        try await NetworkExecutor.shared.send(
+            VerifyEmailRequest(token: token),
+            strategies: NetworkStrategy.defaultFlow
+        )
+    }
 }

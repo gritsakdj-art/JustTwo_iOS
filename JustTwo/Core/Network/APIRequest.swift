@@ -92,6 +92,7 @@ enum APIErrorCode: String {
     case invalidEmail = "invalid_email"
     case weakPassword = "weak_password"
     case invalidCredentials = "invalid_credentials"
+    case emailNotVerified = "email_not_verified"
     case missingToken = "missing_token"
     case invalidToken = "invalid_token"
     case profileNotFound = "profile_not_found"
@@ -99,6 +100,8 @@ enum APIErrorCode: String {
     case ageRestricted = "age_restricted"
     case validationFailed = "validation_failed"
     case invalidProfileModes = "invalid_profile_modes"
+    case invalidOrExpiredVerificationToken = "invalid_or_expired_verification_token"
+    case emailDeliveryFailed = "email_delivery_failed"
 }
 
 struct APIErrorResponse: Decodable, Error {
@@ -121,6 +124,8 @@ struct APIErrorResponse: Decodable, Error {
             return String(localized: "auth.error.weak_password")
         case .invalidCredentials:
             return String(localized: "auth.error.invalid_credentials")
+        case .emailNotVerified:
+            return String(localized: "auth.error.email_not_verified")
         case .missingToken, .invalidToken:
             return String(localized: "auth.error.session_expired")
         case .profileNotFound:
@@ -131,6 +136,10 @@ struct APIErrorResponse: Decodable, Error {
             return String(localized: "profile.error.age_restricted")
         case .invalidProfileModes:
             return String(localized: "profile.error.invalid_modes")
+        case .invalidOrExpiredVerificationToken:
+            return String(localized: "email_verification.error.invalid_or_expired")
+        case .emailDeliveryFailed:
+            return String(localized: "email_verification.error.delivery_failed")
         case .validationFailed, .none:
             return errorCode == .validationFailed ? String(localized: "common.error.validation_failed") : message
         }

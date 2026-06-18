@@ -74,6 +74,13 @@ final class AuthViewModel {
                     )
                 }
 
+                if response.requiresEmailVerification {
+                    session.setPendingVerificationEmail(normalizedEmail)
+                    router.showCheckEmail(email: normalizedEmail)
+                    isLoading = false
+                    return
+                }
+
                 try session.signIn(response)
 
                 switch mode {
@@ -84,7 +91,15 @@ final class AuthViewModel {
                     router.retrySplash()
                 }
             } catch let error as NetworkError {
-                errorMessage = error.userMessage
+                if error.isEmailNotVerified {
+                    session.setPendingVerificationEmail(normalizedEmail)
+                    router.showCheckEmail(
+                        email: normalizedEmail,
+                        message: String(localized: "email_verification.login_required_message")
+                    )
+                } else {
+                    errorMessage = error.userMessage
+                }
             } catch {
                 errorMessage = error.localizedDescription
             }

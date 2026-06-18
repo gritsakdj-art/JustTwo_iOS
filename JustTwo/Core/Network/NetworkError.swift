@@ -154,6 +154,14 @@ extension NetworkError {
         apiErrorCode == "profile_not_found"
     }
 
+    var isEmailNotVerified: Bool {
+        apiErrorCode == "email_not_verified"
+    }
+
+    var isInvalidOrExpiredVerificationToken: Bool {
+        apiErrorCode == "invalid_or_expired_verification_token"
+    }
+
     var isUnauthorized: Bool {
         switch self {
         case .unauthorized:
