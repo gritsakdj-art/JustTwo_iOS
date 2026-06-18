@@ -81,7 +81,7 @@ struct CheckEmailView: View {
                         .disabled(resendDisabled)
 
                         Button {
-                            session.setPendingVerificationEmail(nil)
+                            session.clearSession()
                             router.resetTo(.auth)
                         } label: {
                             Text("email_verification.check.back_to_login")

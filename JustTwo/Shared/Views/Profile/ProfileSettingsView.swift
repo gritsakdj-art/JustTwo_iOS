@@ -419,6 +419,15 @@ struct ProfileSettingsView: View {
     private func saveProfile() {
         guard canSave, !isSaving, let selectedGender else { return }
 
+        guard session.isFullyAuthenticated else {
+            if let email = session.pendingVerificationEmail ?? session.currentUser?.email {
+                router.showCheckEmail(email: email)
+            } else {
+                router.resetTo(.auth)
+            }
+            return
+        }
+
         isSaving = true
         errorMessage = nil
 

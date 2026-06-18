@@ -18,6 +18,10 @@ final class SessionStore {
         APIAuth.accessToken != nil
     }
 
+    var isFullyAuthenticated: Bool {
+        hasActiveSession && isEmailVerified
+    }
+
     private init() {}
 
     func signIn(_ response: AuthResponse) throws {
@@ -27,13 +31,16 @@ final class SessionStore {
 
         try APIAuth.save(token: token)
         currentUser = user
+        currentProfile = nil
         pendingVerificationEmail = user.emailVerified ? nil : user.email
     }
 
     func setCurrentUser(_ user: UserResponse) {
         currentUser = user
-        if user.emailVerified {
-            pendingVerificationEmail = nil
+        pendingVerificationEmail = user.emailVerified ? nil : user.email
+
+        if !user.emailVerified {
+            currentProfile = nil
         }
     }
 

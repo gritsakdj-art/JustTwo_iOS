@@ -83,12 +83,16 @@ final class AuthViewModel {
 
                 try session.signIn(response)
 
-                switch mode {
-                case .register:
-                    session.updateCurrentProfile(nil)
-                    router.resetTo(.profileSetup)
-                case .login:
-                    router.retrySplash()
+                if session.isEmailVerified {
+                    switch mode {
+                    case .register:
+                        session.updateCurrentProfile(nil)
+                        router.resetTo(.profileSetup)
+                    case .login:
+                        router.retrySplash()
+                    }
+                } else {
+                    router.showCheckEmail(email: session.pendingVerificationEmail ?? normalizedEmail)
                 }
             } catch let error as NetworkError {
                 if error.isEmailNotVerified {

@@ -1,3 +1,4 @@
+import Combine
 import SwiftUI
 
 enum EmailVerificationResultState: Equatable {
@@ -15,6 +16,14 @@ struct EmailVerificationResultView: View {
     private let token: String?
     @State private var state: EmailVerificationResultState
     @State private var didStart = false
+    @State private var isResending = false
+    @State private var statusMessage: String?
+    @State private var errorMessage: String?
+    @State private var resendAvailableAt: Date = .now
+    @State private var now = Date()
+
+    private let resendCooldown: TimeInterval = 45
+    private let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
 
     init(token: String) {
         self.token = token
@@ -49,11 +58,36 @@ struct EmailVerificationResultView: View {
                         .tint(Color.brandPrimary)
                 }
 
+                messageBlock
+
                 VStack(spacing: AppSpacing.lg) {
                     if showRetry {
                         PrimaryButton("common.retry", systemImage: "arrow.clockwise") {
                             verify()
                         }
+                    }
+
+                    if showResend {
+                        Button {
+                            resend()
+                        } label: {
+                            HStack(spacing: 8) {
+                                if isResending {
+                                    ProgressView()
+                                } else {
+                                    Image(systemName: "paperplane")
+                                }
+
+                                Text(resendTitle)
+                                    .font(.system(size: 15, weight: .semibold, design: .rounded))
+                            }
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 50)
+                            .foregroundStyle(resendDisabled ? Color.discoverSecondaryText : Color.brandPrimary)
+                            .background(Color.surface.opacity(0.62), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                        }
+                        .buttonStyle(.spring(pressedScale: 0.97, isEnabled: !resendDisabled))
+                        .disabled(resendDisabled)
                     }
 
                     PrimaryButton(primaryTitle, systemImage: primaryIcon, isDisabled: isLoading) {
@@ -87,6 +121,9 @@ struct EmailVerificationResultView: View {
             if token != nil {
                 verify()
             }
+        }
+        .onReceive(timer) { value in
+            now = value
         }
     }
 
@@ -137,6 +174,28 @@ struct EmailVerificationResultView: View {
         case .loading:
             return "hourglass"
         }
+    }
+
+    @ViewBuilder
+    private var messageBlock: some View {
+        VStack(spacing: AppSpacing.sm) {
+            if let statusMessage {
+                Text(statusMessage)
+                    .font(.footnote)
+                    .foregroundStyle(Color.brandPrimary)
+                    .multilineTextAlignment(.center)
+            }
+
+            if let errorMessage {
+                Text(errorMessage)
+                    .font(.footnote)
+                    .foregroundStyle(Color.discoverPink)
+                    .multilineTextAlignment(.center)
+            }
+        }
+        .frame(minHeight: 28)
+        .animation(.easeInOut(duration: 0.18), value: statusMessage)
+        .animation(.easeInOut(duration: 0.18), value: errorMessage)
     }
 
     private var title: LocalizedStringResource {
@@ -200,6 +259,38 @@ struct EmailVerificationResultView: View {
         showRetry
     }
 
+    private var pendingEmail: String? {
+        let email = session.pendingVerificationEmail?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return email.isEmpty ? nil : email
+    }
+
+    private var showResend: Bool {
+        if case .invalidOrExpired = state {
+            return pendingEmail != nil
+        }
+
+        return false
+    }
+
+    private var resendDisabled: Bool {
+        isResending || resendRemaining > 0
+    }
+
+    private var resendRemaining: Int {
+        max(Int(ceil(resendAvailableAt.timeIntervalSince(now))), 0)
+    }
+
+    private var resendTitle: String {
+        guard resendRemaining > 0 else {
+            return String(localized: "email_verification.check.resend")
+        }
+
+        return String.localizedStringWithFormat(
+            String(localized: "email_verification.check.resend_countdown_format"),
+            resendRemaining
+        )
+    }
+
     private func primaryAction() {
         switch state {
         case .success:
@@ -219,6 +310,8 @@ struct EmailVerificationResultView: View {
         guard let token else { return }
 
         state = .loading
+        statusMessage = nil
+        errorMessage = nil
 
         Task {
             do {
@@ -233,13 +326,36 @@ struct EmailVerificationResultView: View {
 
                 state = .success
             } catch let error as NetworkError {
-                if error.isInvalidOrExpiredVerificationToken {
+                if error.isInvalidOrExpiredVerificationToken || error.isValidationFailed {
                     state = .invalidOrExpired
                 } else {
                     state = .networkError(error.userMessage)
                 }
             } catch {
                 state = .genericError(error.localizedDescription)
+            }
+        }
+    }
+
+    private func resend() {
+        guard let pendingEmail, !resendDisabled else { return }
+
+        isResending = true
+        statusMessage = nil
+        errorMessage = nil
+
+        Task {
+            defer { isResending = false }
+
+            do {
+                _ = try await AuthService.resendVerification(email: pendingEmail)
+                resendAvailableAt = Date().addingTimeInterval(resendCooldown)
+                now = Date()
+                statusMessage = String(localized: "email_verification.check.resend_success")
+            } catch let error as NetworkError {
+                errorMessage = error.userMessage
+            } catch {
+                errorMessage = error.localizedDescription
             }
         }
     }

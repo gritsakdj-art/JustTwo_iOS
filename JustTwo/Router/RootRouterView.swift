@@ -2,10 +2,11 @@ import SwiftUI
 
 struct RootRouterView: View {
     @Environment(AppRouter.self) private var router
+    @Environment(SessionStore.self) private var session
 
     var body: some View {
         Group {
-            if router.screen == .main {
+            if router.screen == .main, session.isFullyAuthenticated {
                 DiscoverView()
             } else {
                 NavigationStack {
@@ -36,10 +37,23 @@ struct RootRouterView: View {
             EmailVerificationResultView(initialState: .genericError(message))
 
         case .profileSetup:
-            ProfileSettingsView(context: .onboarding)
+            if session.isFullyAuthenticated {
+                ProfileSettingsView(context: .onboarding)
+            } else {
+                verificationGateOrAuth
+            }
 
         case .main:
-            EmptyView()
+            verificationGateOrAuth
+        }
+    }
+
+    @ViewBuilder
+    private var verificationGateOrAuth: some View {
+        if let email = session.pendingVerificationEmail ?? session.currentUser?.email {
+            CheckEmailView(email: email)
+        } else {
+            AuthView()
         }
     }
 }

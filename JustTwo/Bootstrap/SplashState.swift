@@ -8,6 +8,7 @@ enum SplashState {
 
 enum SplashResult: Equatable {
     case needAuth
+    case needEmailVerification(email: String)
     case needProfileSetup
     case ready
 }

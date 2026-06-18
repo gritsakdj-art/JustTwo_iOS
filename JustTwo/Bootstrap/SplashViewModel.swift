@@ -115,6 +115,13 @@ final class SplashViewModel {
             session.setCurrentUser(user)
             guard flowToken == token else { return }
 
+            guard user.emailVerified else {
+                await ensureMinimumDisplayDuration(since: startedAt, token: token)
+                guard flowToken == token else { return }
+                setState(.result(.needEmailVerification(email: user.email)))
+                return
+            }
+
             setPhase(.loadingProfile)
             let profile = try await ProfileService.fetchMyProfile()
             session.updateCurrentProfile(profile)

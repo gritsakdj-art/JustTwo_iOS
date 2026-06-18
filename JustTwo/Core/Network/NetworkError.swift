@@ -162,6 +162,10 @@ extension NetworkError {
         apiErrorCode == "invalid_or_expired_verification_token"
     }
 
+    var isValidationFailed: Bool {
+        apiErrorCode == "validation_failed"
+    }
+
     var isUnauthorized: Bool {
         switch self {
         case .unauthorized:

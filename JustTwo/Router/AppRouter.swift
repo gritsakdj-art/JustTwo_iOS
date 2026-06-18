@@ -36,6 +36,8 @@ final class AppRouter {
             switch result {
             case .needAuth:
                 resetTo(.auth)
+            case .needEmailVerification(let email):
+                showCheckEmail(email: email)
             case .needProfileSetup:
                 resetTo(.profileSetup)
             case .ready:
