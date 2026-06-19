@@ -62,6 +62,8 @@
 - Added iOS API support for backend PR4 auth account lifecycle endpoints: forgot password, reset password, and delete account.
 - Added forgot password UX on the auth screen that appears only after invalid login credentials.
 - Added account deletion flow in profile settings with destructive confirmation, current password confirmation, session clearing, and localized errors.
+- Added password reset Universal Link handling for `https://api.jtwo.online/auth/reset-password?token=...`.
+- Added `ResetPasswordView` with new password confirmation, client-side password validation, backend reset submission, and return-to-login flow.
 
 ## Notes
 

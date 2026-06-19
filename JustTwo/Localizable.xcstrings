@@ -6884,6 +6884,126 @@
         "ru": { "stringUnit": { "state": "translated", "value": "Не удалось удалить аккаунт. Попробуйте ещё раз." } }
       }
     },
+    "reset_password.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "ar": { "stringUnit": { "state": "translated", "value": "تعيين كلمة مرور جديدة" } },
+        "de": { "stringUnit": { "state": "translated", "value": "Neues Passwort festlegen" } },
+        "en": { "stringUnit": { "state": "translated", "value": "Set a new password" } },
+        "es": { "stringUnit": { "state": "translated", "value": "Crea una nueva contraseña" } },
+        "fr": { "stringUnit": { "state": "translated", "value": "Créer un nouveau mot de passe" } },
+        "it": { "stringUnit": { "state": "translated", "value": "Imposta una nuova password" } },
+        "ru": { "stringUnit": { "state": "translated", "value": "Задайте новый пароль" } }
+      }
+    },
+    "reset_password.subtitle": {
+      "extractionState": "manual",
+      "localizations": {
+        "ar": { "stringUnit": { "state": "translated", "value": "اختر كلمة مرور جديدة لحساب JustTwo الخاص بك." } },
+        "de": { "stringUnit": { "state": "translated", "value": "Wähle ein neues Passwort für deinen JustTwo-Account." } },
+        "en": { "stringUnit": { "state": "translated", "value": "Choose a new password for your JustTwo account." } },
+        "es": { "stringUnit": { "state": "translated", "value": "Elige una nueva contraseña para tu cuenta de JustTwo." } },
+        "fr": { "stringUnit": { "state": "translated", "value": "Choisis un nouveau mot de passe pour ton compte JustTwo." } },
+        "it": { "stringUnit": { "state": "translated", "value": "Scegli una nuova password per il tuo account JustTwo." } },
+        "ru": { "stringUnit": { "state": "translated", "value": "Выберите новый пароль для аккаунта JustTwo." } }
+      }
+    },
+    "reset_password.new_password": {
+      "extractionState": "manual",
+      "localizations": {
+        "ar": { "stringUnit": { "state": "translated", "value": "كلمة المرور الجديدة" } },
+        "de": { "stringUnit": { "state": "translated", "value": "Neues Passwort" } },
+        "en": { "stringUnit": { "state": "translated", "value": "New password" } },
+        "es": { "stringUnit": { "state": "translated", "value": "Nueva contraseña" } },
+        "fr": { "stringUnit": { "state": "translated", "value": "Nouveau mot de passe" } },
+        "it": { "stringUnit": { "state": "translated", "value": "Nuova password" } },
+        "ru": { "stringUnit": { "state": "translated", "value": "Новый пароль" } }
+      }
+    },
+    "reset_password.confirm_password": {
+      "extractionState": "manual",
+      "localizations": {
+        "ar": { "stringUnit": { "state": "translated", "value": "تأكيد كلمة المرور" } },
+        "de": { "stringUnit": { "state": "translated", "value": "Passwort bestätigen" } },
+        "en": { "stringUnit": { "state": "translated", "value": "Confirm password" } },
+        "es": { "stringUnit": { "state": "translated", "value": "Confirmar contraseña" } },
+        "fr": { "stringUnit": { "state": "translated", "value": "Confirmer le mot de passe" } },
+        "it": { "stringUnit": { "state": "translated", "value": "Conferma password" } },
+        "ru": { "stringUnit": { "state": "translated", "value": "Подтвердите пароль" } }
+      }
+    },
+    "reset_password.change_password": {
+      "extractionState": "manual",
+      "localizations": {
+        "ar": { "stringUnit": { "state": "translated", "value": "تغيير كلمة المرور" } },
+        "de": { "stringUnit": { "state": "translated", "value": "Passwort ändern" } },
+        "en": { "stringUnit": { "state": "translated", "value": "Change password" } },
+        "es": { "stringUnit": { "state": "translated", "value": "Cambiar contraseña" } },
+        "fr": { "stringUnit": { "state": "translated", "value": "Changer le mot de passe" } },
+        "it": { "stringUnit": { "state": "translated", "value": "Cambia password" } },
+        "ru": { "stringUnit": { "state": "translated", "value": "Изменить пароль" } }
+      }
+    },
+    "reset_password.success": {
+      "extractionState": "manual",
+      "localizations": {
+        "ar": { "stringUnit": { "state": "translated", "value": "تم تغيير كلمة المرور. يمكنك تسجيل الدخول الآن." } },
+        "de": { "stringUnit": { "state": "translated", "value": "Dein Passwort wurde geändert. Du kannst dich jetzt anmelden." } },
+        "en": { "stringUnit": { "state": "translated", "value": "Your password has been changed. You can log in now." } },
+        "es": { "stringUnit": { "state": "translated", "value": "Tu contraseña se ha cambiado. Ya puedes iniciar sesión." } },
+        "fr": { "stringUnit": { "state": "translated", "value": "Ton mot de passe a été modifié. Tu peux te connecter." } },
+        "it": { "stringUnit": { "state": "translated", "value": "La password è stata cambiata. Ora puoi accedere." } },
+        "ru": { "stringUnit": { "state": "translated", "value": "Пароль изменён. Теперь можно войти." } }
+      }
+    },
+    "reset_password.back_to_login": {
+      "extractionState": "manual",
+      "localizations": {
+        "ar": { "stringUnit": { "state": "translated", "value": "العودة إلى تسجيل الدخول" } },
+        "de": { "stringUnit": { "state": "translated", "value": "Zurück zur Anmeldung" } },
+        "en": { "stringUnit": { "state": "translated", "value": "Back to login" } },
+        "es": { "stringUnit": { "state": "translated", "value": "Volver al inicio de sesión" } },
+        "fr": { "stringUnit": { "state": "translated", "value": "Retour à la connexion" } },
+        "it": { "stringUnit": { "state": "translated", "value": "Torna al login" } },
+        "ru": { "stringUnit": { "state": "translated", "value": "Вернуться ко входу" } }
+      }
+    },
+    "reset_password.error.passwords_do_not_match": {
+      "extractionState": "manual",
+      "localizations": {
+        "ar": { "stringUnit": { "state": "translated", "value": "كلمتا المرور غير متطابقتين." } },
+        "de": { "stringUnit": { "state": "translated", "value": "Die Passwörter stimmen nicht überein." } },
+        "en": { "stringUnit": { "state": "translated", "value": "Passwords do not match." } },
+        "es": { "stringUnit": { "state": "translated", "value": "Las contraseñas no coinciden." } },
+        "fr": { "stringUnit": { "state": "translated", "value": "Les mots de passe ne correspondent pas." } },
+        "it": { "stringUnit": { "state": "translated", "value": "Le password non coincidono." } },
+        "ru": { "stringUnit": { "state": "translated", "value": "Пароли не совпадают." } }
+      }
+    },
+    "reset_password.error.invalid_or_expired": {
+      "extractionState": "manual",
+      "localizations": {
+        "ar": { "stringUnit": { "state": "translated", "value": "رابط إعادة تعيين كلمة المرور غير صالح أو انتهت صلاحيته. اطلب رسالة جديدة من شاشة تسجيل الدخول." } },
+        "de": { "stringUnit": { "state": "translated", "value": "Der Link ist ungültig oder abgelaufen. Fordere über die Anmeldung eine neue E-Mail an." } },
+        "en": { "stringUnit": { "state": "translated", "value": "This password reset link is invalid or expired. Request a new email from the login screen." } },
+        "es": { "stringUnit": { "state": "translated", "value": "Este enlace no es válido o ha caducado. Solicita un nuevo email desde la pantalla de inicio de sesión." } },
+        "fr": { "stringUnit": { "state": "translated", "value": "Ce lien est invalide ou expiré. Demande un nouvel e-mail depuis l’écran de connexion." } },
+        "it": { "stringUnit": { "state": "translated", "value": "Questo link non è valido o è scaduto. Richiedi una nuova email dalla schermata di login." } },
+        "ru": { "stringUnit": { "state": "translated", "value": "Ссылка недействительна или устарела. Запросите новое письмо на экране входа." } }
+      }
+    },
+    "reset_password.error.missing_token": {
+      "extractionState": "manual",
+      "localizations": {
+        "ar": { "stringUnit": { "state": "translated", "value": "رابط إعادة تعيين كلمة المرور غير مكتمل. اطلب رسالة جديدة." } },
+        "de": { "stringUnit": { "state": "translated", "value": "Der Link ist unvollständig. Fordere eine neue E-Mail an." } },
+        "en": { "stringUnit": { "state": "translated", "value": "This password reset link is incomplete. Request a new email." } },
+        "es": { "stringUnit": { "state": "translated", "value": "Este enlace está incompleto. Solicita un nuevo email." } },
+        "fr": { "stringUnit": { "state": "translated", "value": "Ce lien est incomplet. Demande un nouvel e-mail." } },
+        "it": { "stringUnit": { "state": "translated", "value": "Questo link è incompleto. Richiedi una nuova email." } },
+        "ru": { "stringUnit": { "state": "translated", "value": "Ссылка неполная. Запросите новое письмо." } }
+      }
+    },
     "email_verification.result.back_to_login": {
       "extractionState": "manual",
       "localizations": {

@@ -33,7 +33,7 @@ final class AuthViewModel {
         case .login:
             return nil
         case .register:
-            return isValidPassword(password) ? nil : String(localized: "auth.error.weak_password")
+            return PasswordPolicy.isValid(password) ? nil : String(localized: "auth.error.weak_password")
         }
     }
 
@@ -48,7 +48,7 @@ final class AuthViewModel {
         case .login:
             return true
         case .register:
-            return isValidEmail(trimmedEmail) && isValidPassword(password)
+            return isValidEmail(trimmedEmail) && PasswordPolicy.isValid(password)
         }
     }
 
@@ -176,12 +176,6 @@ final class AuthViewModel {
         let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
         let pattern = #"^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$"#
         return trimmed.range(of: pattern, options: [.regularExpression, .caseInsensitive]) != nil
-    }
-
-    private func isValidPassword(_ value: String) -> Bool {
-        let hasLetter = value.rangeOfCharacter(from: .letters) != nil
-        let hasDigit = value.rangeOfCharacter(from: .decimalDigits) != nil
-        return value.count >= 8 && hasLetter && hasDigit
     }
 
     private func resetForgotPasswordState() {

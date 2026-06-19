@@ -170,6 +170,10 @@ extension NetworkError {
         apiErrorCode == "invalid_or_expired_verification_token"
     }
 
+    var isInvalidOrExpiredPasswordResetToken: Bool {
+        apiErrorCode == "invalid_or_expired_password_reset_token"
+    }
+
     var isValidationFailed: Bool {
         apiErrorCode == "validation_failed"
     }

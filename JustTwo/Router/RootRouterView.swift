@@ -36,6 +36,12 @@ struct RootRouterView: View {
         case .emailVerificationError(let message):
             EmailVerificationResultView(initialState: .genericError(message))
 
+        case .resetPassword(let token):
+            ResetPasswordView(token: token)
+
+        case .resetPasswordError(let message):
+            ResetPasswordView(initialErrorMessage: message)
+
         case .profileSetup:
             if session.isFullyAuthenticated {
                 ProfileSettingsView(context: .onboarding)

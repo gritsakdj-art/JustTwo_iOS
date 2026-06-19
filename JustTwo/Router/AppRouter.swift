@@ -63,4 +63,12 @@ final class AppRouter {
     func showEmailVerificationError(_ message: String) {
         resetTo(.emailVerificationError(message: message))
     }
+
+    func showResetPassword(token: String) {
+        resetTo(.resetPassword(token: token))
+    }
+
+    func showResetPasswordError(_ message: String) {
+        resetTo(.resetPasswordError(message: message))
+    }
 }
