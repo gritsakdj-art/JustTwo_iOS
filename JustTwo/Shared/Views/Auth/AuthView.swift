@@ -81,6 +81,24 @@ struct AuthView: View {
                     .transition(.opacity.combined(with: .move(edge: .top)))
             }
 
+            if viewModel.mode == .login, viewModel.showForgotPasswordOption {
+                Button {
+                    viewModel.presentForgotPassword()
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "key.fill")
+                            .font(.system(size: 13, weight: .bold))
+
+                        Text("auth.forgot_password.link")
+                            .font(.footnote.weight(.semibold))
+                    }
+                    .foregroundStyle(Color.brandPrimary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .buttonStyle(.spring(pressedScale: 0.96))
+                .transition(.opacity.combined(with: .move(edge: .top)))
+            }
+
             PrimaryButton(
                 viewModel.mode == .login ? "auth.login" : "auth.register",
                 systemImage: "arrow.right",
@@ -116,6 +134,66 @@ struct AuthView: View {
         }
         .shadow(color: Color.discoverCardShadow.opacity(0.10), radius: 24, x: 0, y: 14)
         .animation(.easeInOut(duration: 0.18), value: viewModel.errorMessage)
+        .animation(.easeInOut(duration: 0.18), value: viewModel.showForgotPasswordOption)
+        .sheet(isPresented: $viewModel.isForgotPasswordSheetPresented) {
+            forgotPasswordSheet
+                .presentationDetents([.height(390)])
+                .presentationDragIndicator(.visible)
+        }
+    }
+
+    private var forgotPasswordSheet: some View {
+        VStack(alignment: .leading, spacing: AppSpacing.lg) {
+            VStack(alignment: .leading, spacing: AppSpacing.sm) {
+                Text("auth.forgot_password.title")
+                    .font(.system(.title3, design: .rounded, weight: .bold))
+                    .foregroundStyle(Color.discoverPrimaryText)
+
+                Text("auth.forgot_password.subtitle")
+                    .font(.subheadline)
+                    .foregroundStyle(Color.discoverSecondaryText)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            BaseTextField(
+                title: "auth.email",
+                text: $viewModel.forgotPasswordEmail,
+                keyboardType: .emailAddress,
+                textContentType: .emailAddress,
+                errorMessage: viewModel.forgotPasswordErrorMessage
+            )
+
+            if let message = viewModel.forgotPasswordMessage {
+                Text(message)
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(Color.brandPrimary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            PrimaryButton(
+                "auth.forgot_password.send",
+                systemImage: "paperplane.fill",
+                isLoading: viewModel.isSendingForgotPassword,
+                isDisabled: viewModel.forgotPasswordEmail.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            ) {
+                viewModel.sendForgotPassword()
+            }
+
+            Button {
+                viewModel.isForgotPasswordSheetPresented = false
+            } label: {
+                Text("common.cancel")
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(Color.discoverSecondaryText)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 8)
+            }
+            .buttonStyle(.spring(pressedScale: 0.96))
+        }
+        .padding(.horizontal, AppSpacing.xl)
+        .padding(.top, AppSpacing.lg)
+        .padding(.bottom, AppSpacing.xl)
+        .background(Color.discoverBackgroundGradient.ignoresSafeArea())
     }
 
     private var authBackground: some View {

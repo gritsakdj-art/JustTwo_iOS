@@ -59,6 +59,9 @@
 - Added redacted network URL logging so verification tokens are not printed in debug logs.
 - Added localized strings for email verification flow and new backend error codes.
 - Added `Docs/EmailVerification.md` with backend endpoint notes, universal links checklist, AASA examples, and current staging compatibility mode.
+- Added iOS API support for backend PR4 auth account lifecycle endpoints: forgot password, reset password, and delete account.
+- Added forgot password UX on the auth screen that appears only after invalid login credentials.
+- Added account deletion flow in profile settings with destructive confirmation, current password confirmation, session clearing, and localized errors.
 
 ## Notes
 

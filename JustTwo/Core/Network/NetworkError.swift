@@ -158,6 +158,14 @@ extension NetworkError {
         apiErrorCode == "email_not_verified"
     }
 
+    var isInvalidCredentials: Bool {
+        apiErrorCode == "invalid_credentials"
+    }
+
+    var isInvalidPassword: Bool {
+        apiErrorCode == "invalid_password"
+    }
+
     var isInvalidOrExpiredVerificationToken: Bool {
         apiErrorCode == "invalid_or_expired_verification_token"
     }

@@ -21,6 +21,11 @@ struct ProfileSettingsView: View {
     @State private var isSaving = false
     @State private var errorMessage: String?
     @State private var isBirthDatePickerPresented = false
+    @State private var isDeleteConfirmationPresented = false
+    @State private var isDeletePasswordSheetPresented = false
+    @State private var deletePassword = ""
+    @State private var isDeletingAccount = false
+    @State private var deleteAccountErrorMessage: String?
 
     private let bioLimit = 180
 
@@ -50,6 +55,10 @@ struct ProfileSettingsView: View {
                 ) {
                     saveProfile()
                 }
+
+                if context == .settings {
+                    dangerZone
+                }
             }
             .padding(.horizontal, AppSpacing.xl)
             .padding(.top, AppSpacing.lg)
@@ -73,6 +82,26 @@ struct ProfileSettingsView: View {
         .sheet(isPresented: $isBirthDatePickerPresented) {
             birthDatePickerSheet
                 .presentationDetents([.height(360)])
+                .presentationDragIndicator(.visible)
+        }
+        .confirmationDialog(
+            Text("profile.account.delete_title"),
+            isPresented: $isDeleteConfirmationPresented,
+            titleVisibility: .visible
+        ) {
+            Button("profile.account.delete_confirm", role: .destructive) {
+                deleteAccountErrorMessage = nil
+                deletePassword = ""
+                isDeletePasswordSheetPresented = true
+            }
+
+            Button("common.cancel", role: .cancel) { }
+        } message: {
+            Text("profile.account.delete_message")
+        }
+        .sheet(isPresented: $isDeletePasswordSheetPresented) {
+            deleteAccountSheet
+                .presentationDetents([.height(390)])
                 .presentationDragIndicator(.visible)
         }
     }
@@ -312,6 +341,50 @@ struct ProfileSettingsView: View {
         }
     }
 
+    private var dangerZone: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            sectionTitle("profile.account.danger_section")
+
+            Button {
+                isDeleteConfirmationPresented = true
+            } label: {
+                HStack(spacing: 12) {
+                    Image(systemName: "trash.fill")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(Color.onAccentText)
+                        .frame(width: 36, height: 36)
+                        .background(Color.discoverPink, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("profile.account.delete")
+                            .font(.system(size: 16, weight: .bold, design: .rounded))
+                            .foregroundStyle(Color.discoverPink)
+
+                        Text("profile.account.delete_message")
+                            .font(.caption)
+                            .foregroundStyle(Color.discoverSecondaryText)
+                            .lineLimit(2)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+
+                    Spacer(minLength: 12)
+
+                    Image(systemName: "chevron.forward")
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundStyle(Color.discoverSecondaryText.opacity(0.72))
+                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 12)
+                .background(Color.surface.opacity(0.72), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        .stroke(Color.discoverPink.opacity(0.22), lineWidth: 1)
+                }
+            }
+            .buttonStyle(.spring(pressedScale: 0.98))
+        }
+    }
+
     private var birthDatePickerSheet: some View {
         VStack(spacing: AppSpacing.lg) {
             Text("profile.settings.birth_date.sheet_title")
@@ -339,6 +412,76 @@ struct ProfileSettingsView: View {
         .padding(.top, AppSpacing.lg)
         .padding(.bottom, AppSpacing.xl)
         .background(Color.discoverBackgroundGradient.ignoresSafeArea())
+    }
+
+    private var deleteAccountSheet: some View {
+        VStack(alignment: .leading, spacing: AppSpacing.lg) {
+            VStack(alignment: .leading, spacing: AppSpacing.sm) {
+                Text("profile.account.delete_password_title")
+                    .font(.system(.title3, design: .rounded, weight: .bold))
+                    .foregroundStyle(Color.discoverPrimaryText)
+
+                Text("profile.account.delete_password_subtitle")
+                    .font(.subheadline)
+                    .foregroundStyle(Color.discoverSecondaryText)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            BaseTextField(
+                title: "profile.account.current_password",
+                text: $deletePassword,
+                isSecure: true,
+                textContentType: .password,
+                errorMessage: deleteAccountErrorMessage
+            )
+
+            destructiveDeleteButton
+
+            Button {
+                isDeletePasswordSheetPresented = false
+                deletePassword = ""
+                deleteAccountErrorMessage = nil
+            } label: {
+                Text("common.cancel")
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(Color.discoverSecondaryText)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 8)
+            }
+            .buttonStyle(.spring(pressedScale: 0.96))
+        }
+        .padding(.horizontal, AppSpacing.xl)
+        .padding(.top, AppSpacing.lg)
+        .padding(.bottom, AppSpacing.xl)
+        .background(Color.discoverBackgroundGradient.ignoresSafeArea())
+        .interactiveDismissDisabled(isDeletingAccount)
+    }
+
+    private var destructiveDeleteButton: some View {
+        Button {
+            deleteAccount()
+        } label: {
+            HStack(spacing: 10) {
+                if isDeletingAccount {
+                    ProgressView()
+                        .tint(Color.onAccentText)
+                } else {
+                    Image(systemName: "trash.fill")
+                        .font(.system(size: 17, weight: .semibold))
+                }
+
+                Text("profile.account.delete")
+                    .font(.system(size: 16, weight: .bold, design: .rounded))
+            }
+            .foregroundStyle(Color.onAccentText)
+            .frame(maxWidth: .infinity)
+            .frame(height: 54)
+            .background(Color.discoverPink, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .opacity(deletePassword.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? 0.65 : 1)
+            .shadow(color: Color.discoverPink.opacity(0.20), radius: 14, x: 0, y: 8)
+        }
+        .buttonStyle(.spring(pressedScale: 0.98))
+        .disabled(deletePassword.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isDeletingAccount)
     }
 
     private var genderColumns: [GridItem] {
@@ -464,6 +607,39 @@ struct ProfileSettingsView: View {
             }
 
             isSaving = false
+        }
+    }
+
+    private func deleteAccount() {
+        let password = deletePassword
+        guard !password.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, !isDeletingAccount else { return }
+
+        isDeletingAccount = true
+        deleteAccountErrorMessage = nil
+
+        Task {
+            do {
+                _ = try await AuthService.deleteAccount(password: password)
+                deletePassword = ""
+                session.clearSession()
+                router.resetTo(.auth)
+            } catch let error as NetworkError {
+                deletePassword = ""
+
+                if error.shouldClearSession {
+                    session.clearSession()
+                    router.resetTo(.auth)
+                } else if error.isInvalidPassword {
+                    deleteAccountErrorMessage = String(localized: "profile.account.error.incorrect_password")
+                } else {
+                    deleteAccountErrorMessage = error.userMessage
+                }
+            } catch {
+                deletePassword = ""
+                deleteAccountErrorMessage = error.localizedDescription
+            }
+
+            isDeletingAccount = false
         }
     }
 }

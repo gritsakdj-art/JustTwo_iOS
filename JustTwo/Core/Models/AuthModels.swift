@@ -10,6 +10,19 @@ struct RegisterRequestBody: Encodable {
     let password: String
 }
 
+struct ForgotPasswordRequestBody: Encodable {
+    let email: String
+}
+
+struct ResetPasswordRequestBody: Encodable {
+    let token: String
+    let newPassword: String
+}
+
+struct DeleteAccountRequestBody: Encodable {
+    let password: String
+}
+
 struct AuthResponse: Decodable {
     let success: Bool
     let message: String

@@ -26,6 +26,44 @@ struct RegisterRequest: EncodableAPIRequest {
     }
 }
 
+struct ForgotPasswordRequest: EncodableAPIRequest {
+    typealias Response = MessageResponse
+
+    let email: String
+
+    var path: String { "auth/forgot-password" }
+    var method: HTTPMethod { .post }
+    var bodyValue: ForgotPasswordRequestBody? {
+        ForgotPasswordRequestBody(email: email)
+    }
+}
+
+struct ResetPasswordRequest: EncodableAPIRequest {
+    typealias Response = MessageResponse
+
+    let token: String
+    let newPassword: String
+
+    var path: String { "auth/reset-password" }
+    var method: HTTPMethod { .post }
+    var bodyValue: ResetPasswordRequestBody? {
+        ResetPasswordRequestBody(token: token, newPassword: newPassword)
+    }
+}
+
+struct DeleteAccountRequest: EncodableAPIRequest {
+    typealias Response = MessageResponse
+
+    let password: String
+
+    var path: String { "me/account" }
+    var method: HTTPMethod { .delete }
+    var requiresAuth: Bool { true }
+    var bodyValue: DeleteAccountRequestBody? {
+        DeleteAccountRequestBody(password: password)
+    }
+}
+
 struct CurrentUserRequest: APIRequest {
     typealias Response = UserResponse
 
