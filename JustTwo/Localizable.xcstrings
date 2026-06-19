@@ -3907,6 +3907,147 @@
         }
       }
     },
+    "profile.settings.privacy_section": {
+      "extractionState": "manual",
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "الخصوصية"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Privatsphäre"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Privacy"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Privacidad"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Confidentialité"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Privacy"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Приватность"
+          }
+        }
+      }
+    },
+    "profile.settings.discovery_visibility.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "إظهار ملفي في الاكتشاف"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mein Profil in Discovery anzeigen"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Show my profile in discovery"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mostrar mi perfil en discovery"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Afficher mon profil dans discovery"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mostra il mio profilo in discovery"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Показывать мой профиль в discovery"
+          }
+        }
+      }
+    },
+    "profile.settings.discovery_visibility.subtitle": {
+      "extractionState": "manual",
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "عند إيقافه، لن يظهر ملفك في الاكتشاف. قد تتيح ميزات الدعوة المباشرة ورمز QR للأشخاص التواصل معك في الإصدارات القادمة."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Wenn deaktiviert, erscheint dein Profil nicht in Discovery. Direkte Einladungen und QR-Funktionen können es in zukünftigen Versionen trotzdem ermöglichen, dass andere dich erreichen."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "When turned off, your profile won’t appear in discovery. Direct invite and QR features may still allow people to connect with you in future versions."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Si lo desactivas, tu perfil no aparecerá en discovery. Las invitaciones directas y las funciones QR aún podrían permitir que otras personas conecten contigo en versiones futuras."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Si cette option est désactivée, votre profil n’apparaîtra pas dans discovery. Les invitations directes et les fonctions QR pourront toujours permettre à des personnes de vous contacter dans de futures versions."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Se disattivata, il tuo profilo non apparirà in discovery. Inviti diretti e funzioni QR potrebbero comunque consentire alle persone di connettersi con te nelle versioni future."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Если выключить, профиль не будет появляться в discovery. В будущих версиях прямые приглашения и QR-функции всё ещё могут позволять людям связаться с тобой."
+          }
+        }
+      }
+    },
     "profile.setup.subtitle": {
       "extractionState": "manual",
       "localizations": {

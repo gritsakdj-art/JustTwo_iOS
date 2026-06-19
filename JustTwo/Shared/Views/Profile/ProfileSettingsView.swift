@@ -26,6 +26,9 @@ struct ProfileSettingsView: View {
     @State private var deletePassword = ""
     @State private var isDeletingAccount = false
     @State private var deleteAccountErrorMessage: String?
+    @State private var isVisibleInDiscovery = true
+    @State private var isUpdatingDiscoveryVisibility = false
+    @State private var discoveryVisibilityErrorMessage: String?
 
     private let bioLimit = 180
 
@@ -149,6 +152,13 @@ struct ProfileSettingsView: View {
                     textContentType: .addressCity,
                     autocapitalization: .words
                 )
+            }
+
+            if context == .settings && session.currentProfile != nil {
+                Divider()
+                    .overlay(Color.discoverViolet.opacity(0.12))
+
+                discoveryVisibilitySection
             }
         }
         .padding(AppSpacing.lg)
@@ -341,6 +351,60 @@ struct ProfileSettingsView: View {
         }
     }
 
+    private var discoveryVisibilitySection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            sectionTitle("profile.settings.privacy_section")
+
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(alignment: .center, spacing: 12) {
+                    Image(systemName: isVisibleInDiscovery ? "eye.fill" : "eye.slash.fill")
+                        .font(.system(size: 17, weight: .semibold))
+                        .foregroundStyle(Color.onAccentText)
+                        .frame(width: 36, height: 36)
+                        .background(Color.discoverSelectedGradient, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("profile.settings.discovery_visibility.title")
+                            .font(.system(size: 16, weight: .bold, design: .rounded))
+                            .foregroundStyle(Color.discoverPrimaryText)
+
+                        Text("profile.settings.discovery_visibility.subtitle")
+                            .font(.caption)
+                            .foregroundStyle(Color.discoverSecondaryText)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+
+                    Spacer(minLength: 12)
+
+                    if isUpdatingDiscoveryVisibility {
+                        ProgressView()
+                            .controlSize(.small)
+                            .tint(Color.discoverViolet)
+                    }
+
+                    Toggle("profile.settings.discovery_visibility.title", isOn: discoveryVisibilityBinding)
+                        .labelsHidden()
+                        .tint(Color.discoverViolet)
+                        .disabled(isUpdatingDiscoveryVisibility || isSaving)
+                }
+
+                if let discoveryVisibilityErrorMessage {
+                    Text(discoveryVisibilityErrorMessage)
+                        .font(.footnote)
+                        .foregroundStyle(Color.discoverPink)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 12)
+            .background(Color.surface.opacity(0.96), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .stroke(Color.discoverViolet.opacity(0.14), lineWidth: 1)
+            }
+        }
+    }
+
     private var dangerZone: some View {
         VStack(alignment: .leading, spacing: 12) {
             sectionTitle("profile.account.danger_section")
@@ -528,6 +592,15 @@ struct ProfileSettingsView: View {
         )
     }
 
+    private var discoveryVisibilityBinding: Binding<Bool> {
+        Binding(
+            get: { isVisibleInDiscovery },
+            set: { newValue in
+                updateDiscoveryVisibility(to: newValue)
+            }
+        )
+    }
+
     private func sectionTitle(_ title: LocalizedStringResource) -> some View {
         Text(title)
             .font(.system(size: 13, weight: .bold, design: .rounded))
@@ -548,6 +621,7 @@ struct ProfileSettingsView: View {
         displayName = profile.displayName
         bio = profile.bio ?? ""
         city = profile.city ?? ""
+        isVisibleInDiscovery = profile.isVisibleInDiscovery
 
         if let parsedBirthDate = DateOnlyFormatter.date(from: profile.birthDate) {
             birthDate = parsedBirthDate
@@ -586,7 +660,8 @@ struct ProfileSettingsView: View {
             latitude: nil,
             longitude: nil,
             moodModeEnabled: true,
-            activityModeEnabled: true
+            activityModeEnabled: true,
+            isVisibleInDiscovery: isVisibleInDiscovery
         )
 
         Task {
@@ -607,6 +682,34 @@ struct ProfileSettingsView: View {
             }
 
             isSaving = false
+        }
+    }
+
+    private func updateDiscoveryVisibility(to newValue: Bool) {
+        guard newValue != isVisibleInDiscovery else { return }
+        guard context == .settings, session.currentProfile != nil, !isUpdatingDiscoveryVisibility else { return }
+
+        let previousValue = isVisibleInDiscovery
+        isVisibleInDiscovery = newValue
+        isUpdatingDiscoveryVisibility = true
+        discoveryVisibilityErrorMessage = nil
+
+        let body = UpsertProfileRequestBody(isVisibleInDiscovery: newValue)
+
+        Task {
+            do {
+                let profile = try await ProfileService.upsertProfile(body)
+                session.updateCurrentProfile(profile)
+                isVisibleInDiscovery = profile.isVisibleInDiscovery
+            } catch let error as NetworkError {
+                isVisibleInDiscovery = previousValue
+                discoveryVisibilityErrorMessage = error.userMessage
+            } catch {
+                isVisibleInDiscovery = previousValue
+                discoveryVisibilityErrorMessage = error.localizedDescription
+            }
+
+            isUpdatingDiscoveryVisibility = false
         }
     }
 

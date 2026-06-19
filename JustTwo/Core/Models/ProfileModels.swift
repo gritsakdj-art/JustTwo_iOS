@@ -12,20 +12,79 @@ struct UserProfileDTO: Decodable {
     let longitude: Double?
     let moodModeEnabled: Bool
     let activityModeEnabled: Bool
+    let isVisibleInDiscovery: Bool
     let createdAt: Date?
     let updatedAt: Date?
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case displayName
+        case birthDate
+        case gender
+        case bio
+        case city
+        case latitude
+        case longitude
+        case moodModeEnabled
+        case activityModeEnabled
+        case isVisibleInDiscovery
+        case createdAt
+        case updatedAt
+    }
+
+    init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        displayName = try container.decode(String.self, forKey: .displayName)
+        birthDate = try container.decode(String.self, forKey: .birthDate)
+        gender = try container.decode(String.self, forKey: .gender)
+        bio = try container.decodeIfPresent(String.self, forKey: .bio)
+        city = try container.decodeIfPresent(String.self, forKey: .city)
+        latitude = try container.decodeIfPresent(Double.self, forKey: .latitude)
+        longitude = try container.decodeIfPresent(Double.self, forKey: .longitude)
+        moodModeEnabled = try container.decode(Bool.self, forKey: .moodModeEnabled)
+        activityModeEnabled = try container.decode(Bool.self, forKey: .activityModeEnabled)
+        isVisibleInDiscovery = try container.decodeIfPresent(Bool.self, forKey: .isVisibleInDiscovery) ?? true
+        createdAt = try container.decodeIfPresent(Date.self, forKey: .createdAt)
+        updatedAt = try container.decodeIfPresent(Date.self, forKey: .updatedAt)
+    }
 }
 
 struct UpsertProfileRequestBody: Encodable {
-    let displayName: String
-    let birthDate: String
-    let gender: String
+    let displayName: String?
+    let birthDate: String?
+    let gender: String?
     let bio: String?
     let city: String?
     let latitude: Double?
     let longitude: Double?
-    let moodModeEnabled: Bool
-    let activityModeEnabled: Bool
+    let moodModeEnabled: Bool?
+    let activityModeEnabled: Bool?
+    let isVisibleInDiscovery: Bool?
+
+    init(
+        displayName: String? = nil,
+        birthDate: String? = nil,
+        gender: String? = nil,
+        bio: String? = nil,
+        city: String? = nil,
+        latitude: Double? = nil,
+        longitude: Double? = nil,
+        moodModeEnabled: Bool? = nil,
+        activityModeEnabled: Bool? = nil,
+        isVisibleInDiscovery: Bool? = nil
+    ) {
+        self.displayName = displayName
+        self.birthDate = birthDate
+        self.gender = gender
+        self.bio = bio
+        self.city = city
+        self.latitude = latitude
+        self.longitude = longitude
+        self.moodModeEnabled = moodModeEnabled
+        self.activityModeEnabled = activityModeEnabled
+        self.isVisibleInDiscovery = isVisibleInDiscovery
+    }
 }
 
 struct ProfileEnvelopeResponse: Decodable {
