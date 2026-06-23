@@ -11,72 +11,98 @@ import AppKit
 extension Color {
     // MARK: Base
 
-    private static let lightSurface = Color(hex: "#FFF8F5")
-    private static let darkSurface = Color(hex: "#171421")
+    private static let lightSurface = Color(hex: "#FFFBF7")
+    private static let darkSurface = Color(hex: "#100D18")
 
     private static let lightOnAccentText = Color(hex: "#FFFFFF")
     private static let darkOnAccentText = Color(hex: "#FFFFFF")
 
-    private static let lightBrandPrimary = Color(hex: "#7C4DDB")
-    private static let darkBrandPrimary = Color(hex: "#7A62B5")
+    private static let lightBrandPrimary = Color(hex: "#B8325E")
+    private static let darkBrandPrimary = Color(hex: "#C94268")
 
-    private static let lightBrandPrimaryPressed = Color(hex: "#6738C8")
-    private static let darkBrandPrimaryPressed = Color(hex: "#6650A0")
+    private static let lightBrandPrimaryPressed = Color(hex: "#8F2347")
+    private static let darkBrandPrimaryPressed = Color(hex: "#A83356")
 
-    private static let lightBrandGradientEnd = Color(hex: "#B06DE8")
-    private static let darkBrandGradientEnd = Color(hex: "#8F78C6")
+    private static let lightBrandGradientEnd = Color(hex: "#6E56CF")
+    private static let darkBrandGradientEnd = Color(hex: "#7E5FD4")
 
-    private static let lightBrandPrimaryGlow = Color(hex: "#7C4DDB")
-    private static let darkBrandPrimaryGlow = Color(hex: "#000000")
+    private static let lightBrandPrimaryGlow = Color(hex: "#FF6B8A")
+    private static let darkBrandPrimaryGlow = Color(hex: "#FF5F87")
 
     // MARK: Discover
 
-    private static let lightDiscoverBackgroundTop = Color(hex: "#F8F3EF")
-    private static let darkDiscoverBackgroundTop = Color(hex: "#161221")
+    private static let lightDiscoverBackgroundTop = Color(hex: "#FFFBF7")
+    private static let darkDiscoverBackgroundTop = Color(hex: "#0F0B16")
 
-    private static let lightDiscoverBackgroundMiddle = Color(hex: "#FADADD")
-    private static let darkDiscoverBackgroundMiddle = Color(hex: "#231524")
+    private static let lightDiscoverBackgroundMiddle = Color(hex: "#FFE6EA")
+    private static let darkDiscoverBackgroundMiddle = Color(hex: "#211224")
 
-    private static let lightDiscoverBackgroundBottom = Color(hex: "#F3E7E2")
-    private static let darkDiscoverBackgroundBottom = Color(hex: "#101A2A")
+    private static let lightDiscoverBackgroundBottom = Color(hex: "#F3ECFF")
+    private static let darkDiscoverBackgroundBottom = Color(hex: "#0E1826")
 
-    private static let lightDiscoverPrimaryText = Color(hex: "#2B2B2B")
-    private static let darkDiscoverPrimaryText = Color(hex: "#F8F4FF")
+    private static let lightDiscoverPrimaryText = Color(hex: "#24151F")
+    private static let darkDiscoverPrimaryText = Color(hex: "#FFF7FB")
 
-    private static let lightDiscoverSecondaryText = Color(hex: "#6E6A68")
-    private static let darkDiscoverSecondaryText = Color(hex: "#BDB4D6")
+    private static let lightDiscoverSecondaryText = Color(hex: "#75616B")
+    private static let darkDiscoverSecondaryText = Color(hex: "#CDBDC8")
 
-    private static let lightDiscoverViolet = Color(hex: "#7C4DDB")
-    private static let darkDiscoverViolet = Color(hex: "#8E7AB8")
+    private static let lightDiscoverViolet = Color(hex: "#6E56CF")
+    private static let darkDiscoverViolet = Color(hex: "#7E5FD4")
 
-    private static let lightDiscoverVioletLight = Color(hex: "#B06DE8")
-    private static let darkDiscoverVioletLight = Color(hex: "#A08FC8")
+    private static let lightDiscoverVioletLight = Color(hex: "#7758D5")
+    private static let darkDiscoverVioletLight = Color(hex: "#9A82F0")
 
-    private static let lightDiscoverPink = Color(hex: "#E55A7A")
-    private static let darkDiscoverPink = Color(hex: "#C96B88")
+    private static let lightDiscoverPink = Color(hex: "#B8325E")
+    private static let darkDiscoverPink = Color(hex: "#C94268")
 
-    private static let lightDiscoverPinkLight = Color(hex: "#F59AC9")
-    private static let darkDiscoverPinkLight = Color(hex: "#D8849C")
+    private static let lightDiscoverPinkLight = Color(hex: "#C3476B")
+    private static let darkDiscoverPinkLight = Color(hex: "#C44B59")
 
-    private static let lightDiscoverCardShadow = Color(hex: "#6E6A68")
-    private static let darkDiscoverCardShadow = Color(hex: "#1A1525")
+    private static let lightDiscoverCardShadow = Color(hex: "#5A3142")
+    private static let darkDiscoverCardShadow = Color(hex: "#05030A")
 
-    private static let lightDiscoverMockLavender = Color(hex: "#FFF8F5")
-    private static let darkDiscoverMockLavender = Color(hex: "#4B3F6D")
+    private static let lightDiscoverMockLavender = Color(hex: "#F1E7FF")
+    private static let darkDiscoverMockLavender = Color(hex: "#2E2642")
 
-    private static let lightDiscoverMockPeach = Color(hex: "#FADADD")
-    private static let darkDiscoverMockPeach = Color(hex: "#5A3B3B")
+    private static let lightDiscoverMockPeach = Color(hex: "#FFE1D8")
+    private static let darkDiscoverMockPeach = Color(hex: "#3A2028")
 
-    private static let lightDiscoverOnline = Color(hex: "#5DFFA0")
-    private static let darkDiscoverOnline = Color(hex: "#6DFFB0")
+    private static let lightDiscoverOnline = Color(hex: "#18C97A")
+    private static let darkDiscoverOnline = Color(hex: "#35D989")
 
-    private static let lightDiscoverCardScrim = Color(hex: "#12103A")
-    private static let darkDiscoverCardScrim = Color(hex: "#05040A")
+    private static let lightDiscoverCardScrim = Color(hex: "#110812")
+    private static let darkDiscoverCardScrim = Color(hex: "#04020A")
 
     private static let lightGlassBorderHighlight = Color(hex: "#FFFFFF")
-    private static let darkGlassBorderHighlight = Color(hex: "#E8E2F0")
+    private static let darkGlassBorderHighlight = Color(hex: "#F1EAFB")
 
-    // MARK: Semantic
+    // MARK: Additional Semantic Colors
+
+    private static let lightCardSurface = Color(hex: "#FFFFFF")
+    private static let darkCardSurface = Color(hex: "#191522")
+
+    private static let lightElevatedSurface = Color(hex: "#FFF5F2")
+    private static let darkElevatedSurface = Color(hex: "#241A2D")
+
+    private static let lightFieldBackground = Color(hex: "#FFFFFF")
+    private static let darkFieldBackground = Color(hex: "#1D1727")
+
+    private static let lightHairline = Color(hex: "#E8D9E1")
+    private static let darkHairline = Color(hex: "#36283F")
+
+    private static let lightDisabled = Color(hex: "#C9B8C0")
+    private static let darkDisabled = Color(hex: "#6F6073")
+
+    private static let lightSuccess = Color(hex: "#18C97A")
+    private static let darkSuccess = Color(hex: "#35D989")
+
+    private static let lightWarning = Color(hex: "#C67A22")
+    private static let darkWarning = Color(hex: "#E0A64A")
+
+    private static let lightError = Color(hex: "#C9364F")
+    private static let darkError = Color(hex: "#FF6B7E")
+
+    // MARK: Semantic — Core UI
 
     static var surface: Color {
         dynamic(light: lightSurface, dark: darkSurface)
@@ -90,14 +116,6 @@ extension Color {
         dynamic(light: lightBrandPrimary, dark: darkBrandPrimary)
     }
 
-    static var brandPrimaryPressed: Color {
-        dynamic(light: lightBrandPrimaryPressed, dark: darkBrandPrimaryPressed)
-    }
-
-    static var brandGradientEnd: Color {
-        dynamic(light: lightBrandGradientEnd, dark: darkBrandGradientEnd)
-    }
-
     static var brandPrimaryGlow: Color {
         dynamic(light: lightBrandPrimaryGlow, dark: darkBrandPrimaryGlow)
     }
@@ -105,6 +123,40 @@ extension Color {
     static var glassBorderHighlight: Color {
         dynamic(light: lightGlassBorderHighlight, dark: darkGlassBorderHighlight)
     }
+
+    static var cardSurface: Color {
+        dynamic(light: lightCardSurface, dark: darkCardSurface)
+    }
+
+    static var elevatedSurface: Color {
+        dynamic(light: lightElevatedSurface, dark: darkElevatedSurface)
+    }
+
+    static var fieldBackground: Color {
+        dynamic(light: lightFieldBackground, dark: darkFieldBackground)
+    }
+
+    static var hairline: Color {
+        dynamic(light: lightHairline, dark: darkHairline)
+    }
+
+    static var primaryText: Color {
+        discoverPrimaryText
+    }
+
+    static var secondaryText: Color {
+        discoverSecondaryText
+    }
+
+    static var success: Color {
+        dynamic(light: lightSuccess, dark: darkSuccess)
+    }
+
+    static var error: Color {
+        dynamic(light: lightError, dark: darkError)
+    }
+
+    // MARK: Semantic — Discover
 
     static var discoverPrimaryText: Color {
         dynamic(light: lightDiscoverPrimaryText, dark: darkDiscoverPrimaryText)
@@ -126,20 +178,8 @@ extension Color {
         dynamic(light: lightDiscoverPink, dark: darkDiscoverPink)
     }
 
-    static var discoverPinkLight: Color {
-        dynamic(light: lightDiscoverPinkLight, dark: darkDiscoverPinkLight)
-    }
-
     static var discoverCardShadow: Color {
         dynamic(light: lightDiscoverCardShadow, dark: darkDiscoverCardShadow)
-    }
-
-    static var discoverMockLavender: Color {
-        dynamic(light: lightDiscoverMockLavender, dark: darkDiscoverMockLavender)
-    }
-
-    static var discoverMockPeach: Color {
-        dynamic(light: lightDiscoverMockPeach, dark: darkDiscoverMockPeach)
     }
 
     static var discoverOnline: Color {
@@ -154,6 +194,39 @@ extension Color {
     /// Text placed on top of profile photos over `discoverCardScrim`.
     static var discoverOnPhotoText: Color {
         onAccentText
+    }
+
+    // MARK: Semantic — Supporting Tokens
+    //
+    // Used by gradients, state styles, placeholders, disabled controls,
+    // warnings, and future UI components.
+
+    static var brandPrimaryPressed: Color {
+        dynamic(light: lightBrandPrimaryPressed, dark: darkBrandPrimaryPressed)
+    }
+
+    static var brandGradientEnd: Color {
+        dynamic(light: lightBrandGradientEnd, dark: darkBrandGradientEnd)
+    }
+
+    static var disabled: Color {
+        dynamic(light: lightDisabled, dark: darkDisabled)
+    }
+
+    static var warning: Color {
+        dynamic(light: lightWarning, dark: darkWarning)
+    }
+
+    static var discoverPinkLight: Color {
+        dynamic(light: lightDiscoverPinkLight, dark: darkDiscoverPinkLight)
+    }
+
+    static var discoverMockLavender: Color {
+        dynamic(light: lightDiscoverMockLavender, dark: darkDiscoverMockLavender)
+    }
+
+    static var discoverMockPeach: Color {
+        dynamic(light: lightDiscoverMockPeach, dark: darkDiscoverMockPeach)
     }
 
     // MARK: Gradients
@@ -329,12 +402,16 @@ extension Font {
             manrope(size: 13, weight: weight, relativeTo: .footnote)
         }
 
+        static var button: Font {
+            headline(size: 16, weight: .bold)
+        }
+
         static var screenTitle: Font {
-            title(size: 28, weight: .bold)
+            title(size: 30, weight: .heavy)
         }
 
         static var subtitle: Font {
-            subheadline(size: 15, weight: .regular)
+            subheadline(size: 15, weight: .medium)
         }
     }
 }
@@ -346,6 +423,14 @@ enum AppSpacing {
     static let lg: CGFloat = 20
     static let xl: CGFloat = 24
     static let xxl: CGFloat = 32
+}
+
+enum AppCornerRadius {
+    static let field: CGFloat = 18
+    static let button: CGFloat = 26
+    static let card: CGFloat = 24
+    static let profileCard: CGFloat = 32
+    static let sheet: CGFloat = 28
 }
 
 // MARK: - Hex Support

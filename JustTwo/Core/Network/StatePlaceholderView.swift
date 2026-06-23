@@ -16,13 +16,13 @@ struct StatePlaceholderView: View {
 
             Text(title)
                 .font(Font.App.manrope(size: 22, weight: .bold))
-                .foregroundStyle(Color.discoverPrimaryText)
+                .foregroundStyle(Color.primaryText)
                 .multilineTextAlignment(.center)
 
             Text(subtitle)
                 .font(Font.App.subtitle)
                 .multilineTextAlignment(.center)
-                .foregroundStyle(Color.discoverSecondaryText)
+                .foregroundStyle(Color.secondaryText)
                 .padding(.horizontal, AppSpacing.xl)
 
             if let actionTitle, let action {

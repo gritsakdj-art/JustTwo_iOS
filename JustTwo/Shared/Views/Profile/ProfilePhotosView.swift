@@ -74,7 +74,7 @@ struct ProfilePhotosView: View {
                 Circle()
                     .fill(Color.brandPrimaryGradient)
                     .frame(width: 76, height: 76)
-                    .shadow(color: Color.brandPrimary.opacity(0.22), radius: 18, x: 0, y: 8)
+                    .shadow(color: Color.brandPrimaryGlow.opacity(0.22), radius: 18, x: 0, y: 8)
 
                 Image(systemName: "photo.stack.fill")
                     .font(.system(size: 30, weight: .semibold))
@@ -84,12 +84,12 @@ struct ProfilePhotosView: View {
             VStack(spacing: 6) {
                 Text(photoStore.photos.isEmpty ? "profile.photos.empty_title" : "profile.photos.title")
                     .font(Font.App.manrope(size: 24, weight: .bold))
-                    .foregroundStyle(Color.discoverPrimaryText)
+                    .foregroundStyle(Color.primaryText)
                     .multilineTextAlignment(.center)
 
                 Text("profile.photos.subtitle")
                     .font(Font.App.manrope(size: 15, weight: .medium))
-                    .foregroundStyle(Color.discoverSecondaryText)
+                    .foregroundStyle(Color.secondaryText)
                     .multilineTextAlignment(.center)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -97,10 +97,10 @@ struct ProfilePhotosView: View {
         .frame(maxWidth: .infinity)
         .padding(.vertical, AppSpacing.xl)
         .padding(.horizontal, AppSpacing.lg)
-        .background(Color.surface.opacity(0.72), in: RoundedRectangle(cornerRadius: 22))
+        .background(Color.cardSurface, in: RoundedRectangle(cornerRadius: AppCornerRadius.card))
         .overlay(
-            RoundedRectangle(cornerRadius: 22)
-                .stroke(Color.discoverViolet.opacity(0.12), lineWidth: 1)
+            RoundedRectangle(cornerRadius: AppCornerRadius.card)
+                .stroke(Color.hairline, lineWidth: 1)
         )
         .shadow(color: Color.discoverCardShadow.opacity(0.08), radius: 24, x: 0, y: 10)
     }
@@ -117,10 +117,10 @@ struct ProfilePhotosView: View {
             }
         }
         .padding(AppSpacing.lg)
-        .background(Color.surface.opacity(0.72), in: RoundedRectangle(cornerRadius: 22))
+        .background(Color.cardSurface, in: RoundedRectangle(cornerRadius: AppCornerRadius.card))
         .overlay(
-            RoundedRectangle(cornerRadius: 22)
-                .stroke(Color.discoverViolet.opacity(0.10), lineWidth: 1)
+            RoundedRectangle(cornerRadius: AppCornerRadius.card)
+                .stroke(Color.hairline, lineWidth: 1)
         )
         .shadow(color: Color.discoverCardShadow.opacity(0.06), radius: 20, x: 0, y: 8)
     }
@@ -143,7 +143,7 @@ struct ProfilePhotosView: View {
             .overlay(
                 RoundedRectangle(cornerRadius: 18, style: .continuous)
                     .stroke(
-                        photo.isPrimary ? Color.discoverViolet : Color.discoverViolet.opacity(0.14),
+                        photo.isPrimary ? Color.discoverViolet : Color.hairline,
                         lineWidth: photo.isPrimary ? 2 : 1
                     )
             )
@@ -177,12 +177,12 @@ struct ProfilePhotosView: View {
             isShowingPhotoPicker = true
         } label: {
             ZStack {
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .fill(Color.surface.opacity(0.62))
+                RoundedRectangle(cornerRadius: AppCornerRadius.field, style: .continuous)
+                    .fill(Color.fieldBackground)
                     .aspectRatio(1, contentMode: .fit)
                     .overlay(
-                        RoundedRectangle(cornerRadius: 18, style: .continuous)
-                            .stroke(Color.discoverViolet.opacity(0.28), style: StrokeStyle(lineWidth: 1, dash: [6, 5]))
+                        RoundedRectangle(cornerRadius: AppCornerRadius.field, style: .continuous)
+                            .stroke(Color.hairline, style: StrokeStyle(lineWidth: 1, dash: [6, 5]))
                     )
 
                 if photoStore.isUploading {
@@ -197,7 +197,7 @@ struct ProfilePhotosView: View {
                             .font(Font.App.manrope(size: 12, weight: .semibold))
                             .multilineTextAlignment(.center)
                     }
-                    .foregroundStyle(Color.discoverSecondaryText)
+                    .foregroundStyle(Color.secondaryText)
                     .padding(8)
                 }
             }

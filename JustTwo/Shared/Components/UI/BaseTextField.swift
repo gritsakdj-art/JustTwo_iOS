@@ -19,7 +19,7 @@ struct BaseTextField: View {
         VStack(alignment: .leading, spacing: 8) {
             Text(title)
                 .font(Font.App.manrope(size: 13, weight: .semibold))
-                .foregroundStyle(isFocused ? Color.discoverViolet : Color.discoverSecondaryText)
+                .foregroundStyle(isFocused ? Color.brandPrimary : Color.secondaryText)
 
             HStack(spacing: 12) {
                 Group {
@@ -36,7 +36,7 @@ struct BaseTextField: View {
                 }
                 .focused($isFocused)
                 .font(Font.App.manrope(size: 16, weight: .medium))
-                .foregroundStyle(Color.discoverPrimaryText)
+                .foregroundStyle(Color.primaryText)
 
                 if isSecure {
                     Button {
@@ -46,43 +46,35 @@ struct BaseTextField: View {
                     } label: {
                         Image(systemName: showPassword ? "eye.slash" : "eye")
                             .font(.system(size: 16, weight: .semibold))
-                            .foregroundStyle(isFocused ? Color.discoverViolet : Color.discoverSecondaryText)
+                            .foregroundStyle(isFocused ? Color.brandPrimary : Color.secondaryText)
                             .scaleEffect(showPassword ? 1.08 : 1)
                     }
                     .buttonStyle(.spring(pressedScale: 0.88))
                 }
             }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 14)
+            .frame(minHeight: 54)
+            .padding(.horizontal, 16)
             .background(
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .fill(Color.surface.opacity(0.96))
+                RoundedRectangle(cornerRadius: AppCornerRadius.field, style: .continuous)
+                    .fill(Color.fieldBackground)
             )
             .overlay {
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                RoundedRectangle(cornerRadius: AppCornerRadius.field, style: .continuous)
                     .strokeBorder(borderColor, lineWidth: isFocused ? 1.5 : 1)
             }
             .shadow(
-                color: isFocused ? Color.discoverViolet.opacity(0.14) : Color.clear,
+                color: isFocused ? Color.brandPrimary.opacity(0.12) : Color.clear,
                 radius: 8,
                 x: 0,
                 y: 3
             )
-            .overlay {
-                if isFocused {
-                    RoundedRectangle(cornerRadius: 16, style: .continuous)
-                        .stroke(Color.discoverViolet.opacity(0.34), lineWidth: 2)
-                        .blur(radius: 2)
-                        .allowsHitTesting(false)
-                }
-            }
             .animation(.easeInOut(duration: 0.16), value: isFocused)
             .animation(.easeInOut(duration: 0.16), value: errorMessage)
 
             if let errorMessage {
                 Text(errorMessage)
                     .font(Font.App.footnote())
-                    .foregroundStyle(Color.discoverPink)
+                    .foregroundStyle(Color.error)
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
@@ -90,15 +82,15 @@ struct BaseTextField: View {
 
     private var borderColor: Color {
         if errorMessage != nil {
-            return Color.discoverPink
+            return Color.error
         }
-        return isFocused ? Color.discoverViolet : Color.discoverSecondaryText.opacity(0.22)
+        return isFocused ? Color.brandPrimary.opacity(0.72) : Color.hairline
     }
 }
 
 #Preview("BaseTextField") {
     ZStack {
-        Color.discoverBackgroundGradient.ignoresSafeArea()
+        Color.authBackgroundGradient.ignoresSafeArea()
 
         VStack(spacing: 20) {
             BaseTextField(

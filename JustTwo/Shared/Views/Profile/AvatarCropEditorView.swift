@@ -43,7 +43,7 @@ struct AvatarCropEditorView: View {
                 }
                 .accessibilityLabel(Text("profile.avatar_editor.save"))
                 .disabled(sourceImage == nil)
-                .foregroundStyle(sourceImage == nil ? Color.discoverSecondaryText : Color.brandPrimary)
+                .foregroundStyle(sourceImage == nil ? Color.secondaryText : Color.brandPrimary)
             }
         }
         .task {
@@ -58,7 +58,7 @@ struct AvatarCropEditorView: View {
     private var header: some View {
         Text("profile.avatar_editor.subtitle")
             .font(Font.App.manrope(size: 15, weight: .medium))
-            .foregroundStyle(Color.discoverSecondaryText)
+            .foregroundStyle(Color.secondaryText)
             .multilineTextAlignment(.center)
             .padding(.horizontal, AppSpacing.sm)
     }
@@ -77,18 +77,18 @@ struct AvatarCropEditorView: View {
                     Text("profile.avatar_editor.hint")
                         .font(Font.App.manrope(size: 12, weight: .medium))
                 }
-                .foregroundStyle(Color.discoverSecondaryText)
+                .foregroundStyle(Color.secondaryText)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)
-                .background(Color.surface.opacity(0.72), in: Capsule())
+                .background(Color.elevatedSurface, in: Capsule())
             }
         }
         .padding(.vertical, AppSpacing.lg)
         .padding(.horizontal, AppSpacing.sm)
-        .background(Color.surface.opacity(0.74), in: RoundedRectangle(cornerRadius: 28, style: .continuous))
+        .background(Color.cardSurface, in: RoundedRectangle(cornerRadius: AppCornerRadius.sheet, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 28, style: .continuous)
-                .stroke(Color.discoverViolet.opacity(0.14), lineWidth: 1)
+            RoundedRectangle(cornerRadius: AppCornerRadius.sheet, style: .continuous)
+                .stroke(Color.hairline, lineWidth: 1)
         )
         .shadow(color: Color.discoverCardShadow.opacity(0.08), radius: 24, x: 0, y: 10)
     }
@@ -109,7 +109,7 @@ struct AvatarCropEditorView: View {
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 14)
                 .background(Color.brandPrimaryGradient, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-                .shadow(color: Color.brandPrimary.opacity(0.22), radius: 16, x: 0, y: 8)
+                .shadow(color: Color.brandPrimaryGlow.opacity(0.22), radius: 16, x: 0, y: 8)
             }
             .buttonStyle(.spring(pressedScale: 0.98, response: 0.2, dampingFraction: 0.75))
 
@@ -125,13 +125,13 @@ struct AvatarCropEditorView: View {
                         Text("profile.avatar_editor.delete")
                             .font(Font.App.manrope(size: 15, weight: .semibold))
                     }
-                    .foregroundStyle(Color.discoverPink)
+                    .foregroundStyle(Color.error)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 14)
-                    .background(Color.surface.opacity(0.74), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    .background(Color.error.opacity(0.08), in: RoundedRectangle(cornerRadius: AppCornerRadius.field, style: .continuous))
                     .overlay(
-                        RoundedRectangle(cornerRadius: 16, style: .continuous)
-                            .stroke(Color.discoverPink.opacity(0.24), lineWidth: 1)
+                        RoundedRectangle(cornerRadius: AppCornerRadius.field, style: .continuous)
+                            .stroke(Color.error.opacity(0.22), lineWidth: 1)
                     )
                 }
                 .buttonStyle(.spring(pressedScale: 0.98, response: 0.2, dampingFraction: 0.75))
@@ -196,7 +196,7 @@ struct AvatarCropEditorView: View {
     private func cropOverlay(size: CGFloat) -> some View {
         ZStack {
             Rectangle()
-                .fill(Color.discoverPrimaryText.opacity(0.42))
+                .fill(Color.primaryText.opacity(0.42))
                 .mask {
                     Rectangle()
                         .overlay {
@@ -226,21 +226,21 @@ struct AvatarCropEditorView: View {
     private var emptyAvatarPlaceholder: some View {
         ZStack {
             Circle()
-                .fill(Color.surface.opacity(0.78))
+                .fill(Color.fieldBackground)
                 .frame(width: cropSize, height: cropSize)
 
             Circle()
-                .stroke(Color.discoverViolet.opacity(0.18), lineWidth: 1)
+                .stroke(Color.hairline, lineWidth: 1)
                 .frame(width: cropSize, height: cropSize)
 
             VStack(spacing: 14) {
                 Image(systemName: "person.crop.circle.badge.plus")
                     .font(.system(size: 72, weight: .regular))
-                    .foregroundStyle(Color.discoverSecondaryText.opacity(0.82))
+                    .foregroundStyle(Color.secondaryText.opacity(0.82))
 
                 Text("profile.avatar_editor.empty")
                     .font(Font.App.manrope(size: 15, weight: .medium))
-                    .foregroundStyle(Color.discoverSecondaryText)
+                    .foregroundStyle(Color.secondaryText)
             }
         }
         .frame(height: 340)

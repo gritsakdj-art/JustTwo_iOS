@@ -18,13 +18,13 @@ struct JustTwoLoaderCard: View {
             VStack(spacing: 8) {
                 Text(title)
                     .font(Font.App.manrope(size: 16, weight: .bold))
-                    .foregroundStyle(Color.discoverPrimaryText)
+                    .foregroundStyle(Color.primaryText)
                     .multilineTextAlignment(.center)
 
                 if let subtitle {
                     Text(subtitle)
                         .font(Font.App.subtitle)
-                        .foregroundStyle(Color.discoverSecondaryText)
+                        .foregroundStyle(Color.secondaryText)
                         .multilineTextAlignment(.center)
                 }
             }
@@ -32,17 +32,13 @@ struct JustTwoLoaderCard: View {
         .padding(.horizontal, 22)
         .padding(.vertical, 24)
         .frame(maxWidth: 360)
-        .background(cardBackground, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .background(Color.cardSurface.opacity(0.88), in: RoundedRectangle(cornerRadius: AppCornerRadius.card, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .stroke(Color.discoverViolet.opacity(0.14), lineWidth: 1)
+            RoundedRectangle(cornerRadius: AppCornerRadius.card, style: .continuous)
+                .stroke(Color.hairline, lineWidth: 1)
         }
         .shadow(color: Color.discoverCardShadow.opacity(0.14), radius: 28, x: 0, y: 14)
         .padding(.horizontal, 24)
-    }
-
-    private var cardBackground: some ShapeStyle {
-        Color.surface.opacity(0.88)
     }
 }
 

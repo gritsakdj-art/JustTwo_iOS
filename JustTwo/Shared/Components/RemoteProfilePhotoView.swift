@@ -24,7 +24,7 @@ struct RemoteProfilePhotoView: View {
                             }
                     case .empty:
                         ProgressView()
-                            .tint(Color.discoverViolet)
+                            .tint(Color.brandPrimary)
                     @unknown default:
                         failurePlaceholder
                     }

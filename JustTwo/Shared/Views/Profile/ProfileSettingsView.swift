@@ -48,7 +48,7 @@ struct ProfileSettingsView: View {
                 if let errorMessage {
                     Text(errorMessage)
                         .font(Font.App.footnote())
-                        .foregroundStyle(Color.discoverPink)
+                        .foregroundStyle(Color.error)
                 }
 
                 PrimaryButton(
@@ -116,7 +116,7 @@ struct ProfileSettingsView: View {
         VStack(alignment: .leading, spacing: AppSpacing.sm) {
             Text("profile.setup.subtitle")
                 .font(Font.App.subtitle)
-                .foregroundStyle(Color.discoverSecondaryText)
+                .foregroundStyle(Color.secondaryText)
                 .fixedSize(horizontal: false, vertical: true)
         }
     }
@@ -139,7 +139,7 @@ struct ProfileSettingsView: View {
             }
 
             Divider()
-                .overlay(Color.discoverViolet.opacity(0.12))
+                .overlay(Color.hairline)
 
             VStack(alignment: .leading, spacing: 16) {
                 sectionTitle("profile.settings.about_section")
@@ -155,16 +155,16 @@ struct ProfileSettingsView: View {
 
             if context == .settings && session.currentProfile != nil {
                 Divider()
-                    .overlay(Color.discoverViolet.opacity(0.12))
+                    .overlay(Color.hairline)
 
                 discoveryVisibilitySection
             }
         }
         .padding(AppSpacing.lg)
-        .background(Color.surface.opacity(0.78), in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .background(Color.cardSurface, in: RoundedRectangle(cornerRadius: AppCornerRadius.card, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .stroke(Color.discoverViolet.opacity(0.12), lineWidth: 1)
+            RoundedRectangle(cornerRadius: AppCornerRadius.card, style: .continuous)
+                .stroke(Color.hairline, lineWidth: 1)
         }
         .shadow(color: Color.discoverCardShadow.opacity(0.10), radius: 24, x: 0, y: 14)
     }
@@ -179,44 +179,44 @@ struct ProfileSettingsView: View {
                 HStack(spacing: 12) {
                     Image(systemName: "calendar")
                         .font(.system(size: 17, weight: .semibold))
-                        .foregroundStyle(Color.discoverViolet)
+                        .foregroundStyle(Color.brandPrimary)
                         .frame(width: 34, height: 34)
-                        .background(Color.discoverViolet.opacity(0.12), in: Circle())
+                        .background(Color.elevatedSurface, in: Circle())
 
                     VStack(alignment: .leading, spacing: 3) {
                         Text(birthDate.formatted(date: .abbreviated, time: .omitted))
                             .font(Font.App.manrope(size: 16, weight: .semibold))
-                            .foregroundStyle(Color.discoverPrimaryText)
+                            .foregroundStyle(Color.primaryText)
 
                         Text(ageDescription)
                             .font(Font.App.caption())
-                            .foregroundStyle(Color.discoverSecondaryText)
+                            .foregroundStyle(Color.secondaryText)
                     }
 
                     Spacer(minLength: 12)
 
                     Image(systemName: "chevron.down")
                         .font(.system(size: 13, weight: .bold))
-                        .foregroundStyle(Color.discoverSecondaryText)
+                        .foregroundStyle(Color.secondaryText)
                 }
                 .padding(.horizontal, 14)
                 .padding(.vertical, 12)
-                .background(Color.surface.opacity(0.96), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .background(Color.fieldBackground, in: RoundedRectangle(cornerRadius: AppCornerRadius.field, style: .continuous))
                 .overlay {
-                    RoundedRectangle(cornerRadius: 16, style: .continuous)
-                        .strokeBorder(birthDateValidationMessage == nil ? Color.discoverSecondaryText.opacity(0.22) : Color.discoverPink, lineWidth: 1)
+                    RoundedRectangle(cornerRadius: AppCornerRadius.field, style: .continuous)
+                        .strokeBorder(birthDateValidationMessage == nil ? Color.hairline : Color.error, lineWidth: 1)
                 }
             }
             .buttonStyle(.spring(pressedScale: 0.98))
 
             Text("profile.settings.birth_date.helper")
                 .font(Font.App.caption())
-                .foregroundStyle(Color.discoverSecondaryText)
+                .foregroundStyle(Color.secondaryText)
 
             if let birthDateValidationMessage {
                 Text(birthDateValidationMessage)
                     .font(Font.App.footnote())
-                    .foregroundStyle(Color.discoverPink)
+                    .foregroundStyle(Color.error)
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
@@ -260,13 +260,13 @@ struct ProfileSettingsView: View {
                                 if isSelected {
                                     Color.discoverSelectedGradient
                                 } else {
-                                    Color.surface.opacity(0.82)
+                                    Color.fieldBackground
                                 }
                             }
                             .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                             .overlay {
                                 RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                    .stroke(Color.discoverViolet.opacity(isSelected ? 0 : 0.18), lineWidth: 1)
+                                    .stroke(isSelected ? Color.clear : Color.hairline, lineWidth: 1)
                             }
                             .shadow(color: isSelected ? Color.discoverViolet.opacity(0.20) : Color.clear, radius: 12, x: 0, y: 6)
                         }
@@ -288,7 +288,7 @@ struct ProfileSettingsView: View {
 
             Text(gender.title)
                 .font(Font.App.manrope(size: 16, weight: .semibold))
-                .foregroundStyle(Color.discoverPrimaryText)
+                .foregroundStyle(Color.primaryText)
 
             Spacer(minLength: 12)
 
@@ -302,16 +302,16 @@ struct ProfileSettingsView: View {
                     .foregroundStyle(Color.brandPrimary)
                     .padding(.horizontal, 12)
                     .padding(.vertical, 8)
-                    .background(Color.brandPrimary.opacity(0.12), in: Capsule())
+                    .background(Color.elevatedSurface, in: Capsule())
             }
             .buttonStyle(.spring(pressedScale: 0.94))
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 12)
-        .background(Color.surface.opacity(0.96), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .background(Color.fieldBackground, in: RoundedRectangle(cornerRadius: AppCornerRadius.field, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .strokeBorder(Color.discoverSecondaryText.opacity(0.22), lineWidth: 1)
+            RoundedRectangle(cornerRadius: AppCornerRadius.field, style: .continuous)
+                .strokeBorder(Color.hairline, lineWidth: 1)
         }
     }
 
@@ -322,7 +322,7 @@ struct ProfileSettingsView: View {
             ZStack(alignment: .topLeading) {
                 TextEditor(text: $bio)
                     .font(Font.App.manrope(size: 16, weight: .medium))
-                    .foregroundStyle(Color.discoverPrimaryText)
+                    .foregroundStyle(Color.primaryText)
                     .scrollContentBackground(.hidden)
                     .frame(minHeight: 112, maxHeight: 112)
                     .padding(.horizontal, 10)
@@ -331,21 +331,21 @@ struct ProfileSettingsView: View {
                 if bio.isEmpty {
                     Text("profile.settings.bio_placeholder")
                         .font(Font.App.manrope(size: 16, weight: .medium))
-                        .foregroundStyle(Color.discoverSecondaryText.opacity(0.72))
+                        .foregroundStyle(Color.secondaryText.opacity(0.72))
                         .padding(.horizontal, 15)
                         .padding(.vertical, 16)
                         .allowsHitTesting(false)
                 }
             }
-            .background(Color.surface.opacity(0.96), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .background(Color.fieldBackground, in: RoundedRectangle(cornerRadius: AppCornerRadius.field, style: .continuous))
             .overlay {
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .strokeBorder(Color.discoverSecondaryText.opacity(0.22), lineWidth: 1)
+                RoundedRectangle(cornerRadius: AppCornerRadius.field, style: .continuous)
+                    .strokeBorder(Color.hairline, lineWidth: 1)
             }
 
             Text(bioCounterText)
                 .font(Font.App.caption())
-                .foregroundStyle(Color.discoverSecondaryText)
+                .foregroundStyle(Color.secondaryText)
                 .frame(maxWidth: .infinity, alignment: .trailing)
         }
     }
@@ -365,11 +365,11 @@ struct ProfileSettingsView: View {
                     VStack(alignment: .leading, spacing: 4) {
                         Text("profile.settings.discovery_visibility.title")
                             .font(Font.App.manrope(size: 16, weight: .bold))
-                            .foregroundStyle(Color.discoverPrimaryText)
+                            .foregroundStyle(Color.primaryText)
 
                         Text("profile.settings.discovery_visibility.subtitle")
                             .font(Font.App.caption())
-                            .foregroundStyle(Color.discoverSecondaryText)
+                            .foregroundStyle(Color.secondaryText)
                             .fixedSize(horizontal: false, vertical: true)
                     }
 
@@ -390,16 +390,16 @@ struct ProfileSettingsView: View {
                 if let discoveryVisibilityErrorMessage {
                     Text(discoveryVisibilityErrorMessage)
                         .font(Font.App.footnote())
-                        .foregroundStyle(Color.discoverPink)
+                        .foregroundStyle(Color.error)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 12)
-            .background(Color.surface.opacity(0.96), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .background(Color.fieldBackground, in: RoundedRectangle(cornerRadius: AppCornerRadius.field, style: .continuous))
             .overlay {
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .stroke(Color.discoverViolet.opacity(0.14), lineWidth: 1)
+                RoundedRectangle(cornerRadius: AppCornerRadius.field, style: .continuous)
+                    .stroke(Color.hairline, lineWidth: 1)
             }
         }
     }
@@ -414,18 +414,18 @@ struct ProfileSettingsView: View {
                 HStack(spacing: 12) {
                     Image(systemName: "trash.fill")
                         .font(.system(size: 16, weight: .semibold))
-                        .foregroundStyle(Color.onAccentText)
+                        .foregroundStyle(Color.error)
                         .frame(width: 36, height: 36)
-                        .background(Color.discoverPink, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                        .background(Color.elevatedSurface, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
 
                     VStack(alignment: .leading, spacing: 3) {
                         Text("profile.account.delete")
                             .font(Font.App.manrope(size: 16, weight: .bold))
-                            .foregroundStyle(Color.discoverPink)
+                            .foregroundStyle(Color.error)
 
                         Text("profile.account.delete_message")
                             .font(Font.App.caption())
-                            .foregroundStyle(Color.discoverSecondaryText)
+                            .foregroundStyle(Color.secondaryText)
                             .lineLimit(2)
                             .fixedSize(horizontal: false, vertical: true)
                     }
@@ -434,14 +434,14 @@ struct ProfileSettingsView: View {
 
                     Image(systemName: "chevron.forward")
                         .font(.system(size: 13, weight: .bold))
-                        .foregroundStyle(Color.discoverSecondaryText.opacity(0.72))
+                        .foregroundStyle(Color.secondaryText.opacity(0.72))
                 }
                 .padding(.horizontal, 14)
                 .padding(.vertical, 12)
-                .background(Color.surface.opacity(0.72), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                .background(Color.error.opacity(0.08), in: RoundedRectangle(cornerRadius: AppCornerRadius.field, style: .continuous))
                 .overlay {
-                    RoundedRectangle(cornerRadius: 18, style: .continuous)
-                        .stroke(Color.discoverPink.opacity(0.22), lineWidth: 1)
+                    RoundedRectangle(cornerRadius: AppCornerRadius.field, style: .continuous)
+                        .stroke(Color.error.opacity(0.22), lineWidth: 1)
                 }
             }
             .buttonStyle(.spring(pressedScale: 0.98))
@@ -452,7 +452,7 @@ struct ProfileSettingsView: View {
         VStack(spacing: AppSpacing.lg) {
             Text("profile.settings.birth_date.sheet_title")
                 .font(Font.App.manrope(size: 17, weight: .bold))
-                .foregroundStyle(Color.discoverPrimaryText)
+                .foregroundStyle(Color.primaryText)
                 .frame(maxWidth: .infinity, alignment: .leading)
 
             DatePicker(
@@ -482,11 +482,11 @@ struct ProfileSettingsView: View {
             VStack(alignment: .leading, spacing: AppSpacing.sm) {
                 Text("profile.account.delete_password_title")
                     .font(Font.App.manrope(size: 20, weight: .bold))
-                    .foregroundStyle(Color.discoverPrimaryText)
+                    .foregroundStyle(Color.primaryText)
 
                 Text("profile.account.delete_password_subtitle")
                     .font(Font.App.subheadline())
-                    .foregroundStyle(Color.discoverSecondaryText)
+                    .foregroundStyle(Color.secondaryText)
                     .fixedSize(horizontal: false, vertical: true)
             }
 
@@ -507,7 +507,7 @@ struct ProfileSettingsView: View {
             } label: {
                 Text("common.cancel")
                     .font(Font.App.footnote(weight: .semibold))
-                    .foregroundStyle(Color.discoverSecondaryText)
+                    .foregroundStyle(Color.secondaryText)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 8)
             }
@@ -527,7 +527,7 @@ struct ProfileSettingsView: View {
             HStack(spacing: 10) {
                 if isDeletingAccount {
                     ProgressView()
-                        .tint(Color.onAccentText)
+                        .tint(Color.error)
                 } else {
                     Image(systemName: "trash.fill")
                         .font(.system(size: 17, weight: .semibold))
@@ -536,12 +536,15 @@ struct ProfileSettingsView: View {
                 Text("profile.account.delete")
                     .font(Font.App.manrope(size: 16, weight: .bold))
             }
-            .foregroundStyle(Color.onAccentText)
+            .foregroundStyle(Color.error)
             .frame(maxWidth: .infinity)
             .frame(height: 54)
-            .background(Color.discoverPink, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .background(Color.error.opacity(0.08), in: RoundedRectangle(cornerRadius: AppCornerRadius.field, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: AppCornerRadius.field, style: .continuous)
+                    .stroke(Color.error.opacity(0.22), lineWidth: 1)
+            }
             .opacity(deletePassword.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? 0.65 : 1)
-            .shadow(color: Color.discoverPink.opacity(0.20), radius: 14, x: 0, y: 8)
         }
         .buttonStyle(.spring(pressedScale: 0.98))
         .disabled(deletePassword.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isDeletingAccount)
@@ -603,7 +606,7 @@ struct ProfileSettingsView: View {
     private func sectionTitle(_ title: LocalizedStringResource) -> some View {
         Text(title)
             .font(Font.App.manrope(size: 13, weight: .bold))
-            .foregroundStyle(Color.discoverSecondaryText)
+            .foregroundStyle(Color.secondaryText)
             .textCase(.uppercase)
             .padding(.horizontal, 4)
     }
@@ -611,7 +614,7 @@ struct ProfileSettingsView: View {
     private func fieldLabel(_ title: LocalizedStringResource) -> some View {
         Text(title)
             .font(Font.App.manrope(size: 13, weight: .semibold))
-            .foregroundStyle(Color.discoverSecondaryText)
+            .foregroundStyle(Color.secondaryText)
     }
 
     private func loadExistingProfile() {

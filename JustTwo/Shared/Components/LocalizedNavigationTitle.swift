@@ -12,7 +12,7 @@ private struct LocalizedNavigationTitleModifier: ViewModifier {
                 ToolbarItem(placement: .principal) {
                     Text(title)
                         .font(Font.App.manrope(size: 17, weight: .semibold))
-                        .foregroundStyle(Color.discoverPrimaryText)
+                        .foregroundStyle(Color.primaryText)
                         .lineLimit(1)
                         .minimumScaleFactor(0.82)
                         .id(selectedLanguageRawValue)

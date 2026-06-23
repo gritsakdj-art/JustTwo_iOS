@@ -17,7 +17,7 @@ struct GeneralSettingsView: View {
             .padding(.bottom, AppSpacing.xxl)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color.discoverBackgroundGradient.ignoresSafeArea())
+        .background(Color.surface.ignoresSafeArea())
         .localizedNavigationTitle("profile.menu.general_settings")
     }
 
@@ -148,7 +148,7 @@ private struct SettingsPickerSection<SelectedRow: View, Options: View>: View {
         VStack(alignment: .leading, spacing: AppSpacing.sm) {
             Text(title)
                 .font(Font.App.manrope(size: 13, weight: .bold))
-                .foregroundStyle(Color.discoverSecondaryText)
+                .foregroundStyle(Color.secondaryText)
                 .textCase(.uppercase)
                 .padding(.horizontal, 4)
 
@@ -169,10 +169,10 @@ private struct SettingsPickerSection<SelectedRow: View, Options: View>: View {
                     .transition(.opacity.combined(with: .move(edge: .top)))
                 }
             }
-            .background(Color.surface.opacity(0.72), in: RoundedRectangle(cornerRadius: 18))
+            .background(Color.cardSurface, in: RoundedRectangle(cornerRadius: AppCornerRadius.field))
             .overlay(
-                RoundedRectangle(cornerRadius: 18)
-                    .stroke(Color.discoverViolet.opacity(isExpanded ? 0.22 : 0.10), lineWidth: 1)
+                RoundedRectangle(cornerRadius: AppCornerRadius.field)
+                    .stroke(Color.hairline, lineWidth: 1)
             )
             .shadow(color: Color.discoverCardShadow.opacity(isExpanded ? 0.10 : 0.06), radius: 22, x: 0, y: 10)
         }
@@ -200,12 +200,12 @@ private struct SettingsPickerOptionRow: View {
             VStack(alignment: .leading, spacing: 2) {
                 title
                     .font(Font.App.manrope(size: 16, weight: .semibold))
-                    .foregroundStyle(Color.discoverPrimaryText)
+                    .foregroundStyle(Color.primaryText)
 
                 if let subtitle {
                     Text(subtitle)
                         .font(Font.App.caption(size: 12, weight: .medium))
-                        .foregroundStyle(Color.discoverSecondaryText)
+                        .foregroundStyle(Color.secondaryText)
                 }
             }
 
@@ -214,7 +214,7 @@ private struct SettingsPickerOptionRow: View {
             if let trailingIconName {
                 Image(systemName: trailingIconName)
                     .font(.system(size: trailingIconName.hasPrefix("chevron") ? 13 : 20, weight: .semibold))
-                    .foregroundStyle(isSelected ? Color.brandPrimary : Color.discoverSecondaryText.opacity(0.72))
+                    .foregroundStyle(isSelected ? Color.brandPrimary : Color.secondaryText.opacity(0.72))
             }
         }
         .frame(minHeight: 60)
@@ -229,7 +229,7 @@ private struct SettingsPickerOptionRow: View {
         if isSelected {
             Color.brandPrimaryGradient
         } else {
-            Color.brandPrimary.opacity(0.12)
+            Color.elevatedSurface
         }
     }
 }

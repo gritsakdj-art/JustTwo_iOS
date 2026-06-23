@@ -133,7 +133,7 @@ private struct AppTabBarItem: View {
             VStack(spacing: 2) {
                 Image(systemName: isSelected ? tab.selectedIcon : tab.icon)
                     .font(.system(size: 16, weight: isSelected ? .semibold : .regular))
-                    .foregroundStyle(isSelected ? Color.onAccentText : Color.discoverPrimaryText.opacity(0.42))
+                    .foregroundStyle(isSelected ? Color.onAccentText : Color.primaryText.opacity(0.42))
                     .frame(width: 30, height: 30)
                     .background {
                         if isSelected {
@@ -145,7 +145,7 @@ private struct AppTabBarItem: View {
 
                 Text(tab.title)
                     .font(Font.App.manrope(size: 9, weight: isSelected ? .bold : .medium))
-                    .foregroundStyle(isSelected ? Color.discoverViolet : Color.discoverSecondaryText)
+                    .foregroundStyle(isSelected ? Color.discoverViolet : Color.secondaryText)
                     .tracking(-0.1)
                     .lineLimit(1)
                     .minimumScaleFactor(0.85)

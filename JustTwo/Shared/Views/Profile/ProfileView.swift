@@ -59,12 +59,12 @@ struct ProfileView: View {
             VStack(spacing: 6) {
                 Text(session.currentProfile?.displayName ?? String(localized: "profile.current_user.name"))
                     .font(Font.App.manrope(size: 28, weight: .bold))
-                    .foregroundStyle(Color.discoverPrimaryText)
+                    .foregroundStyle(Color.primaryText)
                     .multilineTextAlignment(.center)
 
                 Text(session.currentUser?.email ?? String(localized: "profile.current_user.subtitle"))
                     .font(Font.App.manrope(size: 15, weight: .medium))
-                    .foregroundStyle(Color.discoverSecondaryText)
+                    .foregroundStyle(Color.secondaryText)
                     .multilineTextAlignment(.center)
                     .lineLimit(2)
                     .fixedSize(horizontal: false, vertical: true)
@@ -73,10 +73,10 @@ struct ProfileView: View {
         .frame(maxWidth: .infinity)
         .padding(.vertical, AppSpacing.xl)
         .padding(.horizontal, AppSpacing.lg)
-        .background(Color.surface.opacity(0.72), in: RoundedRectangle(cornerRadius: 22))
+        .background(Color.cardSurface, in: RoundedRectangle(cornerRadius: AppCornerRadius.card))
         .overlay(
-            RoundedRectangle(cornerRadius: 22)
-                .stroke(Color.discoverViolet.opacity(0.12), lineWidth: 1)
+            RoundedRectangle(cornerRadius: AppCornerRadius.card)
+                .stroke(Color.hairline, lineWidth: 1)
         )
         .shadow(color: Color.discoverCardShadow.opacity(0.08), radius: 24, x: 0, y: 10)
     }
@@ -133,7 +133,7 @@ struct ProfileView: View {
 
                 if isUploadingAvatar || photoStore.isUploading {
                     Circle()
-                        .fill(Color.discoverPrimaryText.opacity(0.28))
+                        .fill(Color.primaryText.opacity(0.28))
                         .frame(width: 118, height: 118)
                     ProgressView()
                         .tint(Color.onAccentText)
@@ -144,7 +144,7 @@ struct ProfileView: View {
                 Circle()
                     .stroke(Color.onAccentText.opacity(0.65), lineWidth: 3)
             )
-            .shadow(color: Color.discoverViolet.opacity(0.22), radius: 22, x: 0, y: 10)
+            .shadow(color: Color.brandPrimaryGlow.opacity(0.22), radius: 22, x: 0, y: 10)
 
             Image(systemName: "camera.fill")
                 .font(.system(size: 15, weight: .bold))
@@ -153,9 +153,9 @@ struct ProfileView: View {
                 .background(Color.brandPrimaryGradient, in: Circle())
                 .overlay(
                     Circle()
-                        .stroke(Color.surface.opacity(0.92), lineWidth: 2)
+                        .stroke(Color.cardSurface, lineWidth: 2)
                 )
-                .shadow(color: Color.brandPrimary.opacity(0.24), radius: 10, x: 0, y: 5)
+                .shadow(color: Color.brandPrimaryGlow.opacity(0.22), radius: 10, x: 0, y: 5)
                 .offset(x: -2, y: -2)
         }
         .accessibilityLabel(Text("profile.avatar.placeholder"))
@@ -267,11 +267,11 @@ private struct ProfileMenuRowContent: View {
                 .font(.system(size: 17, weight: .semibold))
                 .foregroundStyle(Color.brandPrimary)
                 .frame(width: 38, height: 38)
-                .background(Color.brandPrimary.opacity(0.12), in: RoundedRectangle(cornerRadius: 12))
+                .background(Color.elevatedSurface, in: RoundedRectangle(cornerRadius: 12))
 
             Text(title)
                 .font(Font.App.manrope(size: 16, weight: .semibold))
-                .foregroundStyle(Color.discoverPrimaryText)
+                .foregroundStyle(Color.primaryText)
                 .lineLimit(1)
                 .minimumScaleFactor(0.82)
 
@@ -279,14 +279,14 @@ private struct ProfileMenuRowContent: View {
 
             Image(systemName: "chevron.forward")
                 .font(.system(size: 13, weight: .bold))
-                .foregroundStyle(Color.discoverSecondaryText.opacity(0.72))
+                .foregroundStyle(Color.secondaryText.opacity(0.72))
         }
         .padding(.horizontal, AppSpacing.sm)
         .frame(height: 62)
-        .background(Color.surface.opacity(0.72), in: RoundedRectangle(cornerRadius: 18))
+        .background(Color.cardSurface, in: RoundedRectangle(cornerRadius: AppCornerRadius.field))
         .overlay(
-            RoundedRectangle(cornerRadius: 18)
-                .stroke(Color.discoverViolet.opacity(0.10), lineWidth: 1)
+            RoundedRectangle(cornerRadius: AppCornerRadius.field)
+                .stroke(Color.hairline, lineWidth: 1)
         )
     }
 }

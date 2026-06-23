@@ -39,16 +39,16 @@ struct AuthView: View {
                         .foregroundStyle(Color.onAccentText)
                 }
                 .frame(width: 44, height: 44)
-                .shadow(color: Color.brandPrimary.opacity(0.18), radius: 10, x: 0, y: 5)
+                .shadow(color: Color.brandPrimaryGlow.opacity(0.18), radius: 10, x: 0, y: 5)
 
                 Text("app.name")
                     .font(Font.App.screenTitle)
-                    .foregroundStyle(Color.discoverPrimaryText)
+                    .foregroundStyle(Color.primaryText)
             }
 
             Text(viewModel.mode == .login ? "auth.subtitle" : "auth.register_subtitle")
                 .font(Font.App.subtitle)
-                .foregroundStyle(Color.discoverSecondaryText)
+                .foregroundStyle(Color.secondaryText)
                 .fixedSize(horizontal: false, vertical: true)
         }
     }
@@ -76,7 +76,7 @@ struct AuthView: View {
             if let errorMessage = viewModel.errorMessage {
                 Text(errorMessage)
                     .font(Font.App.footnote())
-                    .foregroundStyle(Color.discoverPink)
+                    .foregroundStyle(Color.error)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .transition(.opacity.combined(with: .move(edge: .top)))
             }
@@ -111,7 +111,7 @@ struct AuthView: View {
             HStack(spacing: 6) {
                 Text(viewModel.mode == .login ? "auth.no_account" : "auth.have_account")
                     .font(Font.App.footnote())
-                    .foregroundStyle(Color.discoverSecondaryText)
+                    .foregroundStyle(Color.secondaryText)
 
                 Button {
                     withAnimation(.spring(response: 0.25, dampingFraction: 0.78)) {
@@ -127,12 +127,12 @@ struct AuthView: View {
             .frame(maxWidth: .infinity, alignment: .center)
         }
         .padding(AppSpacing.lg)
-        .background(Color.surface.opacity(0.78), in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .background(Color.cardSurface.opacity(0.86), in: RoundedRectangle(cornerRadius: AppCornerRadius.card, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .stroke(Color.discoverViolet.opacity(0.12), lineWidth: 1)
+            RoundedRectangle(cornerRadius: AppCornerRadius.card, style: .continuous)
+                .stroke(Color.glassBorderHighlight.opacity(0.35), lineWidth: 1)
         }
-        .shadow(color: Color.discoverCardShadow.opacity(0.10), radius: 24, x: 0, y: 14)
+        .shadow(color: Color.discoverCardShadow.opacity(0.16), radius: 24, x: 0, y: 14)
         .animation(.easeInOut(duration: 0.18), value: viewModel.errorMessage)
         .animation(.easeInOut(duration: 0.18), value: viewModel.showForgotPasswordOption)
         .sheet(isPresented: $viewModel.isForgotPasswordSheetPresented) {
@@ -147,11 +147,11 @@ struct AuthView: View {
             VStack(alignment: .leading, spacing: AppSpacing.sm) {
                 Text("auth.forgot_password.title")
                     .font(Font.App.manrope(size: 20, weight: .bold))
-                    .foregroundStyle(Color.discoverPrimaryText)
+                    .foregroundStyle(Color.primaryText)
 
                 Text("auth.forgot_password.subtitle")
                     .font(Font.App.subheadline())
-                    .foregroundStyle(Color.discoverSecondaryText)
+                    .foregroundStyle(Color.secondaryText)
                     .fixedSize(horizontal: false, vertical: true)
             }
 
@@ -184,7 +184,7 @@ struct AuthView: View {
             } label: {
                 Text("common.cancel")
                     .font(Font.App.footnote(weight: .semibold))
-                    .foregroundStyle(Color.discoverSecondaryText)
+                    .foregroundStyle(Color.secondaryText)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 8)
             }
@@ -193,7 +193,7 @@ struct AuthView: View {
         .padding(.horizontal, AppSpacing.xl)
         .padding(.top, AppSpacing.lg)
         .padding(.bottom, AppSpacing.xl)
-        .background(Color.discoverBackgroundGradient.ignoresSafeArea())
+        .background(Color.authBackgroundGradient.ignoresSafeArea())
     }
 
     private var authBackground: some View {

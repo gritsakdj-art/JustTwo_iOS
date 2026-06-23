@@ -54,16 +54,16 @@ struct ResetPasswordView: View {
                     .foregroundStyle(Color.onAccentText)
             }
             .frame(width: 78, height: 78)
-            .shadow(color: Color.brandPrimary.opacity(0.22), radius: 18, x: 0, y: 10)
+            .shadow(color: Color.brandPrimaryGlow.opacity(0.22), radius: 18, x: 0, y: 10)
 
             Text("reset_password.title")
                 .font(Font.App.screenTitle)
-                .foregroundStyle(Color.discoverPrimaryText)
+                .foregroundStyle(Color.primaryText)
                 .multilineTextAlignment(.center)
 
             Text("reset_password.subtitle")
                 .font(Font.App.subtitle)
-                .foregroundStyle(Color.discoverSecondaryText)
+                .foregroundStyle(Color.secondaryText)
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
         }
@@ -88,7 +88,7 @@ struct ResetPasswordView: View {
                 } label: {
                     Text("reset_password.back_to_login")
                         .font(Font.App.footnote(weight: .semibold))
-                        .foregroundStyle(Color.discoverSecondaryText)
+                        .foregroundStyle(Color.secondaryText)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 4)
                 }
@@ -102,12 +102,12 @@ struct ResetPasswordView: View {
             }
         }
         .padding(AppSpacing.lg)
-        .background(Color.surface.opacity(0.78), in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .background(Color.cardSurface.opacity(0.86), in: RoundedRectangle(cornerRadius: AppCornerRadius.card, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .stroke(Color.discoverViolet.opacity(0.12), lineWidth: 1)
+            RoundedRectangle(cornerRadius: AppCornerRadius.card, style: .continuous)
+                .stroke(Color.glassBorderHighlight.opacity(0.35), lineWidth: 1)
         }
-        .shadow(color: Color.discoverCardShadow.opacity(0.10), radius: 24, x: 0, y: 14)
+        .shadow(color: Color.discoverCardShadow.opacity(0.16), radius: 24, x: 0, y: 14)
         .animation(.easeInOut(duration: 0.18), value: errorMessage)
         .animation(.easeInOut(duration: 0.18), value: statusMessage)
         .animation(.easeInOut(duration: 0.18), value: didComplete)
@@ -148,7 +148,7 @@ struct ResetPasswordView: View {
             if let errorMessage {
                 Text(errorMessage)
                     .font(Font.App.footnote())
-                    .foregroundStyle(Color.discoverPink)
+                    .foregroundStyle(Color.error)
                     .multilineTextAlignment(.center)
                     .fixedSize(horizontal: false, vertical: true)
                     .frame(maxWidth: .infinity)

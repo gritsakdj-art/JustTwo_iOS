@@ -33,7 +33,7 @@ struct CheckEmailView: View {
                     VStack(spacing: AppSpacing.sm) {
                         Text("email_verification.check.title")
                             .font(Font.App.screenTitle)
-                            .foregroundStyle(Color.discoverPrimaryText)
+                            .foregroundStyle(Color.primaryText)
                             .multilineTextAlignment(.center)
 
                         Text(
@@ -43,7 +43,7 @@ struct CheckEmailView: View {
                             )
                         )
                         .font(Font.App.subtitle)
-                        .foregroundStyle(Color.discoverSecondaryText)
+                        .foregroundStyle(Color.secondaryText)
                         .multilineTextAlignment(.center)
                         .fixedSize(horizontal: false, vertical: true)
                     }
@@ -74,8 +74,8 @@ struct CheckEmailView: View {
                             }
                             .frame(maxWidth: .infinity)
                             .frame(height: 50)
-                            .foregroundStyle(resendDisabled ? Color.discoverSecondaryText : Color.brandPrimary)
-                            .background(Color.surface.opacity(0.62), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                            .foregroundStyle(resendDisabled ? Color.disabled : Color.brandPrimary)
+                            .background(Color.cardSurface.opacity(0.86), in: RoundedRectangle(cornerRadius: AppCornerRadius.field, style: .continuous))
                         }
                         .buttonStyle(.spring(pressedScale: 0.97, isEnabled: !resendDisabled))
                         .disabled(resendDisabled)
@@ -86,7 +86,7 @@ struct CheckEmailView: View {
                         } label: {
                             Text("email_verification.check.back_to_login")
                                 .font(Font.App.footnote(weight: .semibold))
-                                .foregroundStyle(Color.discoverSecondaryText)
+                                .foregroundStyle(Color.secondaryText)
                         }
                         .buttonStyle(.spring(pressedScale: 0.96))
                     }
@@ -119,7 +119,7 @@ struct CheckEmailView: View {
             if let errorMessage {
                 Text(errorMessage)
                     .font(Font.App.footnote())
-                    .foregroundStyle(Color.discoverPink)
+                    .foregroundStyle(Color.error)
                     .multilineTextAlignment(.center)
             }
         }
@@ -138,7 +138,7 @@ struct CheckEmailView: View {
                 .foregroundStyle(Color.onAccentText)
         }
         .frame(width: 86, height: 86)
-        .shadow(color: Color.brandPrimary.opacity(0.24), radius: 18, x: 0, y: 10)
+        .shadow(color: Color.brandPrimaryGlow.opacity(0.22), radius: 18, x: 0, y: 10)
     }
 
     private var resendDisabled: Bool {
