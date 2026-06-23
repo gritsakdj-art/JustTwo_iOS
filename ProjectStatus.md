@@ -59,6 +59,64 @@
 - Added redacted network URL logging so verification tokens are not printed in debug logs.
 - Added localized strings for email verification flow and new backend error codes.
 - Added `Docs/EmailVerification.md` with backend endpoint notes, universal links checklist, AASA examples, and current staging compatibility mode.
+- Added iOS API support for backend PR4 auth account lifecycle endpoints: forgot password, reset password, and delete account.
+- Added forgot password UX on the auth screen that appears only after invalid login credentials.
+- Added account deletion flow in profile settings with destructive confirmation, current password confirmation, session clearing, and localized errors.
+- Added password reset Universal Link handling for `https://api.jtwo.online/auth/reset-password?token=...`.
+- Added `ResetPasswordView` with new password confirmation, client-side password validation, backend reset submission, and return-to-login flow.
+
+## 2026-06-19
+
+### Auth account lifecycle (verified)
+
+- Confirmed end-to-end password reset magic link flow on staging: forgot password from `AuthView` → Resend email → Universal Link opens `ResetPasswordView` → `POST /auth/reset-password` → return to login with the new password.
+- Confirmed account deletion UI in `ProfileSettingsView` remains wired to `DELETE /me/account`.
+- Updated `Docs/EmailVerification.md` with password reset deep link notes, AASA path for `/auth/reset-password`, and current verified status.
+
+### Profile API alignment + photos
+
+- Added `isVisibleInDiscovery` support in `UserProfileDTO` and `UpsertProfileRequestBody` with safe decode default `true`.
+- Added discovery visibility toggle in `ProfileSettingsView` (`Show my profile in discovery`) with immediate `PUT /profile/me`, optimistic UI, and rollback on error.
+- Added profile photo DTOs in `Core/Models/ProfilePhotoModels.swift`.
+- Added profile photo API requests in `Core/API/ProfilePhotoRequests.swift`:
+  - `POST /profile/me/photos/upload-url`
+  - `POST /profile/me/photos/uploads/:uploadID/complete`
+  - `GET /profile/me/photos`
+  - `PATCH /profile/me/photos/:photoID/primary`
+  - `DELETE /profile/me/photos/:photoID`
+  - `GET /profile/photos/:photoID/download-url`
+- Added `ProfilePhotoService` and `ObjectStorageUploader` for direct `PUT` to presigned Object Storage URLs using exact backend headers (no JWT, no full signed URL logging).
+- Added `ProfilePhotoImagePipeline` (resize to max 1024, JPEG ~0.8) and `ProfilePhotoStore` for runtime photo state.
+- Replaced `ProfilePhotosPlaceholderView` with `ProfilePhotosView`:
+  - 2-column progressive gallery up to 6 photos;
+  - add cell only for the next available slot;
+  - context menu: make primary / delete;
+  - upload/list/primary/delete wired to backend.
+- Wired `ProfileView` avatar to primary photo display and real upload flow through existing `AvatarCropEditorView`.
+- Added `RemoteProfilePhotoView` with reload on expired `downloadUrl`.
+- Added localized profile photo errors and UI strings in `Localizable.xcstrings`.
+- Injected `ProfilePhotoStore` through `RootView` environment; reset store on `SessionStore.clearSession()`.
+- Verified iOS build with `xcodebuild -scheme JustTwo -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/JustTwoDerivedData build`.
+
+## 2026-06-23
+
+### Server-synchronized photo order and avatar presentation
+
+- Added `avatarPresentation` decoding to `ProfilePhotoDTO` using camelCase `offsetX`, `offsetY`, and `scale` fields.
+- Added iOS API support for:
+  - `PATCH /profile/me/photos/reorder`;
+  - `PATCH /profile/me/photos/:photoID/presentation`.
+- Changed the gallery source of truth from locally persisted order to backend `position` values.
+- Connected drag-and-drop completion to the atomic backend reorder endpoint using the complete active photo ID list.
+- Kept gallery position and `isPrimary` independent; primary changes still use their dedicated endpoint.
+- Changed avatar rendering and editor initialization to use presentation returned in the primary photo DTO.
+- Changed avatar save to persist normalized presentation on the backend.
+- Changed new avatar uploads to upload the full prepared image first and save presentation separately, avoiding double crop/transform.
+- Normalized outgoing avatar presentation to offsets `-2...2` and scale `1...5`.
+- Preserved server-confirmed photo state when reorder or presentation requests fail.
+- Added `Docs/ProfilePhotos.md` with DTOs, endpoint contracts, synchronization rules, security notes, and a manual smoke test.
+- Manually verified gallery order and avatar presentation persistence.
+- Verified Debug iOS Simulator build with `xcodebuild`; build succeeded.
 
 ## Notes
 

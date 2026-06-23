@@ -107,7 +107,7 @@ private struct AppTabBarGlassBackground: View {
                 .strokeBorder(
                     LinearGradient(
                         colors: [
-                            Color.white.opacity(0.30),
+                            Color.glassBorderHighlight.opacity(0.28),
                             Color.discoverVioletLight.opacity(0.14),
                             Color.discoverPink.opacity(0.08)
                         ],
@@ -126,13 +126,14 @@ private struct AppTabBarItem: View {
     let tab: AppTab
     let isSelected: Bool
     let action: () -> Void
+    @AppStorage("app.language") private var selectedLanguageRawValue = AppLanguage.system.rawValue
 
     var body: some View {
         Button(action: action) {
             VStack(spacing: 2) {
                 Image(systemName: isSelected ? tab.selectedIcon : tab.icon)
                     .font(.system(size: 16, weight: isSelected ? .semibold : .regular))
-                    .foregroundStyle(isSelected ? Color.onAccentText : Color.discoverPrimaryText.opacity(0.42))
+                    .foregroundStyle(isSelected ? Color.onAccentText : Color.primaryText.opacity(0.42))
                     .frame(width: 30, height: 30)
                     .background {
                         if isSelected {
@@ -143,11 +144,12 @@ private struct AppTabBarItem: View {
                     }
 
                 Text(tab.title)
-                    .font(.system(size: 9, weight: isSelected ? .bold : .medium))
-                    .foregroundStyle(isSelected ? Color.discoverViolet : Color.discoverSecondaryText)
+                    .font(Font.App.manrope(size: 9, weight: isSelected ? .bold : .medium))
+                    .foregroundStyle(isSelected ? Color.discoverViolet : Color.secondaryText)
                     .tracking(-0.1)
                     .lineLimit(1)
                     .minimumScaleFactor(0.85)
+                    .id(selectedLanguageRawValue)
             }
             .frame(maxWidth: .infinity)
             .contentShape(Rectangle())

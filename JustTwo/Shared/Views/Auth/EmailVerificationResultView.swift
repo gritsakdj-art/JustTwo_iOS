@@ -43,12 +43,12 @@ struct EmailVerificationResultView: View {
                 VStack(spacing: AppSpacing.sm) {
                     Text(title)
                         .font(Font.App.screenTitle)
-                        .foregroundStyle(Color.discoverPrimaryText)
+                        .foregroundStyle(Color.primaryText)
                         .multilineTextAlignment(.center)
 
                     Text(subtitle)
                         .font(Font.App.subtitle)
-                        .foregroundStyle(Color.discoverSecondaryText)
+                        .foregroundStyle(Color.secondaryText)
                         .multilineTextAlignment(.center)
                         .fixedSize(horizontal: false, vertical: true)
                 }
@@ -79,12 +79,12 @@ struct EmailVerificationResultView: View {
                                 }
 
                                 Text(resendTitle)
-                                    .font(.system(size: 15, weight: .semibold, design: .rounded))
+                                    .font(Font.App.manrope(size: 15, weight: .semibold))
                             }
                             .frame(maxWidth: .infinity)
                             .frame(height: 50)
-                            .foregroundStyle(resendDisabled ? Color.discoverSecondaryText : Color.brandPrimary)
-                            .background(Color.surface.opacity(0.62), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                            .foregroundStyle(resendDisabled ? Color.disabled : Color.brandPrimary)
+                            .background(Color.cardSurface.opacity(0.86), in: RoundedRectangle(cornerRadius: AppCornerRadius.field, style: .continuous))
                         }
                         .buttonStyle(.spring(pressedScale: 0.97, isEnabled: !resendDisabled))
                         .disabled(resendDisabled)
@@ -99,8 +99,8 @@ struct EmailVerificationResultView: View {
                             router.resetTo(.auth)
                         } label: {
                             Text("email_verification.result.back_to_login")
-                                .font(.footnote.weight(.semibold))
-                                .foregroundStyle(Color.discoverSecondaryText)
+                                .font(Font.App.footnote(weight: .semibold))
+                                .foregroundStyle(Color.secondaryText)
                         }
                         .buttonStyle(.spring(pressedScale: 0.96))
                     }
@@ -147,7 +147,7 @@ struct EmailVerificationResultView: View {
             }
         }
         .frame(width: 86, height: 86)
-        .shadow(color: Color.brandPrimary.opacity(0.22), radius: 18, x: 0, y: 10)
+        .shadow(color: Color.brandPrimaryGlow.opacity(0.22), radius: 18, x: 0, y: 10)
     }
 
     private var iconGradient: LinearGradient {
@@ -181,15 +181,15 @@ struct EmailVerificationResultView: View {
         VStack(spacing: AppSpacing.sm) {
             if let statusMessage {
                 Text(statusMessage)
-                    .font(.footnote)
+                    .font(Font.App.footnote())
                     .foregroundStyle(Color.brandPrimary)
                     .multilineTextAlignment(.center)
             }
 
             if let errorMessage {
                 Text(errorMessage)
-                    .font(.footnote)
-                    .foregroundStyle(Color.discoverPink)
+                    .font(Font.App.footnote())
+                    .foregroundStyle(Color.error)
                     .multilineTextAlignment(.center)
             }
         }

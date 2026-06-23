@@ -21,6 +21,14 @@ struct ProfileSettingsView: View {
     @State private var isSaving = false
     @State private var errorMessage: String?
     @State private var isBirthDatePickerPresented = false
+    @State private var isDeleteConfirmationPresented = false
+    @State private var isDeletePasswordSheetPresented = false
+    @State private var deletePassword = ""
+    @State private var isDeletingAccount = false
+    @State private var deleteAccountErrorMessage: String?
+    @State private var isVisibleInDiscovery = true
+    @State private var isUpdatingDiscoveryVisibility = false
+    @State private var discoveryVisibilityErrorMessage: String?
 
     private let bioLimit = 180
 
@@ -39,8 +47,8 @@ struct ProfileSettingsView: View {
 
                 if let errorMessage {
                     Text(errorMessage)
-                        .font(.footnote)
-                        .foregroundStyle(Color.discoverPink)
+                        .font(Font.App.footnote())
+                        .foregroundStyle(Color.error)
                 }
 
                 PrimaryButton(
@@ -50,6 +58,10 @@ struct ProfileSettingsView: View {
                 ) {
                     saveProfile()
                 }
+
+                if context == .settings {
+                    dangerZone
+                }
             }
             .padding(.horizontal, AppSpacing.xl)
             .padding(.top, AppSpacing.lg)
@@ -57,10 +69,9 @@ struct ProfileSettingsView: View {
         }
         .scrollDismissesKeyboard(.interactively)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color.discoverBackgroundGradient.ignoresSafeArea())
+        .discoverShellBackground()
         .hideKeyboardOnTap()
-        .navigationTitle(Text(navigationTitle))
-        .navigationBarTitleDisplayMode(.inline)
+        .localizedNavigationTitle(navigationTitle)
         .navigationBarBackButtonHidden(context == .onboarding)
         .onAppear {
             loadExistingProfile()
@@ -75,6 +86,26 @@ struct ProfileSettingsView: View {
                 .presentationDetents([.height(360)])
                 .presentationDragIndicator(.visible)
         }
+        .confirmationDialog(
+            Text("profile.account.delete_title"),
+            isPresented: $isDeleteConfirmationPresented,
+            titleVisibility: .visible
+        ) {
+            Button("profile.account.delete_confirm", role: .destructive) {
+                deleteAccountErrorMessage = nil
+                deletePassword = ""
+                isDeletePasswordSheetPresented = true
+            }
+
+            Button("common.cancel", role: .cancel) { }
+        } message: {
+            Text("profile.account.delete_message")
+        }
+        .sheet(isPresented: $isDeletePasswordSheetPresented) {
+            deleteAccountSheet
+                .presentationDetents([.height(390)])
+                .presentationDragIndicator(.visible)
+        }
     }
 
     private var navigationTitle: LocalizedStringResource {
@@ -85,7 +116,7 @@ struct ProfileSettingsView: View {
         VStack(alignment: .leading, spacing: AppSpacing.sm) {
             Text("profile.setup.subtitle")
                 .font(Font.App.subtitle)
-                .foregroundStyle(Color.discoverSecondaryText)
+                .foregroundStyle(Color.secondaryText)
                 .fixedSize(horizontal: false, vertical: true)
         }
     }
@@ -108,7 +139,7 @@ struct ProfileSettingsView: View {
             }
 
             Divider()
-                .overlay(Color.discoverViolet.opacity(0.12))
+                .overlay(Color.hairline)
 
             VStack(alignment: .leading, spacing: 16) {
                 sectionTitle("profile.settings.about_section")
@@ -121,12 +152,19 @@ struct ProfileSettingsView: View {
                     autocapitalization: .words
                 )
             }
+
+            if context == .settings && session.currentProfile != nil {
+                Divider()
+                    .overlay(Color.hairline)
+
+                discoveryVisibilitySection
+            }
         }
         .padding(AppSpacing.lg)
-        .background(Color.surface.opacity(0.78), in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .background(Color.cardSurface, in: RoundedRectangle(cornerRadius: AppCornerRadius.card, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .stroke(Color.discoverViolet.opacity(0.12), lineWidth: 1)
+            RoundedRectangle(cornerRadius: AppCornerRadius.card, style: .continuous)
+                .stroke(Color.hairline, lineWidth: 1)
         }
         .shadow(color: Color.discoverCardShadow.opacity(0.10), radius: 24, x: 0, y: 14)
     }
@@ -141,44 +179,44 @@ struct ProfileSettingsView: View {
                 HStack(spacing: 12) {
                     Image(systemName: "calendar")
                         .font(.system(size: 17, weight: .semibold))
-                        .foregroundStyle(Color.discoverViolet)
+                        .foregroundStyle(Color.brandPrimary)
                         .frame(width: 34, height: 34)
-                        .background(Color.discoverViolet.opacity(0.12), in: Circle())
+                        .background(Color.elevatedSurface, in: Circle())
 
                     VStack(alignment: .leading, spacing: 3) {
                         Text(birthDate.formatted(date: .abbreviated, time: .omitted))
-                            .font(.system(size: 16, weight: .semibold, design: .rounded))
-                            .foregroundStyle(Color.discoverPrimaryText)
+                            .font(Font.App.manrope(size: 16, weight: .semibold))
+                            .foregroundStyle(Color.primaryText)
 
                         Text(ageDescription)
-                            .font(.caption)
-                            .foregroundStyle(Color.discoverSecondaryText)
+                            .font(Font.App.caption())
+                            .foregroundStyle(Color.secondaryText)
                     }
 
                     Spacer(minLength: 12)
 
                     Image(systemName: "chevron.down")
                         .font(.system(size: 13, weight: .bold))
-                        .foregroundStyle(Color.discoverSecondaryText)
+                        .foregroundStyle(Color.secondaryText)
                 }
                 .padding(.horizontal, 14)
                 .padding(.vertical, 12)
-                .background(Color.surface.opacity(0.96), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .background(Color.fieldBackground, in: RoundedRectangle(cornerRadius: AppCornerRadius.field, style: .continuous))
                 .overlay {
-                    RoundedRectangle(cornerRadius: 16, style: .continuous)
-                        .strokeBorder(birthDateValidationMessage == nil ? Color.discoverSecondaryText.opacity(0.22) : Color.discoverPink, lineWidth: 1)
+                    RoundedRectangle(cornerRadius: AppCornerRadius.field, style: .continuous)
+                        .strokeBorder(birthDateValidationMessage == nil ? Color.hairline : Color.error, lineWidth: 1)
                 }
             }
             .buttonStyle(.spring(pressedScale: 0.98))
 
             Text("profile.settings.birth_date.helper")
-                .font(.caption)
-                .foregroundStyle(Color.discoverSecondaryText)
+                .font(Font.App.caption())
+                .foregroundStyle(Color.secondaryText)
 
             if let birthDateValidationMessage {
                 Text(birthDateValidationMessage)
-                    .font(.footnote)
-                    .foregroundStyle(Color.discoverPink)
+                    .font(Font.App.footnote())
+                    .foregroundStyle(Color.error)
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
@@ -204,7 +242,7 @@ struct ProfileSettingsView: View {
                         } label: {
                             HStack(spacing: 7) {
                                 Text(gender.title)
-                                    .font(.system(size: 14, weight: isSelected ? .bold : .semibold, design: .rounded))
+                                    .font(Font.App.manrope(size: 14, weight: isSelected ? .bold : .semibold))
                                     .lineLimit(2)
                                     .minimumScaleFactor(0.82)
                                     .multilineTextAlignment(.center)
@@ -222,13 +260,13 @@ struct ProfileSettingsView: View {
                                 if isSelected {
                                     Color.discoverSelectedGradient
                                 } else {
-                                    Color.surface.opacity(0.82)
+                                    Color.fieldBackground
                                 }
                             }
                             .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                             .overlay {
                                 RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                    .stroke(Color.discoverViolet.opacity(isSelected ? 0 : 0.18), lineWidth: 1)
+                                    .stroke(isSelected ? Color.clear : Color.hairline, lineWidth: 1)
                             }
                             .shadow(color: isSelected ? Color.discoverViolet.opacity(0.20) : Color.clear, radius: 12, x: 0, y: 6)
                         }
@@ -249,8 +287,8 @@ struct ProfileSettingsView: View {
                 .background(Color.discoverSelectedGradient, in: Circle())
 
             Text(gender.title)
-                .font(.system(size: 16, weight: .semibold, design: .rounded))
-                .foregroundStyle(Color.discoverPrimaryText)
+                .font(Font.App.manrope(size: 16, weight: .semibold))
+                .foregroundStyle(Color.primaryText)
 
             Spacer(minLength: 12)
 
@@ -260,20 +298,20 @@ struct ProfileSettingsView: View {
                 }
             } label: {
                 Text("profile.settings.gender.edit")
-                    .font(.footnote.weight(.bold))
+                    .font(Font.App.footnote(weight: .bold))
                     .foregroundStyle(Color.brandPrimary)
                     .padding(.horizontal, 12)
                     .padding(.vertical, 8)
-                    .background(Color.brandPrimary.opacity(0.12), in: Capsule())
+                    .background(Color.elevatedSurface, in: Capsule())
             }
             .buttonStyle(.spring(pressedScale: 0.94))
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 12)
-        .background(Color.surface.opacity(0.96), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .background(Color.fieldBackground, in: RoundedRectangle(cornerRadius: AppCornerRadius.field, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .strokeBorder(Color.discoverSecondaryText.opacity(0.22), lineWidth: 1)
+            RoundedRectangle(cornerRadius: AppCornerRadius.field, style: .continuous)
+                .strokeBorder(Color.hairline, lineWidth: 1)
         }
     }
 
@@ -283,8 +321,8 @@ struct ProfileSettingsView: View {
 
             ZStack(alignment: .topLeading) {
                 TextEditor(text: $bio)
-                    .font(.system(size: 16, weight: .medium, design: .rounded))
-                    .foregroundStyle(Color.discoverPrimaryText)
+                    .font(Font.App.manrope(size: 16, weight: .medium))
+                    .foregroundStyle(Color.primaryText)
                     .scrollContentBackground(.hidden)
                     .frame(minHeight: 112, maxHeight: 112)
                     .padding(.horizontal, 10)
@@ -292,31 +330,129 @@ struct ProfileSettingsView: View {
 
                 if bio.isEmpty {
                     Text("profile.settings.bio_placeholder")
-                        .font(.system(size: 16, weight: .medium, design: .rounded))
-                        .foregroundStyle(Color.discoverSecondaryText.opacity(0.72))
+                        .font(Font.App.manrope(size: 16, weight: .medium))
+                        .foregroundStyle(Color.secondaryText.opacity(0.72))
                         .padding(.horizontal, 15)
                         .padding(.vertical, 16)
                         .allowsHitTesting(false)
                 }
             }
-            .background(Color.surface.opacity(0.96), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .background(Color.fieldBackground, in: RoundedRectangle(cornerRadius: AppCornerRadius.field, style: .continuous))
             .overlay {
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .strokeBorder(Color.discoverSecondaryText.opacity(0.22), lineWidth: 1)
+                RoundedRectangle(cornerRadius: AppCornerRadius.field, style: .continuous)
+                    .strokeBorder(Color.hairline, lineWidth: 1)
             }
 
             Text(bioCounterText)
-                .font(.caption)
-                .foregroundStyle(Color.discoverSecondaryText)
+                .font(Font.App.caption())
+                .foregroundStyle(Color.secondaryText)
                 .frame(maxWidth: .infinity, alignment: .trailing)
+        }
+    }
+
+    private var discoveryVisibilitySection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            sectionTitle("profile.settings.privacy_section")
+
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(alignment: .center, spacing: 12) {
+                    Image(systemName: isVisibleInDiscovery ? "eye.fill" : "eye.slash.fill")
+                        .font(.system(size: 17, weight: .semibold))
+                        .foregroundStyle(Color.onAccentText)
+                        .frame(width: 36, height: 36)
+                        .background(Color.discoverSelectedGradient, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("profile.settings.discovery_visibility.title")
+                            .font(Font.App.manrope(size: 16, weight: .bold))
+                            .foregroundStyle(Color.primaryText)
+
+                        Text("profile.settings.discovery_visibility.subtitle")
+                            .font(Font.App.caption())
+                            .foregroundStyle(Color.secondaryText)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+
+                    Spacer(minLength: 12)
+
+                    if isUpdatingDiscoveryVisibility {
+                        ProgressView()
+                            .controlSize(.small)
+                            .tint(Color.discoverViolet)
+                    }
+
+                    Toggle("profile.settings.discovery_visibility.title", isOn: discoveryVisibilityBinding)
+                        .labelsHidden()
+                        .tint(Color.discoverViolet)
+                        .disabled(isUpdatingDiscoveryVisibility || isSaving)
+                }
+
+                if let discoveryVisibilityErrorMessage {
+                    Text(discoveryVisibilityErrorMessage)
+                        .font(Font.App.footnote())
+                        .foregroundStyle(Color.error)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 12)
+            .background(Color.fieldBackground, in: RoundedRectangle(cornerRadius: AppCornerRadius.field, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: AppCornerRadius.field, style: .continuous)
+                    .stroke(Color.hairline, lineWidth: 1)
+            }
+        }
+    }
+
+    private var dangerZone: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            sectionTitle("profile.account.danger_section")
+
+            Button {
+                isDeleteConfirmationPresented = true
+            } label: {
+                HStack(spacing: 12) {
+                    Image(systemName: "trash.fill")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(Color.error)
+                        .frame(width: 36, height: 36)
+                        .background(Color.elevatedSurface, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("profile.account.delete")
+                            .font(Font.App.manrope(size: 16, weight: .bold))
+                            .foregroundStyle(Color.error)
+
+                        Text("profile.account.delete_message")
+                            .font(Font.App.caption())
+                            .foregroundStyle(Color.secondaryText)
+                            .lineLimit(2)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+
+                    Spacer(minLength: 12)
+
+                    Image(systemName: "chevron.forward")
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundStyle(Color.secondaryText.opacity(0.72))
+                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 12)
+                .background(Color.error.opacity(0.08), in: RoundedRectangle(cornerRadius: AppCornerRadius.field, style: .continuous))
+                .overlay {
+                    RoundedRectangle(cornerRadius: AppCornerRadius.field, style: .continuous)
+                        .stroke(Color.error.opacity(0.22), lineWidth: 1)
+                }
+            }
+            .buttonStyle(.spring(pressedScale: 0.98))
         }
     }
 
     private var birthDatePickerSheet: some View {
         VStack(spacing: AppSpacing.lg) {
             Text("profile.settings.birth_date.sheet_title")
-                .font(.system(.headline, design: .rounded, weight: .bold))
-                .foregroundStyle(Color.discoverPrimaryText)
+                .font(Font.App.manrope(size: 17, weight: .bold))
+                .foregroundStyle(Color.primaryText)
                 .frame(maxWidth: .infinity, alignment: .leading)
 
             DatePicker(
@@ -339,6 +475,79 @@ struct ProfileSettingsView: View {
         .padding(.top, AppSpacing.lg)
         .padding(.bottom, AppSpacing.xl)
         .background(Color.discoverBackgroundGradient.ignoresSafeArea())
+    }
+
+    private var deleteAccountSheet: some View {
+        VStack(alignment: .leading, spacing: AppSpacing.lg) {
+            VStack(alignment: .leading, spacing: AppSpacing.sm) {
+                Text("profile.account.delete_password_title")
+                    .font(Font.App.manrope(size: 20, weight: .bold))
+                    .foregroundStyle(Color.primaryText)
+
+                Text("profile.account.delete_password_subtitle")
+                    .font(Font.App.subheadline())
+                    .foregroundStyle(Color.secondaryText)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            BaseTextField(
+                title: "profile.account.current_password",
+                text: $deletePassword,
+                isSecure: true,
+                textContentType: .password,
+                errorMessage: deleteAccountErrorMessage
+            )
+
+            destructiveDeleteButton
+
+            Button {
+                isDeletePasswordSheetPresented = false
+                deletePassword = ""
+                deleteAccountErrorMessage = nil
+            } label: {
+                Text("common.cancel")
+                    .font(Font.App.footnote(weight: .semibold))
+                    .foregroundStyle(Color.secondaryText)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 8)
+            }
+            .buttonStyle(.spring(pressedScale: 0.96))
+        }
+        .padding(.horizontal, AppSpacing.xl)
+        .padding(.top, AppSpacing.lg)
+        .padding(.bottom, AppSpacing.xl)
+        .background(Color.discoverBackgroundGradient.ignoresSafeArea())
+        .interactiveDismissDisabled(isDeletingAccount)
+    }
+
+    private var destructiveDeleteButton: some View {
+        Button {
+            deleteAccount()
+        } label: {
+            HStack(spacing: 10) {
+                if isDeletingAccount {
+                    ProgressView()
+                        .tint(Color.error)
+                } else {
+                    Image(systemName: "trash.fill")
+                        .font(.system(size: 17, weight: .semibold))
+                }
+
+                Text("profile.account.delete")
+                    .font(Font.App.manrope(size: 16, weight: .bold))
+            }
+            .foregroundStyle(Color.error)
+            .frame(maxWidth: .infinity)
+            .frame(height: 54)
+            .background(Color.error.opacity(0.08), in: RoundedRectangle(cornerRadius: AppCornerRadius.field, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: AppCornerRadius.field, style: .continuous)
+                    .stroke(Color.error.opacity(0.22), lineWidth: 1)
+            }
+            .opacity(deletePassword.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? 0.65 : 1)
+        }
+        .buttonStyle(.spring(pressedScale: 0.98))
+        .disabled(deletePassword.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isDeletingAccount)
     }
 
     private var genderColumns: [GridItem] {
@@ -385,18 +594,27 @@ struct ProfileSettingsView: View {
         )
     }
 
+    private var discoveryVisibilityBinding: Binding<Bool> {
+        Binding(
+            get: { isVisibleInDiscovery },
+            set: { newValue in
+                updateDiscoveryVisibility(to: newValue)
+            }
+        )
+    }
+
     private func sectionTitle(_ title: LocalizedStringResource) -> some View {
         Text(title)
-            .font(.system(size: 13, weight: .bold, design: .rounded))
-            .foregroundStyle(Color.discoverSecondaryText)
+            .font(Font.App.manrope(size: 13, weight: .bold))
+            .foregroundStyle(Color.secondaryText)
             .textCase(.uppercase)
             .padding(.horizontal, 4)
     }
 
     private func fieldLabel(_ title: LocalizedStringResource) -> some View {
         Text(title)
-            .font(.system(size: 13, weight: .semibold, design: .rounded))
-            .foregroundStyle(Color.discoverSecondaryText)
+            .font(Font.App.manrope(size: 13, weight: .semibold))
+            .foregroundStyle(Color.secondaryText)
     }
 
     private func loadExistingProfile() {
@@ -405,6 +623,7 @@ struct ProfileSettingsView: View {
         displayName = profile.displayName
         bio = profile.bio ?? ""
         city = profile.city ?? ""
+        isVisibleInDiscovery = profile.isVisibleInDiscovery
 
         if let parsedBirthDate = DateOnlyFormatter.date(from: profile.birthDate) {
             birthDate = parsedBirthDate
@@ -443,7 +662,8 @@ struct ProfileSettingsView: View {
             latitude: nil,
             longitude: nil,
             moodModeEnabled: true,
-            activityModeEnabled: true
+            activityModeEnabled: true,
+            isVisibleInDiscovery: isVisibleInDiscovery
         )
 
         Task {
@@ -464,6 +684,67 @@ struct ProfileSettingsView: View {
             }
 
             isSaving = false
+        }
+    }
+
+    private func updateDiscoveryVisibility(to newValue: Bool) {
+        guard newValue != isVisibleInDiscovery else { return }
+        guard context == .settings, session.currentProfile != nil, !isUpdatingDiscoveryVisibility else { return }
+
+        let previousValue = isVisibleInDiscovery
+        isVisibleInDiscovery = newValue
+        isUpdatingDiscoveryVisibility = true
+        discoveryVisibilityErrorMessage = nil
+
+        let body = UpsertProfileRequestBody(isVisibleInDiscovery: newValue)
+
+        Task {
+            do {
+                let profile = try await ProfileService.upsertProfile(body)
+                session.updateCurrentProfile(profile)
+                isVisibleInDiscovery = profile.isVisibleInDiscovery
+            } catch let error as NetworkError {
+                isVisibleInDiscovery = previousValue
+                discoveryVisibilityErrorMessage = error.userMessage
+            } catch {
+                isVisibleInDiscovery = previousValue
+                discoveryVisibilityErrorMessage = error.localizedDescription
+            }
+
+            isUpdatingDiscoveryVisibility = false
+        }
+    }
+
+    private func deleteAccount() {
+        let password = deletePassword
+        guard !password.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, !isDeletingAccount else { return }
+
+        isDeletingAccount = true
+        deleteAccountErrorMessage = nil
+
+        Task {
+            do {
+                _ = try await AuthService.deleteAccount(password: password)
+                deletePassword = ""
+                session.clearSession()
+                router.resetTo(.auth)
+            } catch let error as NetworkError {
+                deletePassword = ""
+
+                if error.shouldClearSession {
+                    session.clearSession()
+                    router.resetTo(.auth)
+                } else if error.isInvalidPassword {
+                    deleteAccountErrorMessage = String(localized: "profile.account.error.incorrect_password")
+                } else {
+                    deleteAccountErrorMessage = error.userMessage
+                }
+            } catch {
+                deletePassword = ""
+                deleteAccountErrorMessage = error.localizedDescription
+            }
+
+            isDeletingAccount = false
         }
     }
 }

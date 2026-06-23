@@ -113,6 +113,7 @@ struct DiscoverView: View {
     @State private var cardRotation: Double = 0
     @State private var isLiked: Bool = false
     @State private var isPassed: Bool = false
+    @Environment(\.colorScheme) private var colorScheme
 
     let profiles: [Profile]
     let usesRemotePhoto: Bool
@@ -134,15 +135,18 @@ struct DiscoverView: View {
     }
 
     var body: some View {
-        ZStack {
+        VStack(spacing: 0) {
+            headerView
+
+            tabContent
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .environment(\.isDiscoverShell, true)
+
+            AppTabBar(selection: $selectedTab)
+        }
+        .background {
             Color.discoverBackgroundGradient
                 .ignoresSafeArea()
-
-            VStack(spacing: 0) {
-                headerView
-                tabContent
-                AppTabBar(selection: $selectedTab)
-            }
         }
         .statusBarHidden(false)
     }
@@ -182,7 +186,7 @@ struct DiscoverView: View {
         HStack(alignment: .center) {
             VStack(alignment: .leading, spacing: 2) {
                 Text("app.name")
-                    .font(.system(size: 28, weight: .bold, design: .rounded))
+                    .font(Font.App.manrope(size: 28, weight: .bold))
                     .foregroundStyle(Color.discoverPrimaryText)
                     .tracking(-0.8)
 
@@ -191,7 +195,7 @@ struct DiscoverView: View {
                         .font(.system(size: 11, weight: .semibold))
                         .foregroundStyle(Color.discoverViolet)
                     Text("location.amsterdam")
-                        .font(.system(size: 13, weight: .medium))
+                        .font(Font.App.manrope(size: 13, weight: .medium))
                         .foregroundStyle(Color.discoverSecondaryText)
                 }
             }
@@ -201,6 +205,7 @@ struct DiscoverView: View {
         .padding(.horizontal, 24)
         .padding(.top, 4)
         .padding(.bottom, 12)
+        .frame(maxWidth: .infinity)
     }
 
     private var notificationButton: some View {
@@ -212,9 +217,9 @@ struct DiscoverView: View {
                 .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14))
                 .overlay(
                     RoundedRectangle(cornerRadius: 14)
-                        .stroke(Color.discoverViolet.opacity(0.15), lineWidth: 1)
+                        .stroke(Color.hairline, lineWidth: 1)
                 )
-                .shadow(color: Color.discoverViolet.opacity(0.10), radius: 12, x: 0, y: 2)
+                .shadow(color: Color.brandPrimaryGlow.opacity(0.12), radius: 12, x: 0, y: 2)
                 .accessibilityLabel(Text("accessibility.notifications"))
 
             Circle()
@@ -228,35 +233,45 @@ struct DiscoverView: View {
     // MARK: Segmented Control
 
     private var segmentedControl: some View {
-        HStack(spacing: 0) {
-            ForEach(DiscoverMode.allCases, id: \.self) { mode in
-                Button {
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.72)) {
-                        selectedMode = mode
-                    }
-                } label: {
-                    Text(mode.title)
-                        .font(.system(size: 14, weight: selectedMode == mode ? .bold : .medium))
-                        .foregroundStyle(selectedMode == mode ? Color.onAccentText : Color.discoverSecondaryText)
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 40)
-                        .background {
-                            if selectedMode == mode {
-                                Color.discoverSelectedGradient
-                                .clipShape(RoundedRectangle(cornerRadius: 12))
-                                .shadow(color: Color.discoverViolet.opacity(0.32), radius: 14, x: 0, y: 4)
+        GeometryReader { geometry in
+            let inset: CGFloat = 4
+            let segmentCount = CGFloat(DiscoverMode.allCases.count)
+            let segmentWidth = max((geometry.size.width - inset * 2) / segmentCount, 0)
+            let selectedIndex = CGFloat(DiscoverMode.allCases.firstIndex(of: selectedMode) ?? 0)
+
+            ZStack(alignment: .topLeading) {
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(Color.discoverSelectedGradient)
+                    .frame(width: segmentWidth, height: 40)
+                    .offset(x: inset + selectedIndex * segmentWidth, y: inset)
+                    .animation(.spring(response: 0.32, dampingFraction: 0.78), value: selectedMode)
+
+                HStack(spacing: 0) {
+                    ForEach(DiscoverMode.allCases, id: \.self) { mode in
+                        Button {
+                            withAnimation(.spring(response: 0.32, dampingFraction: 0.78)) {
+                                selectedMode = mode
                             }
+                        } label: {
+                            Text(mode.title)
+                                .font(Font.App.manrope(size: 14, weight: selectedMode == mode ? .bold : .medium))
+                                .foregroundStyle(selectedMode == mode ? Color.onAccentText : Color.discoverSecondaryText)
+                                .frame(width: segmentWidth, height: 40)
+                                .contentShape(Rectangle())
                         }
+                        .buttonStyle(.spring(pressedScale: 0.98))
+                    }
                 }
-                .buttonStyle(.spring(pressedScale: 0.96))
+                .padding(inset)
             }
         }
-        .padding(4)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
+        .frame(height: 48)
+        .background(Color.cardSurface.opacity(0.92), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 16)
-                .stroke(Color.discoverViolet.opacity(0.12), lineWidth: 1)
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .stroke(Color.hairline.opacity(0.8), lineWidth: 1)
         )
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         .padding(.horizontal, 24)
         .padding(.bottom, 16)
     }
@@ -273,21 +288,20 @@ struct DiscoverView: View {
                         }
                     } label: {
                         Text(mood.title)
-                            .font(.system(size: 13, weight: selectedMood == mood ? .bold : .medium))
-                            .foregroundStyle(selectedMood == mood ? Color.onAccentText : Color.discoverViolet)
+                            .font(Font.App.manrope(size: 13, weight: selectedMood == mood ? .bold : .medium))
+                            .foregroundStyle(selectedMood == mood ? Color.onAccentText : Color.discoverSecondaryText)
                             .padding(.horizontal, 16)
                             .padding(.vertical, 8)
                             .background {
                                 if selectedMood == mood {
-                                    Color.discoverMoodGradient
-                                    .clipShape(Capsule())
-                                    .shadow(color: Color.discoverPink.opacity(0.30), radius: 14, x: 0, y: 4)
+                                    Capsule(style: .continuous)
+                                        .fill(Color.discoverMoodGradient)
                                 } else {
-                                    Capsule()
-                                        .fill(Color.surface.opacity(0.75))
+                                    Capsule(style: .continuous)
+                                        .fill(Color.cardSurface.opacity(0.88))
                                         .overlay(
-                                            Capsule()
-                                                .stroke(Color.discoverViolet.opacity(0.20), lineWidth: 1.5)
+                                            Capsule(style: .continuous)
+                                                .stroke(Color.hairline.opacity(0.8), lineWidth: 1)
                                         )
                                 }
                             }
@@ -331,9 +345,9 @@ struct DiscoverView: View {
                     .padding(.horizontal, 20)
                     .padding(.bottom, 24)
             }
-            .clipShape(RoundedRectangle(cornerRadius: 28))
-            .shadow(color: Color.discoverCardShadow.opacity(0.16), radius: 60, x: 0, y: 20)
-            .shadow(color: Color.discoverPink.opacity(0.10), radius: 16, x: 0, y: 4)
+            .clipShape(RoundedRectangle(cornerRadius: AppCornerRadius.profileCard, style: .continuous))
+            .shadow(color: Color.discoverCardShadow.opacity(profileCardShadowOpacity), radius: 60, x: 0, y: 20)
+            .shadow(color: Color.brandPrimaryGlow.opacity(0.08), radius: 16, x: 0, y: 4)
             .offset(cardOffset)
             .rotationEffect(.degrees(cardRotation))
             .gesture(swipeGesture)
@@ -376,7 +390,7 @@ struct DiscoverView: View {
                     .foregroundStyle(Color.onAccentText.opacity(0.82))
 
                 Text(profileInitial)
-                    .font(.system(size: 52, weight: .bold, design: .rounded))
+                    .font(Font.App.manrope(size: 52, weight: .bold))
                     .foregroundStyle(Color.onAccentText.opacity(0.72))
                     .frame(width: 86, height: 86)
                     .background(Color.onAccentText.opacity(0.16), in: Circle())
@@ -388,12 +402,12 @@ struct DiscoverView: View {
 
     private var moodPill: some View {
         Text(localizedUppercase(profile.moodTag))
-            .font(.system(size: 10, weight: .semibold))
-            .foregroundStyle(Color.onAccentText)
+            .font(Font.App.manrope(size: 10, weight: .semibold))
+            .foregroundStyle(Color.discoverOnPhotoText)
             .padding(.horizontal, 12)
             .padding(.vertical, 6)
-            .background(.ultraThinMaterial, in: Capsule())
-            .overlay(Capsule().stroke(Color.onAccentText.opacity(0.28), lineWidth: 1))
+            .background(Color.discoverCardScrim.opacity(0.42), in: Capsule())
+            .overlay(Capsule().stroke(Color.discoverOnPhotoText.opacity(0.22), lineWidth: 1))
             .tracking(0.6)
     }
 
@@ -401,23 +415,24 @@ struct DiscoverView: View {
         HStack(alignment: .bottom) {
             VStack(alignment: .leading, spacing: 6) {
                 Text(profileTitle)
-                    .font(.system(size: 26, weight: .bold, design: .rounded))
-                    .foregroundStyle(Color.onAccentText)
+                    .font(Font.App.manrope(size: 26, weight: .bold))
+                    .foregroundStyle(Color.discoverOnPhotoText)
                     .tracking(-0.6)
 
                 HStack(spacing: 6) {
                     Circle()
                         .fill(Color.discoverOnline)
                         .frame(width: 7, height: 7)
-                        .shadow(color: Color.discoverOnline, radius: 4)
+                        .overlay(Circle().stroke(Color.cardSurface, lineWidth: 1.5))
+                        .shadow(color: Color.success.opacity(0.45), radius: 4)
                     Text(distanceText)
-                        .font(.system(size: 13, weight: .medium))
-                        .foregroundStyle(Color.onAccentText.opacity(0.75))
+                        .font(Font.App.manrope(size: 13, weight: .medium))
+                        .foregroundStyle(Color.discoverOnPhotoText.opacity(0.82))
                 }
 
                 Text(profile.bio)
-                    .font(.system(size: 14, weight: .regular))
-                    .foregroundStyle(Color.onAccentText.opacity(0.68))
+                    .font(Font.App.manrope(size: 14, weight: .regular))
+                    .foregroundStyle(Color.discoverOnPhotoText.opacity(0.78))
                     .lineLimit(2)
                     .frame(maxWidth: 220, alignment: .leading)
             }
@@ -434,11 +449,11 @@ struct DiscoverView: View {
                 )
                 .frame(width: 52, height: 52)
             Circle()
-                .fill(Color.discoverPrimaryText.opacity(0.75))
+                .fill(Color.discoverCardScrim.opacity(0.88))
                 .frame(width: 46, height: 46)
             Text("\(profile.matchPercent)%")
-                .font(.system(size: 14, weight: .bold, design: .rounded))
-                .foregroundStyle(Color.onAccentText)
+                .font(Font.App.manrope(size: 14, weight: .bold))
+                .foregroundStyle(Color.discoverOnPhotoText)
                 .tracking(-0.4)
         }
         .shadow(color: Color.discoverViolet.opacity(0.4), radius: 16, x: 0, y: 4)
@@ -612,7 +627,7 @@ struct ActionButton: View {
             gradient
         case .outlined(_, let borderColor):
             ZStack {
-                Color.surface.opacity(0.85)
+                Color.cardSurface.opacity(0.85)
                 Circle().stroke(borderColor, lineWidth: 1.5)
             }
         }
@@ -628,8 +643,14 @@ struct ActionButton: View {
     private var shadowColor: Color {
         switch style {
         case .gradient(_, let shadowColor): return shadowColor
-        case .outlined: return Color.discoverViolet.opacity(0.10)
+        case .outlined: return Color.discoverCardShadow.opacity(0.10)
         }
+    }
+}
+
+private extension DiscoverView {
+    var profileCardShadowOpacity: Double {
+        colorScheme == .dark ? 0.45 : 0.22
     }
 }
 

@@ -16,6 +16,27 @@ enum AuthService {
         )
     }
 
+    static func forgotPassword(email: String) async throws -> MessageResponse {
+        try await NetworkExecutor.shared.send(
+            ForgotPasswordRequest(email: email),
+            strategies: NetworkStrategy.defaultFlow
+        )
+    }
+
+    static func resetPassword(token: String, newPassword: String) async throws -> MessageResponse {
+        try await NetworkExecutor.shared.send(
+            ResetPasswordRequest(token: token, newPassword: newPassword),
+            strategies: NetworkStrategy.defaultFlow
+        )
+    }
+
+    static func deleteAccount(password: String) async throws -> MessageResponse {
+        try await NetworkExecutor.shared.send(
+            DeleteAccountRequest(password: password),
+            strategies: NetworkStrategy.defaultFlow
+        )
+    }
+
     static func currentUser() async throws -> UserResponse {
         try await NetworkExecutor.shared.send(CurrentUserRequest())
     }

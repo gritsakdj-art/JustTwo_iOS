@@ -13,6 +13,12 @@ final class AuthViewModel {
     var password = ""
     var isLoading = false
     var errorMessage: String?
+    var showForgotPasswordOption = false
+    var isForgotPasswordSheetPresented = false
+    var forgotPasswordEmail = ""
+    var isSendingForgotPassword = false
+    var forgotPasswordMessage: String?
+    var forgotPasswordErrorMessage: String?
 
     var emailValidationMessage: String? {
         let trimmedEmail = email.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -27,7 +33,7 @@ final class AuthViewModel {
         case .login:
             return nil
         case .register:
-            return isValidPassword(password) ? nil : String(localized: "auth.error.weak_password")
+            return PasswordPolicy.isValid(password) ? nil : String(localized: "auth.error.weak_password")
         }
     }
 
@@ -42,7 +48,7 @@ final class AuthViewModel {
         case .login:
             return true
         case .register:
-            return isValidEmail(trimmedEmail) && isValidPassword(password)
+            return isValidEmail(trimmedEmail) && PasswordPolicy.isValid(password)
         }
     }
 
@@ -51,6 +57,7 @@ final class AuthViewModel {
 
         isLoading = true
         errorMessage = nil
+        showForgotPasswordOption = false
 
         let normalizedEmail = email
             .trimmingCharacters(in: .whitespacesAndNewlines)
@@ -78,10 +85,12 @@ final class AuthViewModel {
                     session.setPendingVerificationEmail(normalizedEmail)
                     router.showCheckEmail(email: normalizedEmail)
                     isLoading = false
+                    showForgotPasswordOption = false
                     return
                 }
 
                 try session.signIn(response)
+                showForgotPasswordOption = false
 
                 if session.isEmailVerified {
                     switch mode {
@@ -97,10 +106,14 @@ final class AuthViewModel {
             } catch let error as NetworkError {
                 if error.isEmailNotVerified {
                     session.setPendingVerificationEmail(normalizedEmail)
+                    showForgotPasswordOption = false
                     router.showCheckEmail(
                         email: normalizedEmail,
                         message: String(localized: "email_verification.login_required_message")
                     )
+                } else if mode == .login, error.isInvalidCredentials {
+                    errorMessage = error.userMessage
+                    showForgotPasswordOption = true
                 } else {
                     errorMessage = error.userMessage
                 }
@@ -115,6 +128,48 @@ final class AuthViewModel {
     func toggleMode() {
         mode = mode == .login ? .register : .login
         errorMessage = nil
+        showForgotPasswordOption = false
+        resetForgotPasswordState()
+    }
+
+    func presentForgotPassword() {
+        forgotPasswordEmail = email
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+        forgotPasswordMessage = nil
+        forgotPasswordErrorMessage = nil
+        isForgotPasswordSheetPresented = true
+    }
+
+    func sendForgotPassword() {
+        let normalizedEmail = forgotPasswordEmail
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+
+        guard !isSendingForgotPassword else { return }
+        guard isValidEmail(normalizedEmail) else {
+            forgotPasswordErrorMessage = String(localized: "auth.error.invalid_email")
+            forgotPasswordMessage = nil
+            return
+        }
+
+        isSendingForgotPassword = true
+        forgotPasswordEmail = normalizedEmail
+        forgotPasswordMessage = nil
+        forgotPasswordErrorMessage = nil
+
+        Task {
+            do {
+                _ = try await AuthService.forgotPassword(email: normalizedEmail)
+                forgotPasswordMessage = String(localized: "auth.forgot_password.generic_success")
+            } catch let error as NetworkError {
+                forgotPasswordErrorMessage = error.userMessage
+            } catch {
+                forgotPasswordErrorMessage = error.localizedDescription
+            }
+
+            isSendingForgotPassword = false
+        }
     }
 
     private func isValidEmail(_ value: String) -> Bool {
@@ -123,9 +178,11 @@ final class AuthViewModel {
         return trimmed.range(of: pattern, options: [.regularExpression, .caseInsensitive]) != nil
     }
 
-    private func isValidPassword(_ value: String) -> Bool {
-        let hasLetter = value.rangeOfCharacter(from: .letters) != nil
-        let hasDigit = value.rangeOfCharacter(from: .decimalDigits) != nil
-        return value.count >= 8 && hasLetter && hasDigit
+    private func resetForgotPasswordState() {
+        isForgotPasswordSheetPresented = false
+        forgotPasswordEmail = ""
+        isSendingForgotPassword = false
+        forgotPasswordMessage = nil
+        forgotPasswordErrorMessage = nil
     }
 }

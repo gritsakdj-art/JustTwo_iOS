@@ -15,14 +15,14 @@ struct StatePlaceholderView: View {
                 .foregroundStyle(Color.brandPrimary)
 
             Text(title)
-                .font(.system(size: 22, weight: .bold, design: .rounded))
-                .foregroundStyle(Color.discoverPrimaryText)
+                .font(Font.App.manrope(size: 22, weight: .bold))
+                .foregroundStyle(Color.primaryText)
                 .multilineTextAlignment(.center)
 
             Text(subtitle)
                 .font(Font.App.subtitle)
                 .multilineTextAlignment(.center)
-                .foregroundStyle(Color.discoverSecondaryText)
+                .foregroundStyle(Color.secondaryText)
                 .padding(.horizontal, AppSpacing.xl)
 
             if let actionTitle, let action {

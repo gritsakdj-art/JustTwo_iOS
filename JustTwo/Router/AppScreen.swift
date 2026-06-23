@@ -6,6 +6,8 @@ enum AppScreen: Hashable {
     case checkEmail(email: String, message: String?)
     case emailVerificationResult(token: String)
     case emailVerificationError(message: String)
+    case resetPassword(token: String)
+    case resetPasswordError(message: String)
     case profileSetup
     case main
 }

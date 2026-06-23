@@ -36,16 +36,16 @@ struct PrimaryButton: View {
                 }
 
                 Text(title)
-                    .font(.system(size: 16, weight: .bold, design: .rounded))
+                    .font(Font.App.button)
                     .lineLimit(1)
                     .minimumScaleFactor(0.82)
             }
-            .foregroundStyle(Color.onAccentText)
+            .foregroundStyle(isDisabled ? Color.disabled : Color.onAccentText)
             .frame(maxWidth: .infinity)
-            .frame(height: 54)
-            .background(backgroundStyle, in: RoundedRectangle(cornerRadius: 16))
+            .frame(height: 56)
+            .background(backgroundStyle, in: RoundedRectangle(cornerRadius: AppCornerRadius.button, style: .continuous))
             .opacity(isDisabled ? 0.65 : 1)
-            .shadow(color: Color.brandPrimary.opacity(isDisabled ? 0.12 : 0.26), radius: 18, x: 0, y: 8)
+            .shadow(color: Color.brandPrimaryGlow.opacity(isDisabled ? 0.10 : 0.22), radius: 18, x: 0, y: 8)
         }
         .buttonStyle(PrimaryButtonStyle(isDisabled: isDisabled || isLoading))
         .disabled(isDisabled || isLoading)
@@ -64,7 +64,7 @@ private struct PrimaryButtonStyle: ButtonStyle {
         configuration.label
             .background(
                 Color.brandPrimaryPressedGradient.opacity(configuration.isPressed && !isDisabled ? 1 : 0),
-                in: RoundedRectangle(cornerRadius: 16)
+                in: RoundedRectangle(cornerRadius: AppCornerRadius.button, style: .continuous)
             )
             .springButtonEffect(
                 isPressed: configuration.isPressed && !isDisabled,
@@ -77,7 +77,7 @@ private struct PrimaryButtonStyle: ButtonStyle {
 
 #Preview {
     ZStack {
-        Color.discoverBackgroundGradient.ignoresSafeArea()
+        Color.authBackgroundGradient.ignoresSafeArea()
         VStack(spacing: 16) {
             PrimaryButton("auth.login", systemImage: "arrow.right") { }
             PrimaryButton("auth.register", isLoading: true) { }

@@ -101,7 +101,22 @@ enum APIErrorCode: String {
     case validationFailed = "validation_failed"
     case invalidProfileModes = "invalid_profile_modes"
     case invalidOrExpiredVerificationToken = "invalid_or_expired_verification_token"
+    case invalidOrExpiredPasswordResetToken = "invalid_or_expired_password_reset_token"
     case emailDeliveryFailed = "email_delivery_failed"
+    case invalidPassword = "invalid_password"
+    case accountDeletionFailed = "account_deletion_failed"
+    case unsupportedContentType = "unsupported_content_type"
+    case fileTooLarge = "file_too_large"
+    case photoLimitReached = "photo_limit_reached"
+    case uploadNotFound = "upload_not_found"
+    case uploadExpired = "upload_expired"
+    case uploadAlreadyCompleted = "upload_already_completed"
+    case uploadedObjectNotFound = "uploaded_object_not_found"
+    case uploadedObjectSizeMismatch = "uploaded_object_size_mismatch"
+    case uploadedObjectContentTypeMismatch = "uploaded_object_content_type_mismatch"
+    case photoNotFound = "photo_not_found"
+    case storageSigningFailed = "storage_signing_failed"
+    case storageHeadFailed = "storage_head_failed"
 }
 
 struct APIErrorResponse: Decodable, Error {
@@ -138,8 +153,34 @@ struct APIErrorResponse: Decodable, Error {
             return String(localized: "profile.error.invalid_modes")
         case .invalidOrExpiredVerificationToken:
             return String(localized: "email_verification.error.invalid_or_expired")
+        case .invalidOrExpiredPasswordResetToken:
+            return String(localized: "auth.error.invalid_or_expired_password_reset_token")
         case .emailDeliveryFailed:
             return String(localized: "email_verification.error.delivery_failed")
+        case .invalidPassword:
+            return String(localized: "profile.account.error.incorrect_password")
+        case .accountDeletionFailed:
+            return String(localized: "profile.account.error.deletion_failed")
+        case .unsupportedContentType:
+            return String(localized: "profile.photos.error.unsupported_content_type")
+        case .fileTooLarge:
+            return String(localized: "profile.photos.error.file_too_large")
+        case .photoLimitReached:
+            return String(localized: "profile.photos.error.limit_reached")
+        case .uploadNotFound:
+            return String(localized: "profile.photos.error.upload_not_found")
+        case .uploadExpired:
+            return String(localized: "profile.photos.error.upload_expired")
+        case .uploadAlreadyCompleted:
+            return String(localized: "profile.photos.error.upload_already_completed")
+        case .uploadedObjectNotFound:
+            return String(localized: "profile.photos.error.uploaded_object_not_found")
+        case .uploadedObjectSizeMismatch, .uploadedObjectContentTypeMismatch:
+            return String(localized: "profile.photos.error.upload_verification_failed")
+        case .photoNotFound:
+            return String(localized: "profile.photos.error.not_found")
+        case .storageSigningFailed, .storageHeadFailed:
+            return String(localized: "profile.photos.error.storage_failed")
         case .validationFailed, .none:
             return errorCode == .validationFailed ? String(localized: "common.error.validation_failed") : message
         }

@@ -3,6 +3,10 @@ import SwiftUI
 struct RootView: View {
     @State private var router = AppRouter.shared
     @State private var session = SessionStore.shared
+    @State private var photoStore = ProfilePhotoStore.shared
+    @State private var avatarCropStore = ProfileAvatarCropStore.shared
+    @Environment(\.layoutDirection) private var systemLayoutDirection
+    @AppStorage("app.language") private var selectedLanguageRawValue = AppLanguage.system.rawValue
     @AppStorage("app.theme") private var selectedThemeRawValue = AppTheme.system.rawValue
 
     var body: some View {
@@ -10,10 +14,18 @@ struct RootView: View {
             .id(router.reloadID)
             .environment(router)
             .environment(session)
+            .environment(photoStore)
+            .environment(avatarCropStore)
+            .environment(\.locale, selectedLanguage.locale)
+            .environment(\.layoutDirection, selectedLanguage.layoutDirection(system: systemLayoutDirection))
             .preferredColorScheme(selectedTheme.colorScheme)
             .onOpenURL { url in
                 EmailVerificationDeepLinkHandler.handle(url, router: router)
             }
+    }
+
+    private var selectedLanguage: AppLanguage {
+        AppLanguage(rawValue: selectedLanguageRawValue) ?? .system
     }
 
     private var selectedTheme: AppTheme {

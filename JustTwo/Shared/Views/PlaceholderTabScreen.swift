@@ -13,7 +13,7 @@ struct PlaceholderTabScreen: View {
                 Circle()
                     .fill(Color.discoverSelectedGradient)
                     .frame(width: 82, height: 82)
-                    .shadow(color: Color.discoverViolet.opacity(0.24), radius: 24, x: 0, y: 12)
+                    .shadow(color: Color.brandPrimaryGlow.opacity(0.22), radius: 24, x: 0, y: 12)
 
                 Image(systemName: iconName)
                     .font(.system(size: 32, weight: .semibold))
@@ -23,12 +23,12 @@ struct PlaceholderTabScreen: View {
             VStack(spacing: AppSpacing.sm) {
                 Text(title)
                     .font(Font.App.screenTitle)
-                    .foregroundStyle(Color.discoverPrimaryText)
+                    .foregroundStyle(Color.primaryText)
                     .multilineTextAlignment(.center)
 
                 Text(subtitle)
                     .font(Font.App.subtitle)
-                    .foregroundStyle(Color.discoverSecondaryText)
+                    .foregroundStyle(Color.secondaryText)
                     .multilineTextAlignment(.center)
                     .lineSpacing(3)
                     .fixedSize(horizontal: false, vertical: true)
