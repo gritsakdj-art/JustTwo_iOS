@@ -47,7 +47,7 @@ struct ProfileSettingsView: View {
 
                 if let errorMessage {
                     Text(errorMessage)
-                        .font(.footnote)
+                        .font(Font.App.footnote())
                         .foregroundStyle(Color.discoverPink)
                 }
 
@@ -186,11 +186,11 @@ struct ProfileSettingsView: View {
 
                     VStack(alignment: .leading, spacing: 3) {
                         Text(birthDate.formatted(date: .abbreviated, time: .omitted))
-                            .font(.system(size: 16, weight: .semibold, design: .rounded))
+                            .font(Font.App.manrope(size: 16, weight: .semibold))
                             .foregroundStyle(Color.discoverPrimaryText)
 
                         Text(ageDescription)
-                            .font(.caption)
+                            .font(Font.App.caption())
                             .foregroundStyle(Color.discoverSecondaryText)
                     }
 
@@ -211,12 +211,12 @@ struct ProfileSettingsView: View {
             .buttonStyle(.spring(pressedScale: 0.98))
 
             Text("profile.settings.birth_date.helper")
-                .font(.caption)
+                .font(Font.App.caption())
                 .foregroundStyle(Color.discoverSecondaryText)
 
             if let birthDateValidationMessage {
                 Text(birthDateValidationMessage)
-                    .font(.footnote)
+                    .font(Font.App.footnote())
                     .foregroundStyle(Color.discoverPink)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -243,7 +243,7 @@ struct ProfileSettingsView: View {
                         } label: {
                             HStack(spacing: 7) {
                                 Text(gender.title)
-                                    .font(.system(size: 14, weight: isSelected ? .bold : .semibold, design: .rounded))
+                                    .font(Font.App.manrope(size: 14, weight: isSelected ? .bold : .semibold))
                                     .lineLimit(2)
                                     .minimumScaleFactor(0.82)
                                     .multilineTextAlignment(.center)
@@ -288,7 +288,7 @@ struct ProfileSettingsView: View {
                 .background(Color.discoverSelectedGradient, in: Circle())
 
             Text(gender.title)
-                .font(.system(size: 16, weight: .semibold, design: .rounded))
+                .font(Font.App.manrope(size: 16, weight: .semibold))
                 .foregroundStyle(Color.discoverPrimaryText)
 
             Spacer(minLength: 12)
@@ -299,7 +299,7 @@ struct ProfileSettingsView: View {
                 }
             } label: {
                 Text("profile.settings.gender.edit")
-                    .font(.footnote.weight(.bold))
+                    .font(Font.App.footnote(weight: .bold))
                     .foregroundStyle(Color.brandPrimary)
                     .padding(.horizontal, 12)
                     .padding(.vertical, 8)
@@ -322,7 +322,7 @@ struct ProfileSettingsView: View {
 
             ZStack(alignment: .topLeading) {
                 TextEditor(text: $bio)
-                    .font(.system(size: 16, weight: .medium, design: .rounded))
+                    .font(Font.App.manrope(size: 16, weight: .medium))
                     .foregroundStyle(Color.discoverPrimaryText)
                     .scrollContentBackground(.hidden)
                     .frame(minHeight: 112, maxHeight: 112)
@@ -331,7 +331,7 @@ struct ProfileSettingsView: View {
 
                 if bio.isEmpty {
                     Text("profile.settings.bio_placeholder")
-                        .font(.system(size: 16, weight: .medium, design: .rounded))
+                        .font(Font.App.manrope(size: 16, weight: .medium))
                         .foregroundStyle(Color.discoverSecondaryText.opacity(0.72))
                         .padding(.horizontal, 15)
                         .padding(.vertical, 16)
@@ -345,7 +345,7 @@ struct ProfileSettingsView: View {
             }
 
             Text(bioCounterText)
-                .font(.caption)
+                .font(Font.App.caption())
                 .foregroundStyle(Color.discoverSecondaryText)
                 .frame(maxWidth: .infinity, alignment: .trailing)
         }
@@ -365,11 +365,11 @@ struct ProfileSettingsView: View {
 
                     VStack(alignment: .leading, spacing: 4) {
                         Text("profile.settings.discovery_visibility.title")
-                            .font(.system(size: 16, weight: .bold, design: .rounded))
+                            .font(Font.App.manrope(size: 16, weight: .bold))
                             .foregroundStyle(Color.discoverPrimaryText)
 
                         Text("profile.settings.discovery_visibility.subtitle")
-                            .font(.caption)
+                            .font(Font.App.caption())
                             .foregroundStyle(Color.discoverSecondaryText)
                             .fixedSize(horizontal: false, vertical: true)
                     }
@@ -390,7 +390,7 @@ struct ProfileSettingsView: View {
 
                 if let discoveryVisibilityErrorMessage {
                     Text(discoveryVisibilityErrorMessage)
-                        .font(.footnote)
+                        .font(Font.App.footnote())
                         .foregroundStyle(Color.discoverPink)
                         .fixedSize(horizontal: false, vertical: true)
                 }
@@ -421,11 +421,11 @@ struct ProfileSettingsView: View {
 
                     VStack(alignment: .leading, spacing: 3) {
                         Text("profile.account.delete")
-                            .font(.system(size: 16, weight: .bold, design: .rounded))
+                            .font(Font.App.manrope(size: 16, weight: .bold))
                             .foregroundStyle(Color.discoverPink)
 
                         Text("profile.account.delete_message")
-                            .font(.caption)
+                            .font(Font.App.caption())
                             .foregroundStyle(Color.discoverSecondaryText)
                             .lineLimit(2)
                             .fixedSize(horizontal: false, vertical: true)
@@ -452,7 +452,7 @@ struct ProfileSettingsView: View {
     private var birthDatePickerSheet: some View {
         VStack(spacing: AppSpacing.lg) {
             Text("profile.settings.birth_date.sheet_title")
-                .font(.system(.headline, design: .rounded, weight: .bold))
+                .font(Font.App.manrope(size: 17, weight: .bold))
                 .foregroundStyle(Color.discoverPrimaryText)
                 .frame(maxWidth: .infinity, alignment: .leading)
 
@@ -482,11 +482,11 @@ struct ProfileSettingsView: View {
         VStack(alignment: .leading, spacing: AppSpacing.lg) {
             VStack(alignment: .leading, spacing: AppSpacing.sm) {
                 Text("profile.account.delete_password_title")
-                    .font(.system(.title3, design: .rounded, weight: .bold))
+                    .font(Font.App.manrope(size: 20, weight: .bold))
                     .foregroundStyle(Color.discoverPrimaryText)
 
                 Text("profile.account.delete_password_subtitle")
-                    .font(.subheadline)
+                    .font(Font.App.subheadline())
                     .foregroundStyle(Color.discoverSecondaryText)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -507,7 +507,7 @@ struct ProfileSettingsView: View {
                 deleteAccountErrorMessage = nil
             } label: {
                 Text("common.cancel")
-                    .font(.footnote.weight(.semibold))
+                    .font(Font.App.footnote(weight: .semibold))
                     .foregroundStyle(Color.discoverSecondaryText)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 8)
@@ -535,7 +535,7 @@ struct ProfileSettingsView: View {
                 }
 
                 Text("profile.account.delete")
-                    .font(.system(size: 16, weight: .bold, design: .rounded))
+                    .font(Font.App.manrope(size: 16, weight: .bold))
             }
             .foregroundStyle(Color.onAccentText)
             .frame(maxWidth: .infinity)
@@ -603,7 +603,7 @@ struct ProfileSettingsView: View {
 
     private func sectionTitle(_ title: LocalizedStringResource) -> some View {
         Text(title)
-            .font(.system(size: 13, weight: .bold, design: .rounded))
+            .font(Font.App.manrope(size: 13, weight: .bold))
             .foregroundStyle(Color.discoverSecondaryText)
             .textCase(.uppercase)
             .padding(.horizontal, 4)
@@ -611,7 +611,7 @@ struct ProfileSettingsView: View {
 
     private func fieldLabel(_ title: LocalizedStringResource) -> some View {
         Text(title)
-            .font(.system(size: 13, weight: .semibold, design: .rounded))
+            .font(Font.App.manrope(size: 13, weight: .semibold))
             .foregroundStyle(Color.discoverSecondaryText)
     }
 

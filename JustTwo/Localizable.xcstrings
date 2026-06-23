@@ -7191,6 +7191,186 @@
           }
         }
       }
+    },
+    "profile.avatar.edit": {
+      "extractionState": "manual",
+      "localizations": {
+        "ar": { "stringUnit": { "state": "translated", "value": "تعديل صورة الملف الشخصي" } },
+        "de": { "stringUnit": { "state": "translated", "value": "Profilfoto bearbeiten" } },
+        "en": { "stringUnit": { "state": "translated", "value": "Edit profile photo" } },
+        "es": { "stringUnit": { "state": "translated", "value": "Editar foto de perfil" } },
+        "fr": { "stringUnit": { "state": "translated", "value": "Modifier la photo de profil" } },
+        "it": { "stringUnit": { "state": "translated", "value": "Modifica foto profilo" } },
+        "ru": { "stringUnit": { "state": "translated", "value": "Изменить фото профиля" } }
+      }
+    },
+    "profile.avatar_editor.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "ar": { "stringUnit": { "state": "translated", "value": "صورة الملف الشخصي" } },
+        "de": { "stringUnit": { "state": "translated", "value": "Profilfoto" } },
+        "en": { "stringUnit": { "state": "translated", "value": "Profile photo" } },
+        "es": { "stringUnit": { "state": "translated", "value": "Foto de perfil" } },
+        "fr": { "stringUnit": { "state": "translated", "value": "Photo de profil" } },
+        "it": { "stringUnit": { "state": "translated", "value": "Foto profilo" } },
+        "ru": { "stringUnit": { "state": "translated", "value": "Фото профиля" } }
+      }
+    },
+    "profile.avatar_editor.subtitle": {
+      "extractionState": "manual",
+      "localizations": {
+        "ar": { "stringUnit": { "state": "translated", "value": "اختر صورة واضبط القص لملفك الشخصي." } },
+        "de": { "stringUnit": { "state": "translated", "value": "Wähle ein Foto und passe den Ausschnitt für dein Profil an." } },
+        "en": { "stringUnit": { "state": "translated", "value": "Choose a photo and adjust the crop for your profile." } },
+        "es": { "stringUnit": { "state": "translated", "value": "Elige una foto y ajusta el recorte para tu perfil." } },
+        "fr": { "stringUnit": { "state": "translated", "value": "Choisis une photo et ajuste le cadrage pour ton profil." } },
+        "it": { "stringUnit": { "state": "translated", "value": "Scegli una foto e regola il ritaglio per il tuo profilo." } },
+        "ru": { "stringUnit": { "state": "translated", "value": "Выбери фото и настрой кадрирование для профиля." } }
+      }
+    },
+    "profile.avatar_editor.save": {
+      "extractionState": "manual",
+      "localizations": {
+        "ar": { "stringUnit": { "state": "translated", "value": "حفظ" } },
+        "de": { "stringUnit": { "state": "translated", "value": "Speichern" } },
+        "en": { "stringUnit": { "state": "translated", "value": "Save" } },
+        "es": { "stringUnit": { "state": "translated", "value": "Guardar" } },
+        "fr": { "stringUnit": { "state": "translated", "value": "Enregistrer" } },
+        "it": { "stringUnit": { "state": "translated", "value": "Salva" } },
+        "ru": { "stringUnit": { "state": "translated", "value": "Сохранить" } }
+      }
+    },
+    "profile.avatar_editor.hint": {
+      "extractionState": "manual",
+      "localizations": {
+        "ar": { "stringUnit": { "state": "translated", "value": "اسحب لتحريك الصورة، واقرص للتكبير." } },
+        "de": { "stringUnit": { "state": "translated", "value": "Ziehe zum Verschieben, ziehe mit zwei Fingern zum Zoomen." } },
+        "en": { "stringUnit": { "state": "translated", "value": "Drag to reposition, pinch to zoom." } },
+        "es": { "stringUnit": { "state": "translated", "value": "Arrastra para mover, pellizca para ampliar." } },
+        "fr": { "stringUnit": { "state": "translated", "value": "Fais glisser pour déplacer, pince pour zoomer." } },
+        "it": { "stringUnit": { "state": "translated", "value": "Trascina per spostare, pizzica per ingrandire." } },
+        "ru": { "stringUnit": { "state": "translated", "value": "Перетаскивай фото и меняй масштаб щипком." } }
+      }
+    },
+    "profile.avatar_editor.choose_photo": {
+      "extractionState": "manual",
+      "localizations": {
+        "ar": { "stringUnit": { "state": "translated", "value": "اختيار صورة" } },
+        "de": { "stringUnit": { "state": "translated", "value": "Foto auswählen" } },
+        "en": { "stringUnit": { "state": "translated", "value": "Choose photo" } },
+        "es": { "stringUnit": { "state": "translated", "value": "Elegir foto" } },
+        "fr": { "stringUnit": { "state": "translated", "value": "Choisir une photo" } },
+        "it": { "stringUnit": { "state": "translated", "value": "Scegli foto" } },
+        "ru": { "stringUnit": { "state": "translated", "value": "Выбрать фото" } }
+      }
+    },
+    "profile.avatar_editor.replace_photo": {
+      "extractionState": "manual",
+      "localizations": {
+        "ar": { "stringUnit": { "state": "translated", "value": "استبدال الصورة" } },
+        "de": { "stringUnit": { "state": "translated", "value": "Foto ersetzen" } },
+        "en": { "stringUnit": { "state": "translated", "value": "Replace photo" } },
+        "es": { "stringUnit": { "state": "translated", "value": "Cambiar foto" } },
+        "fr": { "stringUnit": { "state": "translated", "value": "Remplacer la photo" } },
+        "it": { "stringUnit": { "state": "translated", "value": "Sostituisci foto" } },
+        "ru": { "stringUnit": { "state": "translated", "value": "Заменить фото" } }
+      }
+    },
+    "profile.avatar_editor.delete": {
+      "extractionState": "manual",
+      "localizations": {
+        "ar": { "stringUnit": { "state": "translated", "value": "حذف الصورة" } },
+        "de": { "stringUnit": { "state": "translated", "value": "Foto löschen" } },
+        "en": { "stringUnit": { "state": "translated", "value": "Delete photo" } },
+        "es": { "stringUnit": { "state": "translated", "value": "Eliminar foto" } },
+        "fr": { "stringUnit": { "state": "translated", "value": "Supprimer la photo" } },
+        "it": { "stringUnit": { "state": "translated", "value": "Elimina foto" } },
+        "ru": { "stringUnit": { "state": "translated", "value": "Удалить фото" } }
+      }
+    },
+    "profile.avatar_editor.empty": {
+      "extractionState": "manual",
+      "localizations": {
+        "ar": { "stringUnit": { "state": "translated", "value": "إضافة صورة للملف الشخصي" } },
+        "de": { "stringUnit": { "state": "translated", "value": "Profilfoto hinzufügen" } },
+        "en": { "stringUnit": { "state": "translated", "value": "Add a profile photo" } },
+        "es": { "stringUnit": { "state": "translated", "value": "Añadir foto de perfil" } },
+        "fr": { "stringUnit": { "state": "translated", "value": "Ajouter une photo de profil" } },
+        "it": { "stringUnit": { "state": "translated", "value": "Aggiungi foto profilo" } },
+        "ru": { "stringUnit": { "state": "translated", "value": "Добавить фото профиля" } }
+      }
+    },
+    "profile.menu.my_photos": {
+      "extractionState": "manual",
+      "localizations": {
+        "ar": { "stringUnit": { "state": "translated", "value": "صوري" } },
+        "de": { "stringUnit": { "state": "translated", "value": "Meine Fotos" } },
+        "en": { "stringUnit": { "state": "translated", "value": "My photos" } },
+        "es": { "stringUnit": { "state": "translated", "value": "Mis fotos" } },
+        "fr": { "stringUnit": { "state": "translated", "value": "Mes photos" } },
+        "it": { "stringUnit": { "state": "translated", "value": "Le mie foto" } },
+        "ru": { "stringUnit": { "state": "translated", "value": "Мои фото" } }
+      }
+    },
+    "profile.photos.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "ar": { "stringUnit": { "state": "translated", "value": "صوري" } },
+        "de": { "stringUnit": { "state": "translated", "value": "Meine Fotos" } },
+        "en": { "stringUnit": { "state": "translated", "value": "My photos" } },
+        "es": { "stringUnit": { "state": "translated", "value": "Mis fotos" } },
+        "fr": { "stringUnit": { "state": "translated", "value": "Mes photos" } },
+        "it": { "stringUnit": { "state": "translated", "value": "Le mie foto" } },
+        "ru": { "stringUnit": { "state": "translated", "value": "Мои фото" } }
+      }
+    },
+    "profile.photos.empty_title": {
+      "extractionState": "manual",
+      "localizations": {
+        "ar": { "stringUnit": { "state": "translated", "value": "الصور قريبًا" } },
+        "de": { "stringUnit": { "state": "translated", "value": "Fotos kommen bald" } },
+        "en": { "stringUnit": { "state": "translated", "value": "Photos are coming soon" } },
+        "es": { "stringUnit": { "state": "translated", "value": "Las fotos llegarán pronto" } },
+        "fr": { "stringUnit": { "state": "translated", "value": "Les photos arrivent bientôt" } },
+        "it": { "stringUnit": { "state": "translated", "value": "Le foto arriveranno presto" } },
+        "ru": { "stringUnit": { "state": "translated", "value": "Фото скоро появятся" } }
+      }
+    },
+    "profile.photos.empty_subtitle": {
+      "extractionState": "manual",
+      "localizations": {
+        "ar": { "stringUnit": { "state": "translated", "value": "ستتزامن هذه الشاشة مع صور ملفك الشخصي بعد ربط تدفق الخلفية." } },
+        "de": { "stringUnit": { "state": "translated", "value": "Dieser Bildschirm wird mit deinen Profilfotos synchronisiert, sobald der Backend-Flow verbunden ist." } },
+        "en": { "stringUnit": { "state": "translated", "value": "This screen will sync with your profile photos after the backend flow is connected." } },
+        "es": { "stringUnit": { "state": "translated", "value": "Esta pantalla se sincronizará con tus fotos de perfil cuando se conecte el flujo del backend." } },
+        "fr": { "stringUnit": { "state": "translated", "value": "Cet écran se synchronisera avec tes photos de profil une fois le flux backend connecté." } },
+        "it": { "stringUnit": { "state": "translated", "value": "Questa schermata si sincronizzerà con le foto del profilo quando il flusso backend sarà collegato." } },
+        "ru": { "stringUnit": { "state": "translated", "value": "Этот экран будет синхронизироваться с фото профиля после подключения backend-flow." } }
+      }
+    },
+    "profile.photos.subtitle": {
+      "extractionState": "manual",
+      "localizations": {
+        "ar": { "stringUnit": { "state": "translated", "value": "أماكن صور الملف الشخصي" } },
+        "de": { "stringUnit": { "state": "translated", "value": "Profilfoto-Plätze" } },
+        "en": { "stringUnit": { "state": "translated", "value": "Profile photo slots" } },
+        "es": { "stringUnit": { "state": "translated", "value": "Espacios de fotos del perfil" } },
+        "fr": { "stringUnit": { "state": "translated", "value": "Emplacements de photos du profil" } },
+        "it": { "stringUnit": { "state": "translated", "value": "Slot foto profilo" } },
+        "ru": { "stringUnit": { "state": "translated", "value": "Слоты фото профиля" } }
+      }
+    },
+    "profile.photos.slot": {
+      "extractionState": "manual",
+      "localizations": {
+        "ar": { "stringUnit": { "state": "translated", "value": "مكان للصورة" } },
+        "de": { "stringUnit": { "state": "translated", "value": "Foto-Platz" } },
+        "en": { "stringUnit": { "state": "translated", "value": "Photo slot" } },
+        "es": { "stringUnit": { "state": "translated", "value": "Espacio de foto" } },
+        "fr": { "stringUnit": { "state": "translated", "value": "Emplacement photo" } },
+        "it": { "stringUnit": { "state": "translated", "value": "Slot foto" } },
+        "ru": { "stringUnit": { "state": "translated", "value": "Слот фото" } }
+      }
     }
   },
   "version": "1.1"

@@ -17,7 +17,7 @@ struct JustTwoLoaderCard: View {
 
             VStack(spacing: 8) {
                 Text(title)
-                    .font(.system(size: 16, weight: .bold, design: .rounded))
+                    .font(Font.App.manrope(size: 16, weight: .bold))
                     .foregroundStyle(Color.discoverPrimaryText)
                     .multilineTextAlignment(.center)
 

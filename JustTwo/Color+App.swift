@@ -248,12 +248,59 @@ extension Color {
 
 extension Font {
     enum App {
+        private static func manropeName(for weight: Weight) -> String {
+            switch weight {
+            case .bold:
+                return "Manrope-Bold"
+            case .heavy, .black:
+                return "Manrope-ExtraBold"
+            case .semibold:
+                return "Manrope-SemiBold"
+            case .medium:
+                return "Manrope-Medium"
+            default:
+                return "Manrope-Regular"
+            }
+        }
+
+        static func manrope(
+            size: CGFloat,
+            weight: Weight = .regular,
+            relativeTo textStyle: TextStyle = .body
+        ) -> Font {
+            .custom(manropeName(for: weight), size: size, relativeTo: textStyle)
+        }
+
+        static func title(size: CGFloat, weight: Weight = .bold) -> Font {
+            manrope(size: size, weight: weight, relativeTo: .title)
+        }
+
+        static func headline(size: CGFloat, weight: Weight = .semibold) -> Font {
+            manrope(size: size, weight: weight, relativeTo: .headline)
+        }
+
+        static func body(size: CGFloat = 16, weight: Weight = .regular) -> Font {
+            manrope(size: size, weight: weight, relativeTo: .body)
+        }
+
+        static func subheadline(size: CGFloat = 15, weight: Weight = .regular) -> Font {
+            manrope(size: size, weight: weight, relativeTo: .subheadline)
+        }
+
+        static func caption(size: CGFloat = 12, weight: Weight = .regular) -> Font {
+            manrope(size: size, weight: weight, relativeTo: .caption)
+        }
+
+        static func footnote(weight: Weight = .regular) -> Font {
+            manrope(size: 13, weight: weight, relativeTo: .footnote)
+        }
+
         static var screenTitle: Font {
-            .system(.title, design: .rounded, weight: .bold)
+            title(size: 28, weight: .bold)
         }
 
         static var subtitle: Font {
-            .system(.subheadline, design: .rounded, weight: .regular)
+            subheadline(size: 15, weight: .regular)
         }
     }
 }

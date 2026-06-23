@@ -7,7 +7,7 @@ struct GeneralSettingsView: View {
         ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: AppSpacing.sm) {
                 Text("settings.theme.section")
-                    .font(.system(size: 13, weight: .bold, design: .rounded))
+                    .font(Font.App.manrope(size: 13, weight: .bold))
                     .foregroundStyle(Color.discoverSecondaryText)
                     .textCase(.uppercase)
                     .padding(.horizontal, 4)
@@ -69,7 +69,7 @@ private struct ThemeOptionRow: View {
                 }
 
             Text(theme.title)
-                .font(.system(size: 16, weight: .semibold, design: .rounded))
+                .font(Font.App.manrope(size: 16, weight: .semibold))
                 .foregroundStyle(Color.discoverPrimaryText)
 
             Spacer()

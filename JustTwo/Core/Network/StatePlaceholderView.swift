@@ -15,7 +15,7 @@ struct StatePlaceholderView: View {
                 .foregroundStyle(Color.brandPrimary)
 
             Text(title)
-                .font(.system(size: 22, weight: .bold, design: .rounded))
+                .font(Font.App.manrope(size: 22, weight: .bold))
                 .foregroundStyle(Color.discoverPrimaryText)
                 .multilineTextAlignment(.center)
 

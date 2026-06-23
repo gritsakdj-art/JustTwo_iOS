@@ -87,7 +87,7 @@ struct ResetPasswordView: View {
                     goToLogin()
                 } label: {
                     Text("reset_password.back_to_login")
-                        .font(.footnote.weight(.semibold))
+                        .font(Font.App.footnote(weight: .semibold))
                         .foregroundStyle(Color.discoverSecondaryText)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 4)
@@ -139,7 +139,7 @@ struct ResetPasswordView: View {
         VStack(spacing: AppSpacing.sm) {
             if let statusMessage {
                 Text(statusMessage)
-                    .font(.footnote.weight(.semibold))
+                    .font(Font.App.footnote(weight: .semibold))
                     .foregroundStyle(Color.brandPrimary)
                     .multilineTextAlignment(.center)
                     .frame(maxWidth: .infinity)
@@ -147,7 +147,7 @@ struct ResetPasswordView: View {
 
             if let errorMessage {
                 Text(errorMessage)
-                    .font(.footnote)
+                    .font(Font.App.footnote())
                     .foregroundStyle(Color.discoverPink)
                     .multilineTextAlignment(.center)
                     .fixedSize(horizontal: false, vertical: true)

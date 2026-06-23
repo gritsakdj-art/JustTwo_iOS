@@ -23,6 +23,10 @@ struct JustTwoApp: App {
         }
     }()
 
+    init() {
+        AppFontRegistrar.registerFonts()
+    }
+
     var body: some Scene {
         WindowGroup {
             RootView()

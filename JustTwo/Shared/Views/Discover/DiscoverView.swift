@@ -182,7 +182,7 @@ struct DiscoverView: View {
         HStack(alignment: .center) {
             VStack(alignment: .leading, spacing: 2) {
                 Text("app.name")
-                    .font(.system(size: 28, weight: .bold, design: .rounded))
+                    .font(Font.App.manrope(size: 28, weight: .bold))
                     .foregroundStyle(Color.discoverPrimaryText)
                     .tracking(-0.8)
 
@@ -191,7 +191,7 @@ struct DiscoverView: View {
                         .font(.system(size: 11, weight: .semibold))
                         .foregroundStyle(Color.discoverViolet)
                     Text("location.amsterdam")
-                        .font(.system(size: 13, weight: .medium))
+                        .font(Font.App.manrope(size: 13, weight: .medium))
                         .foregroundStyle(Color.discoverSecondaryText)
                 }
             }
@@ -236,7 +236,7 @@ struct DiscoverView: View {
                     }
                 } label: {
                     Text(mode.title)
-                        .font(.system(size: 14, weight: selectedMode == mode ? .bold : .medium))
+                        .font(Font.App.manrope(size: 14, weight: selectedMode == mode ? .bold : .medium))
                         .foregroundStyle(selectedMode == mode ? Color.onAccentText : Color.discoverSecondaryText)
                         .frame(maxWidth: .infinity)
                         .frame(height: 40)
@@ -273,7 +273,7 @@ struct DiscoverView: View {
                         }
                     } label: {
                         Text(mood.title)
-                            .font(.system(size: 13, weight: selectedMood == mood ? .bold : .medium))
+                            .font(Font.App.manrope(size: 13, weight: selectedMood == mood ? .bold : .medium))
                             .foregroundStyle(selectedMood == mood ? Color.onAccentText : Color.discoverViolet)
                             .padding(.horizontal, 16)
                             .padding(.vertical, 8)
@@ -376,7 +376,7 @@ struct DiscoverView: View {
                     .foregroundStyle(Color.onAccentText.opacity(0.82))
 
                 Text(profileInitial)
-                    .font(.system(size: 52, weight: .bold, design: .rounded))
+                    .font(Font.App.manrope(size: 52, weight: .bold))
                     .foregroundStyle(Color.onAccentText.opacity(0.72))
                     .frame(width: 86, height: 86)
                     .background(Color.onAccentText.opacity(0.16), in: Circle())
@@ -388,7 +388,7 @@ struct DiscoverView: View {
 
     private var moodPill: some View {
         Text(localizedUppercase(profile.moodTag))
-            .font(.system(size: 10, weight: .semibold))
+            .font(Font.App.manrope(size: 10, weight: .semibold))
             .foregroundStyle(Color.onAccentText)
             .padding(.horizontal, 12)
             .padding(.vertical, 6)
@@ -401,7 +401,7 @@ struct DiscoverView: View {
         HStack(alignment: .bottom) {
             VStack(alignment: .leading, spacing: 6) {
                 Text(profileTitle)
-                    .font(.system(size: 26, weight: .bold, design: .rounded))
+                    .font(Font.App.manrope(size: 26, weight: .bold))
                     .foregroundStyle(Color.onAccentText)
                     .tracking(-0.6)
 
@@ -411,12 +411,12 @@ struct DiscoverView: View {
                         .frame(width: 7, height: 7)
                         .shadow(color: Color.discoverOnline, radius: 4)
                     Text(distanceText)
-                        .font(.system(size: 13, weight: .medium))
+                        .font(Font.App.manrope(size: 13, weight: .medium))
                         .foregroundStyle(Color.onAccentText.opacity(0.75))
                 }
 
                 Text(profile.bio)
-                    .font(.system(size: 14, weight: .regular))
+                    .font(Font.App.manrope(size: 14, weight: .regular))
                     .foregroundStyle(Color.onAccentText.opacity(0.68))
                     .lineLimit(2)
                     .frame(maxWidth: 220, alignment: .leading)
@@ -437,7 +437,7 @@ struct DiscoverView: View {
                 .fill(Color.discoverPrimaryText.opacity(0.75))
                 .frame(width: 46, height: 46)
             Text("\(profile.matchPercent)%")
-                .font(.system(size: 14, weight: .bold, design: .rounded))
+                .font(Font.App.manrope(size: 14, weight: .bold))
                 .foregroundStyle(Color.onAccentText)
                 .tracking(-0.4)
         }

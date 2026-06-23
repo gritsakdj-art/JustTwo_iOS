@@ -36,7 +36,7 @@ struct PrimaryButton: View {
                 }
 
                 Text(title)
-                    .font(.system(size: 16, weight: .bold, design: .rounded))
+                    .font(Font.App.manrope(size: 16, weight: .bold))
                     .lineLimit(1)
                     .minimumScaleFactor(0.82)
             }

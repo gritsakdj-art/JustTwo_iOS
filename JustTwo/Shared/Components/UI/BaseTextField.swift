@@ -18,7 +18,7 @@ struct BaseTextField: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(title)
-                .font(.system(size: 13, weight: .semibold, design: .rounded))
+                .font(Font.App.manrope(size: 13, weight: .semibold))
                 .foregroundStyle(isFocused ? Color.discoverViolet : Color.discoverSecondaryText)
 
             HStack(spacing: 12) {
@@ -35,7 +35,7 @@ struct BaseTextField: View {
                     }
                 }
                 .focused($isFocused)
-                .font(.system(size: 16, weight: .medium, design: .rounded))
+                .font(Font.App.manrope(size: 16, weight: .medium))
                 .foregroundStyle(Color.discoverPrimaryText)
 
                 if isSecure {
@@ -81,7 +81,7 @@ struct BaseTextField: View {
 
             if let errorMessage {
                 Text(errorMessage)
-                    .font(.footnote)
+                    .font(Font.App.footnote())
                     .foregroundStyle(Color.discoverPink)
                     .fixedSize(horizontal: false, vertical: true)
             }

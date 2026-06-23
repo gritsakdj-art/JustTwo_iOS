@@ -143,7 +143,7 @@ private struct AppTabBarItem: View {
                     }
 
                 Text(tab.title)
-                    .font(.system(size: 9, weight: isSelected ? .bold : .medium))
+                    .font(Font.App.manrope(size: 9, weight: isSelected ? .bold : .medium))
                     .foregroundStyle(isSelected ? Color.discoverViolet : Color.discoverSecondaryText)
                     .tracking(-0.1)
                     .lineLimit(1)

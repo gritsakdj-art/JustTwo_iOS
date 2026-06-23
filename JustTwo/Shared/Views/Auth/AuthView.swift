@@ -75,7 +75,7 @@ struct AuthView: View {
 
             if let errorMessage = viewModel.errorMessage {
                 Text(errorMessage)
-                    .font(.footnote)
+                    .font(Font.App.footnote())
                     .foregroundStyle(Color.discoverPink)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .transition(.opacity.combined(with: .move(edge: .top)))
@@ -90,7 +90,7 @@ struct AuthView: View {
                             .font(.system(size: 13, weight: .bold))
 
                         Text("auth.forgot_password.link")
-                            .font(.footnote.weight(.semibold))
+                            .font(Font.App.footnote(weight: .semibold))
                     }
                     .foregroundStyle(Color.brandPrimary)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -110,7 +110,7 @@ struct AuthView: View {
 
             HStack(spacing: 6) {
                 Text(viewModel.mode == .login ? "auth.no_account" : "auth.have_account")
-                    .font(.footnote)
+                    .font(Font.App.footnote())
                     .foregroundStyle(Color.discoverSecondaryText)
 
                 Button {
@@ -119,7 +119,7 @@ struct AuthView: View {
                     }
                 } label: {
                     Text(viewModel.mode == .login ? "auth.register" : "auth.login")
-                        .font(.footnote.weight(.semibold))
+                        .font(Font.App.footnote(weight: .semibold))
                         .foregroundStyle(Color.brandPrimary)
                 }
                 .buttonStyle(.spring(pressedScale: 0.94))
@@ -146,11 +146,11 @@ struct AuthView: View {
         VStack(alignment: .leading, spacing: AppSpacing.lg) {
             VStack(alignment: .leading, spacing: AppSpacing.sm) {
                 Text("auth.forgot_password.title")
-                    .font(.system(.title3, design: .rounded, weight: .bold))
+                    .font(Font.App.manrope(size: 20, weight: .bold))
                     .foregroundStyle(Color.discoverPrimaryText)
 
                 Text("auth.forgot_password.subtitle")
-                    .font(.subheadline)
+                    .font(Font.App.subheadline())
                     .foregroundStyle(Color.discoverSecondaryText)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -165,7 +165,7 @@ struct AuthView: View {
 
             if let message = viewModel.forgotPasswordMessage {
                 Text(message)
-                    .font(.footnote.weight(.semibold))
+                    .font(Font.App.footnote(weight: .semibold))
                     .foregroundStyle(Color.brandPrimary)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -183,7 +183,7 @@ struct AuthView: View {
                 viewModel.isForgotPasswordSheetPresented = false
             } label: {
                 Text("common.cancel")
-                    .font(.footnote.weight(.semibold))
+                    .font(Font.App.footnote(weight: .semibold))
                     .foregroundStyle(Color.discoverSecondaryText)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 8)

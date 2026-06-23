@@ -79,7 +79,7 @@ struct EmailVerificationResultView: View {
                                 }
 
                                 Text(resendTitle)
-                                    .font(.system(size: 15, weight: .semibold, design: .rounded))
+                                    .font(Font.App.manrope(size: 15, weight: .semibold))
                             }
                             .frame(maxWidth: .infinity)
                             .frame(height: 50)
@@ -99,7 +99,7 @@ struct EmailVerificationResultView: View {
                             router.resetTo(.auth)
                         } label: {
                             Text("email_verification.result.back_to_login")
-                                .font(.footnote.weight(.semibold))
+                                .font(Font.App.footnote(weight: .semibold))
                                 .foregroundStyle(Color.discoverSecondaryText)
                         }
                         .buttonStyle(.spring(pressedScale: 0.96))
@@ -181,14 +181,14 @@ struct EmailVerificationResultView: View {
         VStack(spacing: AppSpacing.sm) {
             if let statusMessage {
                 Text(statusMessage)
-                    .font(.footnote)
+                    .font(Font.App.footnote())
                     .foregroundStyle(Color.brandPrimary)
                     .multilineTextAlignment(.center)
             }
 
             if let errorMessage {
                 Text(errorMessage)
-                    .font(.footnote)
+                    .font(Font.App.footnote())
                     .foregroundStyle(Color.discoverPink)
                     .multilineTextAlignment(.center)
             }
