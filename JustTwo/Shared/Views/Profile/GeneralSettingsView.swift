@@ -17,8 +17,9 @@ struct GeneralSettingsView: View {
             .padding(.bottom, AppSpacing.xxl)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color.surface.ignoresSafeArea())
+        .discoverShellBackground()
         .localizedNavigationTitle("profile.menu.general_settings")
+        .toolbarBackground(.hidden, for: .navigationBar)
     }
 
     private var selectedLanguage: AppLanguage {
@@ -106,9 +107,7 @@ struct GeneralSettingsView: View {
     }
 
     private var pickerDivider: some View {
-        Divider()
-            .padding(.leading, 58)
-            .padding(.trailing, AppSpacing.sm)
+        SettingsPickerDivider()
     }
 
     private func togglePicker(_ picker: SettingsPickerKind) {
@@ -137,6 +136,16 @@ private enum SettingsPickerKind {
     case language
 }
 
+private struct SettingsPickerDivider: View {
+    var body: some View {
+        Rectangle()
+            .fill(Color.hairline)
+            .frame(height: 1)
+            .padding(.leading, 58)
+            .padding(.trailing, AppSpacing.sm)
+    }
+}
+
 private struct SettingsPickerSection<SelectedRow: View, Options: View>: View {
     let title: LocalizedStringResource
     let isExpanded: Bool
@@ -159,9 +168,7 @@ private struct SettingsPickerSection<SelectedRow: View, Options: View>: View {
                 .buttonStyle(.spring(pressedScale: 0.98, pressedOpacity: 0.9))
 
                 if isExpanded {
-                    Divider()
-                        .padding(.leading, 58)
-                        .padding(.trailing, AppSpacing.sm)
+                    SettingsPickerDivider()
 
                     VStack(spacing: 0) {
                         options()
@@ -169,12 +176,12 @@ private struct SettingsPickerSection<SelectedRow: View, Options: View>: View {
                     .transition(.opacity.combined(with: .move(edge: .top)))
                 }
             }
-            .background(Color.cardSurface, in: RoundedRectangle(cornerRadius: AppCornerRadius.field))
+            .background(Color.cardSurface, in: RoundedRectangle(cornerRadius: AppCornerRadius.card, style: .continuous))
             .overlay(
-                RoundedRectangle(cornerRadius: AppCornerRadius.field)
+                RoundedRectangle(cornerRadius: AppCornerRadius.card, style: .continuous)
                     .stroke(Color.hairline, lineWidth: 1)
             )
-            .shadow(color: Color.discoverCardShadow.opacity(isExpanded ? 0.10 : 0.06), radius: 22, x: 0, y: 10)
+            .shadow(color: Color.discoverCardShadow.opacity(isExpanded ? 0.10 : 0.08), radius: 24, x: 0, y: 10)
         }
     }
 }
@@ -214,7 +221,7 @@ private struct SettingsPickerOptionRow: View {
             if let trailingIconName {
                 Image(systemName: trailingIconName)
                     .font(.system(size: trailingIconName.hasPrefix("chevron") ? 13 : 20, weight: .semibold))
-                    .foregroundStyle(isSelected ? Color.brandPrimary : Color.secondaryText.opacity(0.72))
+                    .foregroundStyle(isSelected ? Color.brandPrimary : Color.disabled)
             }
         }
         .frame(minHeight: 60)
@@ -251,6 +258,7 @@ private extension AppTheme {
     NavigationStack {
         GeneralSettingsView()
     }
+    .background(Color.discoverBackgroundGradient.ignoresSafeArea())
 }
 
 #Preview("Arabic RTL") {
@@ -259,4 +267,5 @@ private extension AppTheme {
     }
     .environment(\.locale, Locale(identifier: "ar"))
     .environment(\.layoutDirection, .rightToLeft)
+    .background(Color.discoverBackgroundGradient.ignoresSafeArea())
 }

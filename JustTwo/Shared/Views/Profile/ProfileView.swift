@@ -35,7 +35,7 @@ struct ProfileView: View {
                 .padding(.bottom, AppSpacing.lg)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(Color.discoverBackgroundGradient.ignoresSafeArea())
+            .discoverShellBackground()
             .localizedNavigationTitle("tab.profile")
             .toolbarBackground(.hidden, for: .navigationBar)
             .task {
@@ -306,6 +306,7 @@ private struct ProfileMenuRowStyle: ButtonStyle {
 
 #Preview {
     ProfileView()
+        .background(Color.discoverBackgroundGradient.ignoresSafeArea())
         .environment(SessionStore.shared)
         .environment(AppRouter.shared)
         .environment(ProfilePhotoStore.shared)
@@ -313,6 +314,7 @@ private struct ProfileMenuRowStyle: ButtonStyle {
 
 #Preview("Arabic RTL") {
     ProfileView()
+        .background(Color.discoverBackgroundGradient.ignoresSafeArea())
         .environment(\.locale, Locale(identifier: "ar"))
         .environment(\.layoutDirection, .rightToLeft)
         .environment(SessionStore.shared)

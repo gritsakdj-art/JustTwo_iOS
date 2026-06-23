@@ -26,7 +26,7 @@ struct ProfilePhotosView: View {
             .padding(.bottom, AppSpacing.xxl)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color.discoverBackgroundGradient.ignoresSafeArea())
+        .discoverShellBackground()
         .localizedNavigationTitle("profile.photos.title")
         .toolbarBackground(.hidden, for: .navigationBar)
         .overlay {

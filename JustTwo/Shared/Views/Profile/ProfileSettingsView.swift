@@ -69,7 +69,7 @@ struct ProfileSettingsView: View {
         }
         .scrollDismissesKeyboard(.interactively)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color.discoverBackgroundGradient.ignoresSafeArea())
+        .discoverShellBackground()
         .hideKeyboardOnTap()
         .localizedNavigationTitle(navigationTitle)
         .navigationBarBackButtonHidden(context == .onboarding)

@@ -135,15 +135,18 @@ struct DiscoverView: View {
     }
 
     var body: some View {
-        ZStack {
+        VStack(spacing: 0) {
+            headerView
+
+            tabContent
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .environment(\.isDiscoverShell, true)
+
+            AppTabBar(selection: $selectedTab)
+        }
+        .background {
             Color.discoverBackgroundGradient
                 .ignoresSafeArea()
-
-            VStack(spacing: 0) {
-                headerView
-                tabContent
-                AppTabBar(selection: $selectedTab)
-            }
         }
         .statusBarHidden(false)
     }
@@ -202,6 +205,7 @@ struct DiscoverView: View {
         .padding(.horizontal, 24)
         .padding(.top, 4)
         .padding(.bottom, 12)
+        .frame(maxWidth: .infinity)
     }
 
     private var notificationButton: some View {
