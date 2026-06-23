@@ -6918,325 +6918,1270 @@
     "auth.forgot_password.link": {
       "extractionState": "manual",
       "localizations": {
-        "ar": { "stringUnit": { "state": "translated", "value": "هل نسيت كلمة المرور؟" } },
-        "de": { "stringUnit": { "state": "translated", "value": "Passwort vergessen?" } },
-        "en": { "stringUnit": { "state": "translated", "value": "Forgot password?" } },
-        "es": { "stringUnit": { "state": "translated", "value": "¿Olvidaste tu contraseña?" } },
-        "fr": { "stringUnit": { "state": "translated", "value": "Mot de passe oublié ?" } },
-        "it": { "stringUnit": { "state": "translated", "value": "Hai dimenticato la password?" } },
-        "ru": { "stringUnit": { "state": "translated", "value": "Забыли пароль?" } }
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "هل نسيت كلمة المرور؟"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Passwort vergessen?"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Forgot password?"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "¿Olvidaste tu contraseña?"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mot de passe oublié ?"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hai dimenticato la password?"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Забыли пароль?"
+          }
+        }
       }
     },
     "auth.forgot_password.title": {
       "extractionState": "manual",
       "localizations": {
-        "ar": { "stringUnit": { "state": "translated", "value": "إعادة تعيين كلمة المرور" } },
-        "de": { "stringUnit": { "state": "translated", "value": "Passwort zurücksetzen" } },
-        "en": { "stringUnit": { "state": "translated", "value": "Reset password" } },
-        "es": { "stringUnit": { "state": "translated", "value": "Restablecer contraseña" } },
-        "fr": { "stringUnit": { "state": "translated", "value": "Réinitialiser le mot de passe" } },
-        "it": { "stringUnit": { "state": "translated", "value": "Reimposta password" } },
-        "ru": { "stringUnit": { "state": "translated", "value": "Сбросить пароль" } }
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "إعادة تعيين كلمة المرور"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Passwort zurücksetzen"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reset password"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Restablecer contraseña"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Réinitialiser le mot de passe"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reimposta password"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Сбросить пароль"
+          }
+        }
       }
     },
     "auth.forgot_password.subtitle": {
       "extractionState": "manual",
       "localizations": {
-        "ar": { "stringUnit": { "state": "translated", "value": "أدخل بريدك الإلكتروني وسنرسل تعليمات إعادة تعيين كلمة المرور." } },
-        "de": { "stringUnit": { "state": "translated", "value": "Gib deine E-Mail ein und wir senden dir Anweisungen zum Zurücksetzen des Passworts." } },
-        "en": { "stringUnit": { "state": "translated", "value": "Enter your email and we’ll send password reset instructions." } },
-        "es": { "stringUnit": { "state": "translated", "value": "Introduce tu email y te enviaremos instrucciones para restablecer la contraseña." } },
-        "fr": { "stringUnit": { "state": "translated", "value": "Saisis ton e-mail et nous t’enverrons les instructions de réinitialisation." } },
-        "it": { "stringUnit": { "state": "translated", "value": "Inserisci la tua email e ti invieremo le istruzioni per reimpostare la password." } },
-        "ru": { "stringUnit": { "state": "translated", "value": "Введите email, и мы отправим инструкции по сбросу пароля." } }
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "أدخل بريدك الإلكتروني وسنرسل تعليمات إعادة تعيين كلمة المرور."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gib deine E-Mail ein und wir senden dir Anweisungen zum Zurücksetzen des Passworts."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Enter your email and we’ll send password reset instructions."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Introduce tu email y te enviaremos instrucciones para restablecer la contraseña."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Saisis ton e-mail et nous t’enverrons les instructions de réinitialisation."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Inserisci la tua email e ti invieremo le istruzioni per reimpostare la password."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Введите email, и мы отправим инструкции по сбросу пароля."
+          }
+        }
       }
     },
     "auth.forgot_password.send": {
       "extractionState": "manual",
       "localizations": {
-        "ar": { "stringUnit": { "state": "translated", "value": "إرسال التعليمات" } },
-        "de": { "stringUnit": { "state": "translated", "value": "Anweisungen senden" } },
-        "en": { "stringUnit": { "state": "translated", "value": "Send instructions" } },
-        "es": { "stringUnit": { "state": "translated", "value": "Enviar instrucciones" } },
-        "fr": { "stringUnit": { "state": "translated", "value": "Envoyer les instructions" } },
-        "it": { "stringUnit": { "state": "translated", "value": "Invia istruzioni" } },
-        "ru": { "stringUnit": { "state": "translated", "value": "Отправить инструкции" } }
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "إرسال التعليمات"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Anweisungen senden"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Send instructions"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Enviar instrucciones"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Envoyer les instructions"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Invia istruzioni"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Отправить инструкции"
+          }
+        }
       }
     },
     "auth.forgot_password.generic_success": {
       "extractionState": "manual",
       "localizations": {
-        "ar": { "stringUnit": { "state": "translated", "value": "إذا كان هذا البريد الإلكتروني موجودًا، فقد تم إرسال تعليمات إعادة تعيين كلمة المرور." } },
-        "de": { "stringUnit": { "state": "translated", "value": "Wenn diese E-Mail existiert, wurden Anweisungen zum Zurücksetzen des Passworts gesendet." } },
-        "en": { "stringUnit": { "state": "translated", "value": "If this email exists, password reset instructions have been sent." } },
-        "es": { "stringUnit": { "state": "translated", "value": "Si este email existe, se han enviado instrucciones para restablecer la contraseña." } },
-        "fr": { "stringUnit": { "state": "translated", "value": "Si cet e-mail existe, les instructions de réinitialisation ont été envoyées." } },
-        "it": { "stringUnit": { "state": "translated", "value": "Se questa email esiste, le istruzioni per reimpostare la password sono state inviate." } },
-        "ru": { "stringUnit": { "state": "translated", "value": "Если этот email существует, инструкции по сбросу пароля отправлены." } }
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "إذا كان هذا البريد الإلكتروني موجودًا، فقد تم إرسال تعليمات إعادة تعيين كلمة المرور."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Wenn diese E-Mail existiert, wurden Anweisungen zum Zurücksetzen des Passworts gesendet."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "If this email exists, password reset instructions have been sent."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Si este email existe, se han enviado instrucciones para restablecer la contraseña."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Si cet e-mail existe, les instructions de réinitialisation ont été envoyées."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Se questa email esiste, le istruzioni per reimpostare la password sono state inviate."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Если этот email существует, инструкции по сбросу пароля отправлены."
+          }
+        }
       }
     },
     "auth.error.invalid_or_expired_password_reset_token": {
       "extractionState": "manual",
       "localizations": {
-        "ar": { "stringUnit": { "state": "translated", "value": "رابط إعادة تعيين كلمة المرور غير صالح أو انتهت صلاحيته." } },
-        "de": { "stringUnit": { "state": "translated", "value": "Der Link zum Zurücksetzen des Passworts ist ungültig oder abgelaufen." } },
-        "en": { "stringUnit": { "state": "translated", "value": "Password reset link is invalid or expired." } },
-        "es": { "stringUnit": { "state": "translated", "value": "El enlace para restablecer la contraseña no es válido o ha caducado." } },
-        "fr": { "stringUnit": { "state": "translated", "value": "Le lien de réinitialisation du mot de passe est invalide ou expiré." } },
-        "it": { "stringUnit": { "state": "translated", "value": "Il link per reimpostare la password non è valido o è scaduto." } },
-        "ru": { "stringUnit": { "state": "translated", "value": "Ссылка для сброса пароля недействительна или устарела." } }
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "رابط إعادة تعيين كلمة المرور غير صالح أو انتهت صلاحيته."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Der Link zum Zurücksetzen des Passworts ist ungültig oder abgelaufen."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Password reset link is invalid or expired."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "El enlace para restablecer la contraseña no es válido o ha caducado."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le lien de réinitialisation du mot de passe est invalide ou expiré."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Il link per reimpostare la password non è valido o è scaduto."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ссылка для сброса пароля недействительна или устарела."
+          }
+        }
       }
     },
     "common.cancel": {
       "extractionState": "manual",
       "localizations": {
-        "ar": { "stringUnit": { "state": "translated", "value": "إلغاء" } },
-        "de": { "stringUnit": { "state": "translated", "value": "Abbrechen" } },
-        "en": { "stringUnit": { "state": "translated", "value": "Cancel" } },
-        "es": { "stringUnit": { "state": "translated", "value": "Cancelar" } },
-        "fr": { "stringUnit": { "state": "translated", "value": "Annuler" } },
-        "it": { "stringUnit": { "state": "translated", "value": "Annulla" } },
-        "ru": { "stringUnit": { "state": "translated", "value": "Отмена" } }
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "إلغاء"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Abbrechen"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cancel"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cancelar"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Annuler"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Annulla"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Отмена"
+          }
+        }
       }
     },
     "profile.account.danger_section": {
       "extractionState": "manual",
       "localizations": {
-        "ar": { "stringUnit": { "state": "translated", "value": "منطقة خطرة" } },
-        "de": { "stringUnit": { "state": "translated", "value": "Gefahrenbereich" } },
-        "en": { "stringUnit": { "state": "translated", "value": "Danger zone" } },
-        "es": { "stringUnit": { "state": "translated", "value": "Zona de riesgo" } },
-        "fr": { "stringUnit": { "state": "translated", "value": "Zone sensible" } },
-        "it": { "stringUnit": { "state": "translated", "value": "Zona pericolosa" } },
-        "ru": { "stringUnit": { "state": "translated", "value": "Опасная зона" } }
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "منطقة خطرة"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gefahrenbereich"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Danger zone"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Zona de riesgo"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Zone sensible"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Zona pericolosa"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Опасная зона"
+          }
+        }
       }
     },
     "profile.account.delete": {
       "extractionState": "manual",
       "localizations": {
-        "ar": { "stringUnit": { "state": "translated", "value": "حذف الحساب" } },
-        "de": { "stringUnit": { "state": "translated", "value": "Account löschen" } },
-        "en": { "stringUnit": { "state": "translated", "value": "Delete Account" } },
-        "es": { "stringUnit": { "state": "translated", "value": "Eliminar cuenta" } },
-        "fr": { "stringUnit": { "state": "translated", "value": "Supprimer le compte" } },
-        "it": { "stringUnit": { "state": "translated", "value": "Elimina account" } },
-        "ru": { "stringUnit": { "state": "translated", "value": "Удалить аккаунт" } }
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "حذف الحساب"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Account löschen"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Delete Account"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Eliminar cuenta"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Supprimer le compte"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Elimina account"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Удалить аккаунт"
+          }
+        }
       }
     },
     "profile.account.delete_title": {
       "extractionState": "manual",
       "localizations": {
-        "ar": { "stringUnit": { "state": "translated", "value": "حذف الحساب؟" } },
-        "de": { "stringUnit": { "state": "translated", "value": "Account löschen?" } },
-        "en": { "stringUnit": { "state": "translated", "value": "Delete Account?" } },
-        "es": { "stringUnit": { "state": "translated", "value": "¿Eliminar cuenta?" } },
-        "fr": { "stringUnit": { "state": "translated", "value": "Supprimer le compte ?" } },
-        "it": { "stringUnit": { "state": "translated", "value": "Eliminare l’account?" } },
-        "ru": { "stringUnit": { "state": "translated", "value": "Удалить аккаунт?" } }
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "حذف الحساب؟"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Account löschen?"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Delete Account?"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "¿Eliminar cuenta?"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Supprimer le compte ?"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Eliminare l’account?"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Удалить аккаунт?"
+          }
+        }
       }
     },
     "profile.account.delete_message": {
       "extractionState": "manual",
       "localizations": {
-        "ar": { "stringUnit": { "state": "translated", "value": "هذا الإجراء دائم ولا يمكن التراجع عنه." } },
-        "de": { "stringUnit": { "state": "translated", "value": "Diese Aktion ist dauerhaft und kann nicht rückgängig gemacht werden." } },
-        "en": { "stringUnit": { "state": "translated", "value": "This action is permanent and cannot be undone." } },
-        "es": { "stringUnit": { "state": "translated", "value": "Esta acción es permanente y no se puede deshacer." } },
-        "fr": { "stringUnit": { "state": "translated", "value": "Cette action est définitive et ne peut pas être annulée." } },
-        "it": { "stringUnit": { "state": "translated", "value": "Questa azione è permanente e non può essere annullata." } },
-        "ru": { "stringUnit": { "state": "translated", "value": "Это действие необратимо." } }
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "هذا الإجراء دائم ولا يمكن التراجع عنه."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Diese Aktion ist dauerhaft und kann nicht rückgängig gemacht werden."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This action is permanent and cannot be undone."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Esta acción es permanente y no se puede deshacer."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cette action est définitive et ne peut pas être annulée."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Questa azione è permanente e non può essere annullata."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Это действие необратимо."
+          }
+        }
       }
     },
     "profile.account.delete_confirm": {
       "extractionState": "manual",
       "localizations": {
-        "ar": { "stringUnit": { "state": "translated", "value": "حذف" } },
-        "de": { "stringUnit": { "state": "translated", "value": "Löschen" } },
-        "en": { "stringUnit": { "state": "translated", "value": "Delete" } },
-        "es": { "stringUnit": { "state": "translated", "value": "Eliminar" } },
-        "fr": { "stringUnit": { "state": "translated", "value": "Supprimer" } },
-        "it": { "stringUnit": { "state": "translated", "value": "Elimina" } },
-        "ru": { "stringUnit": { "state": "translated", "value": "Удалить" } }
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "حذف"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Löschen"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Delete"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Eliminar"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Supprimer"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Elimina"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Удалить"
+          }
+        }
       }
     },
     "profile.account.delete_password_title": {
       "extractionState": "manual",
       "localizations": {
-        "ar": { "stringUnit": { "state": "translated", "value": "تأكيد حذف الحساب" } },
-        "de": { "stringUnit": { "state": "translated", "value": "Account-Löschung bestätigen" } },
-        "en": { "stringUnit": { "state": "translated", "value": "Confirm account deletion" } },
-        "es": { "stringUnit": { "state": "translated", "value": "Confirmar eliminación de cuenta" } },
-        "fr": { "stringUnit": { "state": "translated", "value": "Confirmer la suppression du compte" } },
-        "it": { "stringUnit": { "state": "translated", "value": "Conferma eliminazione account" } },
-        "ru": { "stringUnit": { "state": "translated", "value": "Подтвердите удаление аккаунта" } }
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "تأكيد حذف الحساب"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Account-Löschung bestätigen"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Confirm account deletion"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Confirmar eliminación de cuenta"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Confirmer la suppression du compte"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Conferma eliminazione account"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Подтвердите удаление аккаунта"
+          }
+        }
       }
     },
     "profile.account.delete_password_subtitle": {
       "extractionState": "manual",
       "localizations": {
-        "ar": { "stringUnit": { "state": "translated", "value": "أدخل كلمة المرور لتأكيد حذف الحساب." } },
-        "de": { "stringUnit": { "state": "translated", "value": "Gib dein Passwort ein, um die Löschung deines Accounts zu bestätigen." } },
-        "en": { "stringUnit": { "state": "translated", "value": "Enter your password to confirm account deletion." } },
-        "es": { "stringUnit": { "state": "translated", "value": "Introduce tu contraseña para confirmar la eliminación de la cuenta." } },
-        "fr": { "stringUnit": { "state": "translated", "value": "Saisis ton mot de passe pour confirmer la suppression du compte." } },
-        "it": { "stringUnit": { "state": "translated", "value": "Inserisci la password per confermare l’eliminazione dell’account." } },
-        "ru": { "stringUnit": { "state": "translated", "value": "Введите пароль, чтобы подтвердить удаление аккаунта." } }
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "أدخل كلمة المرور لتأكيد حذف الحساب."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gib dein Passwort ein, um die Löschung deines Accounts zu bestätigen."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Enter your password to confirm account deletion."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Introduce tu contraseña para confirmar la eliminación de la cuenta."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Saisis ton mot de passe pour confirmer la suppression du compte."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Inserisci la password per confermare l’eliminazione dell’account."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Введите пароль, чтобы подтвердить удаление аккаунта."
+          }
+        }
       }
     },
     "profile.account.current_password": {
       "extractionState": "manual",
       "localizations": {
-        "ar": { "stringUnit": { "state": "translated", "value": "كلمة المرور الحالية" } },
-        "de": { "stringUnit": { "state": "translated", "value": "Aktuelles Passwort" } },
-        "en": { "stringUnit": { "state": "translated", "value": "Current password" } },
-        "es": { "stringUnit": { "state": "translated", "value": "Contraseña actual" } },
-        "fr": { "stringUnit": { "state": "translated", "value": "Mot de passe actuel" } },
-        "it": { "stringUnit": { "state": "translated", "value": "Password attuale" } },
-        "ru": { "stringUnit": { "state": "translated", "value": "Текущий пароль" } }
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "كلمة المرور الحالية"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aktuelles Passwort"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Current password"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Contraseña actual"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mot de passe actuel"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Password attuale"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Текущий пароль"
+          }
+        }
       }
     },
     "profile.account.error.incorrect_password": {
       "extractionState": "manual",
       "localizations": {
-        "ar": { "stringUnit": { "state": "translated", "value": "كلمة المرور غير صحيحة." } },
-        "de": { "stringUnit": { "state": "translated", "value": "Falsches Passwort." } },
-        "en": { "stringUnit": { "state": "translated", "value": "Incorrect password." } },
-        "es": { "stringUnit": { "state": "translated", "value": "Contraseña incorrecta." } },
-        "fr": { "stringUnit": { "state": "translated", "value": "Mot de passe incorrect." } },
-        "it": { "stringUnit": { "state": "translated", "value": "Password non corretta." } },
-        "ru": { "stringUnit": { "state": "translated", "value": "Неверный пароль." } }
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "كلمة المرور غير صحيحة."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Falsches Passwort."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Incorrect password."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Contraseña incorrecta."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mot de passe incorrect."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Password non corretta."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Неверный пароль."
+          }
+        }
       }
     },
     "profile.account.error.deletion_failed": {
       "extractionState": "manual",
       "localizations": {
-        "ar": { "stringUnit": { "state": "translated", "value": "تعذر حذف الحساب. حاول مرة أخرى." } },
-        "de": { "stringUnit": { "state": "translated", "value": "Der Account konnte nicht gelöscht werden. Bitte versuche es erneut." } },
-        "en": { "stringUnit": { "state": "translated", "value": "Could not delete account. Please try again." } },
-        "es": { "stringUnit": { "state": "translated", "value": "No se pudo eliminar la cuenta. Inténtalo de nuevo." } },
-        "fr": { "stringUnit": { "state": "translated", "value": "Impossible de supprimer le compte. Réessaie." } },
-        "it": { "stringUnit": { "state": "translated", "value": "Impossibile eliminare l’account. Riprova." } },
-        "ru": { "stringUnit": { "state": "translated", "value": "Не удалось удалить аккаунт. Попробуйте ещё раз." } }
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "تعذر حذف الحساب. حاول مرة أخرى."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Der Account konnte nicht gelöscht werden. Bitte versuche es erneut."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Could not delete account. Please try again."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No se pudo eliminar la cuenta. Inténtalo de nuevo."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Impossible de supprimer le compte. Réessaie."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Impossibile eliminare l’account. Riprova."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Не удалось удалить аккаунт. Попробуйте ещё раз."
+          }
+        }
       }
     },
     "reset_password.title": {
       "extractionState": "manual",
       "localizations": {
-        "ar": { "stringUnit": { "state": "translated", "value": "تعيين كلمة مرور جديدة" } },
-        "de": { "stringUnit": { "state": "translated", "value": "Neues Passwort festlegen" } },
-        "en": { "stringUnit": { "state": "translated", "value": "Set a new password" } },
-        "es": { "stringUnit": { "state": "translated", "value": "Crea una nueva contraseña" } },
-        "fr": { "stringUnit": { "state": "translated", "value": "Créer un nouveau mot de passe" } },
-        "it": { "stringUnit": { "state": "translated", "value": "Imposta una nuova password" } },
-        "ru": { "stringUnit": { "state": "translated", "value": "Задайте новый пароль" } }
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "تعيين كلمة مرور جديدة"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Neues Passwort festlegen"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Set a new password"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Crea una nueva contraseña"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Créer un nouveau mot de passe"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Imposta una nuova password"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Задайте новый пароль"
+          }
+        }
       }
     },
     "reset_password.subtitle": {
       "extractionState": "manual",
       "localizations": {
-        "ar": { "stringUnit": { "state": "translated", "value": "اختر كلمة مرور جديدة لحساب JustTwo الخاص بك." } },
-        "de": { "stringUnit": { "state": "translated", "value": "Wähle ein neues Passwort für deinen JustTwo-Account." } },
-        "en": { "stringUnit": { "state": "translated", "value": "Choose a new password for your JustTwo account." } },
-        "es": { "stringUnit": { "state": "translated", "value": "Elige una nueva contraseña para tu cuenta de JustTwo." } },
-        "fr": { "stringUnit": { "state": "translated", "value": "Choisis un nouveau mot de passe pour ton compte JustTwo." } },
-        "it": { "stringUnit": { "state": "translated", "value": "Scegli una nuova password per il tuo account JustTwo." } },
-        "ru": { "stringUnit": { "state": "translated", "value": "Выберите новый пароль для аккаунта JustTwo." } }
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "اختر كلمة مرور جديدة لحساب JustTwo الخاص بك."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Wähle ein neues Passwort für deinen JustTwo-Account."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choose a new password for your JustTwo account."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Elige una nueva contraseña para tu cuenta de JustTwo."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choisis un nouveau mot de passe pour ton compte JustTwo."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scegli una nuova password per il tuo account JustTwo."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Выберите новый пароль для аккаунта JustTwo."
+          }
+        }
       }
     },
     "reset_password.new_password": {
       "extractionState": "manual",
       "localizations": {
-        "ar": { "stringUnit": { "state": "translated", "value": "كلمة المرور الجديدة" } },
-        "de": { "stringUnit": { "state": "translated", "value": "Neues Passwort" } },
-        "en": { "stringUnit": { "state": "translated", "value": "New password" } },
-        "es": { "stringUnit": { "state": "translated", "value": "Nueva contraseña" } },
-        "fr": { "stringUnit": { "state": "translated", "value": "Nouveau mot de passe" } },
-        "it": { "stringUnit": { "state": "translated", "value": "Nuova password" } },
-        "ru": { "stringUnit": { "state": "translated", "value": "Новый пароль" } }
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "كلمة المرور الجديدة"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Neues Passwort"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "New password"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nueva contraseña"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nouveau mot de passe"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nuova password"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Новый пароль"
+          }
+        }
       }
     },
     "reset_password.confirm_password": {
       "extractionState": "manual",
       "localizations": {
-        "ar": { "stringUnit": { "state": "translated", "value": "تأكيد كلمة المرور" } },
-        "de": { "stringUnit": { "state": "translated", "value": "Passwort bestätigen" } },
-        "en": { "stringUnit": { "state": "translated", "value": "Confirm password" } },
-        "es": { "stringUnit": { "state": "translated", "value": "Confirmar contraseña" } },
-        "fr": { "stringUnit": { "state": "translated", "value": "Confirmer le mot de passe" } },
-        "it": { "stringUnit": { "state": "translated", "value": "Conferma password" } },
-        "ru": { "stringUnit": { "state": "translated", "value": "Подтвердите пароль" } }
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "تأكيد كلمة المرور"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Passwort bestätigen"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Confirm password"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Confirmar contraseña"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Confirmer le mot de passe"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Conferma password"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Подтвердите пароль"
+          }
+        }
       }
     },
     "reset_password.change_password": {
       "extractionState": "manual",
       "localizations": {
-        "ar": { "stringUnit": { "state": "translated", "value": "تغيير كلمة المرور" } },
-        "de": { "stringUnit": { "state": "translated", "value": "Passwort ändern" } },
-        "en": { "stringUnit": { "state": "translated", "value": "Change password" } },
-        "es": { "stringUnit": { "state": "translated", "value": "Cambiar contraseña" } },
-        "fr": { "stringUnit": { "state": "translated", "value": "Changer le mot de passe" } },
-        "it": { "stringUnit": { "state": "translated", "value": "Cambia password" } },
-        "ru": { "stringUnit": { "state": "translated", "value": "Изменить пароль" } }
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "تغيير كلمة المرور"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Passwort ändern"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Change password"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cambiar contraseña"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Changer le mot de passe"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cambia password"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Изменить пароль"
+          }
+        }
       }
     },
     "reset_password.success": {
       "extractionState": "manual",
       "localizations": {
-        "ar": { "stringUnit": { "state": "translated", "value": "تم تغيير كلمة المرور. يمكنك تسجيل الدخول الآن." } },
-        "de": { "stringUnit": { "state": "translated", "value": "Dein Passwort wurde geändert. Du kannst dich jetzt anmelden." } },
-        "en": { "stringUnit": { "state": "translated", "value": "Your password has been changed. You can log in now." } },
-        "es": { "stringUnit": { "state": "translated", "value": "Tu contraseña se ha cambiado. Ya puedes iniciar sesión." } },
-        "fr": { "stringUnit": { "state": "translated", "value": "Ton mot de passe a été modifié. Tu peux te connecter." } },
-        "it": { "stringUnit": { "state": "translated", "value": "La password è stata cambiata. Ora puoi accedere." } },
-        "ru": { "stringUnit": { "state": "translated", "value": "Пароль изменён. Теперь можно войти." } }
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "تم تغيير كلمة المرور. يمكنك تسجيل الدخول الآن."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dein Passwort wurde geändert. Du kannst dich jetzt anmelden."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your password has been changed. You can log in now."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tu contraseña se ha cambiado. Ya puedes iniciar sesión."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ton mot de passe a été modifié. Tu peux te connecter."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La password è stata cambiata. Ora puoi accedere."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Пароль изменён. Теперь можно войти."
+          }
+        }
       }
     },
     "reset_password.back_to_login": {
       "extractionState": "manual",
       "localizations": {
-        "ar": { "stringUnit": { "state": "translated", "value": "العودة إلى تسجيل الدخول" } },
-        "de": { "stringUnit": { "state": "translated", "value": "Zurück zur Anmeldung" } },
-        "en": { "stringUnit": { "state": "translated", "value": "Back to login" } },
-        "es": { "stringUnit": { "state": "translated", "value": "Volver al inicio de sesión" } },
-        "fr": { "stringUnit": { "state": "translated", "value": "Retour à la connexion" } },
-        "it": { "stringUnit": { "state": "translated", "value": "Torna al login" } },
-        "ru": { "stringUnit": { "state": "translated", "value": "Вернуться ко входу" } }
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "العودة إلى تسجيل الدخول"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Zurück zur Anmeldung"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Back to login"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Volver al inicio de sesión"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Retour à la connexion"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Torna al login"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Вернуться ко входу"
+          }
+        }
       }
     },
     "reset_password.error.passwords_do_not_match": {
       "extractionState": "manual",
       "localizations": {
-        "ar": { "stringUnit": { "state": "translated", "value": "كلمتا المرور غير متطابقتين." } },
-        "de": { "stringUnit": { "state": "translated", "value": "Die Passwörter stimmen nicht überein." } },
-        "en": { "stringUnit": { "state": "translated", "value": "Passwords do not match." } },
-        "es": { "stringUnit": { "state": "translated", "value": "Las contraseñas no coinciden." } },
-        "fr": { "stringUnit": { "state": "translated", "value": "Les mots de passe ne correspondent pas." } },
-        "it": { "stringUnit": { "state": "translated", "value": "Le password non coincidono." } },
-        "ru": { "stringUnit": { "state": "translated", "value": "Пароли не совпадают." } }
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "كلمتا المرور غير متطابقتين."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Die Passwörter stimmen nicht überein."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Passwords do not match."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Las contraseñas no coinciden."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Les mots de passe ne correspondent pas."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le password non coincidono."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Пароли не совпадают."
+          }
+        }
       }
     },
     "reset_password.error.invalid_or_expired": {
       "extractionState": "manual",
       "localizations": {
-        "ar": { "stringUnit": { "state": "translated", "value": "رابط إعادة تعيين كلمة المرور غير صالح أو انتهت صلاحيته. اطلب رسالة جديدة من شاشة تسجيل الدخول." } },
-        "de": { "stringUnit": { "state": "translated", "value": "Der Link ist ungültig oder abgelaufen. Fordere über die Anmeldung eine neue E-Mail an." } },
-        "en": { "stringUnit": { "state": "translated", "value": "This password reset link is invalid or expired. Request a new email from the login screen." } },
-        "es": { "stringUnit": { "state": "translated", "value": "Este enlace no es válido o ha caducado. Solicita un nuevo email desde la pantalla de inicio de sesión." } },
-        "fr": { "stringUnit": { "state": "translated", "value": "Ce lien est invalide ou expiré. Demande un nouvel e-mail depuis l’écran de connexion." } },
-        "it": { "stringUnit": { "state": "translated", "value": "Questo link non è valido o è scaduto. Richiedi una nuova email dalla schermata di login." } },
-        "ru": { "stringUnit": { "state": "translated", "value": "Ссылка недействительна или устарела. Запросите новое письмо на экране входа." } }
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "رابط إعادة تعيين كلمة المرور غير صالح أو انتهت صلاحيته. اطلب رسالة جديدة من شاشة تسجيل الدخول."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Der Link ist ungültig oder abgelaufen. Fordere über die Anmeldung eine neue E-Mail an."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This password reset link is invalid or expired. Request a new email from the login screen."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Este enlace no es válido o ha caducado. Solicita un nuevo email desde la pantalla de inicio de sesión."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ce lien est invalide ou expiré. Demande un nouvel e-mail depuis l’écran de connexion."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Questo link non è valido o è scaduto. Richiedi una nuova email dalla schermata di login."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ссылка недействительна или устарела. Запросите новое письмо на экране входа."
+          }
+        }
       }
     },
     "reset_password.error.missing_token": {
       "extractionState": "manual",
       "localizations": {
-        "ar": { "stringUnit": { "state": "translated", "value": "رابط إعادة تعيين كلمة المرور غير مكتمل. اطلب رسالة جديدة." } },
-        "de": { "stringUnit": { "state": "translated", "value": "Der Link ist unvollständig. Fordere eine neue E-Mail an." } },
-        "en": { "stringUnit": { "state": "translated", "value": "This password reset link is incomplete. Request a new email." } },
-        "es": { "stringUnit": { "state": "translated", "value": "Este enlace está incompleto. Solicita un nuevo email." } },
-        "fr": { "stringUnit": { "state": "translated", "value": "Ce lien est incomplet. Demande un nouvel e-mail." } },
-        "it": { "stringUnit": { "state": "translated", "value": "Questo link è incompleto. Richiedi una nuova email." } },
-        "ru": { "stringUnit": { "state": "translated", "value": "Ссылка неполная. Запросите новое письмо." } }
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "رابط إعادة تعيين كلمة المرور غير مكتمل. اطلب رسالة جديدة."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Der Link ist unvollständig. Fordere eine neue E-Mail an."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This password reset link is incomplete. Request a new email."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Este enlace está incompleto. Solicita un nuevo email."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ce lien est incomplet. Demande un nouvel e-mail."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Questo link è incompleto. Richiedi una nuova email."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ссылка неполная. Запросите новое письмо."
+          }
+        }
       }
     },
     "email_verification.result.back_to_login": {
@@ -7289,181 +8234,1646 @@
     "profile.avatar.edit": {
       "extractionState": "manual",
       "localizations": {
-        "ar": { "stringUnit": { "state": "translated", "value": "تعديل صورة الملف الشخصي" } },
-        "de": { "stringUnit": { "state": "translated", "value": "Profilfoto bearbeiten" } },
-        "en": { "stringUnit": { "state": "translated", "value": "Edit profile photo" } },
-        "es": { "stringUnit": { "state": "translated", "value": "Editar foto de perfil" } },
-        "fr": { "stringUnit": { "state": "translated", "value": "Modifier la photo de profil" } },
-        "it": { "stringUnit": { "state": "translated", "value": "Modifica foto profilo" } },
-        "ru": { "stringUnit": { "state": "translated", "value": "Изменить фото профиля" } }
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "تعديل صورة الملف الشخصي"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Profilfoto bearbeiten"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Edit profile photo"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Editar foto de perfil"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Modifier la photo de profil"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Modifica foto profilo"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Изменить фото профиля"
+          }
+        }
       }
     },
     "profile.avatar_editor.title": {
       "extractionState": "manual",
       "localizations": {
-        "ar": { "stringUnit": { "state": "translated", "value": "صورة الملف الشخصي" } },
-        "de": { "stringUnit": { "state": "translated", "value": "Profilfoto" } },
-        "en": { "stringUnit": { "state": "translated", "value": "Profile photo" } },
-        "es": { "stringUnit": { "state": "translated", "value": "Foto de perfil" } },
-        "fr": { "stringUnit": { "state": "translated", "value": "Photo de profil" } },
-        "it": { "stringUnit": { "state": "translated", "value": "Foto profilo" } },
-        "ru": { "stringUnit": { "state": "translated", "value": "Фото профиля" } }
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "صورة الملف الشخصي"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Profilfoto"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Profile photo"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Foto de perfil"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Photo de profil"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Foto profilo"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Фото профиля"
+          }
+        }
       }
     },
     "profile.avatar_editor.subtitle": {
       "extractionState": "manual",
       "localizations": {
-        "ar": { "stringUnit": { "state": "translated", "value": "اختر صورة واضبط القص لملفك الشخصي." } },
-        "de": { "stringUnit": { "state": "translated", "value": "Wähle ein Foto und passe den Ausschnitt für dein Profil an." } },
-        "en": { "stringUnit": { "state": "translated", "value": "Choose a photo and adjust the crop for your profile." } },
-        "es": { "stringUnit": { "state": "translated", "value": "Elige una foto y ajusta el recorte para tu perfil." } },
-        "fr": { "stringUnit": { "state": "translated", "value": "Choisis une photo et ajuste le cadrage pour ton profil." } },
-        "it": { "stringUnit": { "state": "translated", "value": "Scegli una foto e regola il ritaglio per il tuo profilo." } },
-        "ru": { "stringUnit": { "state": "translated", "value": "Выбери фото и настрой кадрирование для профиля." } }
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "اختر صورة واضبط القص لملفك الشخصي."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Wähle ein Foto und passe den Ausschnitt für dein Profil an."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choose a photo and adjust the crop for your profile."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Elige una foto y ajusta el recorte para tu perfil."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choisis une photo et ajuste le cadrage pour ton profil."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scegli una foto e regola il ritaglio per il tuo profilo."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Выбери фото и настрой кадрирование для профиля."
+          }
+        }
       }
     },
     "profile.avatar_editor.save": {
       "extractionState": "manual",
       "localizations": {
-        "ar": { "stringUnit": { "state": "translated", "value": "حفظ" } },
-        "de": { "stringUnit": { "state": "translated", "value": "Speichern" } },
-        "en": { "stringUnit": { "state": "translated", "value": "Save" } },
-        "es": { "stringUnit": { "state": "translated", "value": "Guardar" } },
-        "fr": { "stringUnit": { "state": "translated", "value": "Enregistrer" } },
-        "it": { "stringUnit": { "state": "translated", "value": "Salva" } },
-        "ru": { "stringUnit": { "state": "translated", "value": "Сохранить" } }
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "حفظ"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Speichern"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Save"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Guardar"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Enregistrer"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Salva"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Сохранить"
+          }
+        }
       }
     },
     "profile.avatar_editor.hint": {
       "extractionState": "manual",
       "localizations": {
-        "ar": { "stringUnit": { "state": "translated", "value": "اسحب لتحريك الصورة، واقرص للتكبير." } },
-        "de": { "stringUnit": { "state": "translated", "value": "Ziehe zum Verschieben, ziehe mit zwei Fingern zum Zoomen." } },
-        "en": { "stringUnit": { "state": "translated", "value": "Drag to reposition, pinch to zoom." } },
-        "es": { "stringUnit": { "state": "translated", "value": "Arrastra para mover, pellizca para ampliar." } },
-        "fr": { "stringUnit": { "state": "translated", "value": "Fais glisser pour déplacer, pince pour zoomer." } },
-        "it": { "stringUnit": { "state": "translated", "value": "Trascina per spostare, pizzica per ingrandire." } },
-        "ru": { "stringUnit": { "state": "translated", "value": "Перетаскивай фото и меняй масштаб щипком." } }
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "اسحب لتحريك الصورة، واقرص للتكبير."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ziehe zum Verschieben, ziehe mit zwei Fingern zum Zoomen."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Drag to reposition, pinch to zoom."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Arrastra para mover, pellizca para ampliar."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fais glisser pour déplacer, pince pour zoomer."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trascina per spostare, pizzica per ingrandire."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Перетаскивай фото и меняй масштаб щипком."
+          }
+        }
       }
     },
     "profile.avatar_editor.choose_photo": {
       "extractionState": "manual",
       "localizations": {
-        "ar": { "stringUnit": { "state": "translated", "value": "اختيار صورة" } },
-        "de": { "stringUnit": { "state": "translated", "value": "Foto auswählen" } },
-        "en": { "stringUnit": { "state": "translated", "value": "Choose photo" } },
-        "es": { "stringUnit": { "state": "translated", "value": "Elegir foto" } },
-        "fr": { "stringUnit": { "state": "translated", "value": "Choisir une photo" } },
-        "it": { "stringUnit": { "state": "translated", "value": "Scegli foto" } },
-        "ru": { "stringUnit": { "state": "translated", "value": "Выбрать фото" } }
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "اختيار صورة"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Foto auswählen"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choose photo"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Elegir foto"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choisir une photo"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scegli foto"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Выбрать фото"
+          }
+        }
       }
     },
     "profile.avatar_editor.replace_photo": {
       "extractionState": "manual",
       "localizations": {
-        "ar": { "stringUnit": { "state": "translated", "value": "استبدال الصورة" } },
-        "de": { "stringUnit": { "state": "translated", "value": "Foto ersetzen" } },
-        "en": { "stringUnit": { "state": "translated", "value": "Replace photo" } },
-        "es": { "stringUnit": { "state": "translated", "value": "Cambiar foto" } },
-        "fr": { "stringUnit": { "state": "translated", "value": "Remplacer la photo" } },
-        "it": { "stringUnit": { "state": "translated", "value": "Sostituisci foto" } },
-        "ru": { "stringUnit": { "state": "translated", "value": "Заменить фото" } }
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "استبدال الصورة"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Foto ersetzen"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Replace photo"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cambiar foto"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remplacer la photo"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sostituisci foto"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Заменить фото"
+          }
+        }
       }
     },
     "profile.avatar_editor.delete": {
       "extractionState": "manual",
       "localizations": {
-        "ar": { "stringUnit": { "state": "translated", "value": "حذف الصورة" } },
-        "de": { "stringUnit": { "state": "translated", "value": "Foto löschen" } },
-        "en": { "stringUnit": { "state": "translated", "value": "Delete photo" } },
-        "es": { "stringUnit": { "state": "translated", "value": "Eliminar foto" } },
-        "fr": { "stringUnit": { "state": "translated", "value": "Supprimer la photo" } },
-        "it": { "stringUnit": { "state": "translated", "value": "Elimina foto" } },
-        "ru": { "stringUnit": { "state": "translated", "value": "Удалить фото" } }
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "حذف الصورة"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Foto löschen"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Delete photo"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Eliminar foto"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Supprimer la photo"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Elimina foto"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Удалить фото"
+          }
+        }
       }
     },
     "profile.avatar_editor.empty": {
       "extractionState": "manual",
       "localizations": {
-        "ar": { "stringUnit": { "state": "translated", "value": "إضافة صورة للملف الشخصي" } },
-        "de": { "stringUnit": { "state": "translated", "value": "Profilfoto hinzufügen" } },
-        "en": { "stringUnit": { "state": "translated", "value": "Add a profile photo" } },
-        "es": { "stringUnit": { "state": "translated", "value": "Añadir foto de perfil" } },
-        "fr": { "stringUnit": { "state": "translated", "value": "Ajouter une photo de profil" } },
-        "it": { "stringUnit": { "state": "translated", "value": "Aggiungi foto profilo" } },
-        "ru": { "stringUnit": { "state": "translated", "value": "Добавить фото профиля" } }
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "إضافة صورة للملف الشخصي"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Profilfoto hinzufügen"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add a profile photo"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Añadir foto de perfil"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ajouter une photo de profil"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aggiungi foto profilo"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Добавить фото профиля"
+          }
+        }
       }
     },
     "profile.menu.my_photos": {
       "extractionState": "manual",
       "localizations": {
-        "ar": { "stringUnit": { "state": "translated", "value": "صوري" } },
-        "de": { "stringUnit": { "state": "translated", "value": "Meine Fotos" } },
-        "en": { "stringUnit": { "state": "translated", "value": "My photos" } },
-        "es": { "stringUnit": { "state": "translated", "value": "Mis fotos" } },
-        "fr": { "stringUnit": { "state": "translated", "value": "Mes photos" } },
-        "it": { "stringUnit": { "state": "translated", "value": "Le mie foto" } },
-        "ru": { "stringUnit": { "state": "translated", "value": "Мои фото" } }
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "صوري"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Meine Fotos"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "My photos"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mis fotos"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mes photos"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le mie foto"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Мои фото"
+          }
+        }
       }
     },
     "profile.photos.title": {
       "extractionState": "manual",
       "localizations": {
-        "ar": { "stringUnit": { "state": "translated", "value": "صوري" } },
-        "de": { "stringUnit": { "state": "translated", "value": "Meine Fotos" } },
-        "en": { "stringUnit": { "state": "translated", "value": "My photos" } },
-        "es": { "stringUnit": { "state": "translated", "value": "Mis fotos" } },
-        "fr": { "stringUnit": { "state": "translated", "value": "Mes photos" } },
-        "it": { "stringUnit": { "state": "translated", "value": "Le mie foto" } },
-        "ru": { "stringUnit": { "state": "translated", "value": "Мои фото" } }
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "صوري"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Meine Fotos"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "My photos"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mis fotos"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mes photos"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le mie foto"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Мои фото"
+          }
+        }
       }
     },
     "profile.photos.empty_title": {
       "extractionState": "manual",
       "localizations": {
-        "ar": { "stringUnit": { "state": "translated", "value": "الصور قريبًا" } },
-        "de": { "stringUnit": { "state": "translated", "value": "Fotos kommen bald" } },
-        "en": { "stringUnit": { "state": "translated", "value": "Photos are coming soon" } },
-        "es": { "stringUnit": { "state": "translated", "value": "Las fotos llegarán pronto" } },
-        "fr": { "stringUnit": { "state": "translated", "value": "Les photos arrivent bientôt" } },
-        "it": { "stringUnit": { "state": "translated", "value": "Le foto arriveranno presto" } },
-        "ru": { "stringUnit": { "state": "translated", "value": "Фото скоро появятся" } }
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add your first photo"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Добавь первое фото"
+          }
+        },
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "أضف صورتك الأولى"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Füge dein erstes Foto hinzu"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Añade tu primera foto"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ajoute ta première photo"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aggiungi la tua prima foto"
+          }
+        }
       }
     },
     "profile.photos.empty_subtitle": {
       "extractionState": "manual",
       "localizations": {
-        "ar": { "stringUnit": { "state": "translated", "value": "ستتزامن هذه الشاشة مع صور ملفك الشخصي بعد ربط تدفق الخلفية." } },
-        "de": { "stringUnit": { "state": "translated", "value": "Dieser Bildschirm wird mit deinen Profilfotos synchronisiert, sobald der Backend-Flow verbunden ist." } },
-        "en": { "stringUnit": { "state": "translated", "value": "This screen will sync with your profile photos after the backend flow is connected." } },
-        "es": { "stringUnit": { "state": "translated", "value": "Esta pantalla se sincronizará con tus fotos de perfil cuando se conecte el flujo del backend." } },
-        "fr": { "stringUnit": { "state": "translated", "value": "Cet écran se synchronisera avec tes photos de profil une fois le flux backend connecté." } },
-        "it": { "stringUnit": { "state": "translated", "value": "Questa schermata si sincronizzerà con le foto del profilo quando il flusso backend sarà collegato." } },
-        "ru": { "stringUnit": { "state": "translated", "value": "Этот экран будет синхронизироваться с фото профиля после подключения backend-flow." } }
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Upload up to 6 photos. Your primary photo is used as your profile avatar."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Загрузи до 6 фото. Основное фото используется как аватар профиля."
+          }
+        },
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ارفع حتى 6 صور. صورتك الأساسية تُستخدم كصورة الملف الشخصي."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lade bis zu 6 Fotos hoch. Dein Hauptfoto wird als Profilavatar verwendet."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sube hasta 6 fotos. Tu foto principal se usa como avatar del perfil."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ajoute jusqu'à 6 photos. Ta photo principale sert d'avatar de profil."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Carica fino a 6 foto. La foto principale viene usata come avatar del profilo."
+          }
+        }
       }
     },
     "profile.photos.subtitle": {
       "extractionState": "manual",
       "localizations": {
-        "ar": { "stringUnit": { "state": "translated", "value": "أماكن صور الملف الشخصي" } },
-        "de": { "stringUnit": { "state": "translated", "value": "Profilfoto-Plätze" } },
-        "en": { "stringUnit": { "state": "translated", "value": "Profile photo slots" } },
-        "es": { "stringUnit": { "state": "translated", "value": "Espacios de fotos del perfil" } },
-        "fr": { "stringUnit": { "state": "translated", "value": "Emplacements de photos du profil" } },
-        "it": { "stringUnit": { "state": "translated", "value": "Slot foto profilo" } },
-        "ru": { "stringUnit": { "state": "translated", "value": "Слоты фото профиля" } }
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add up to 6 photos. Choose one as your primary avatar."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Добавь до 6 фото. Выбери одно как основной аватар."
+          }
+        },
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "أضف حتى 6 صور. اختر واحدة كصورة أساسية للملف الشخصي."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Füge bis zu 6 Fotos hinzu. Wähle eines als Hauptavatar."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Añade hasta 6 fotos. Elige una como avatar principal."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ajoute jusqu'à 6 photos. Choisis-en une comme avatar principal."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aggiungi fino a 6 foto. Scegline una come avatar principale."
+          }
+        }
       }
     },
     "profile.photos.slot": {
       "extractionState": "manual",
       "localizations": {
-        "ar": { "stringUnit": { "state": "translated", "value": "مكان للصورة" } },
-        "de": { "stringUnit": { "state": "translated", "value": "Foto-Platz" } },
-        "en": { "stringUnit": { "state": "translated", "value": "Photo slot" } },
-        "es": { "stringUnit": { "state": "translated", "value": "Espacio de foto" } },
-        "fr": { "stringUnit": { "state": "translated", "value": "Emplacement photo" } },
-        "it": { "stringUnit": { "state": "translated", "value": "Slot foto" } },
-        "ru": { "stringUnit": { "state": "translated", "value": "Слот фото" } }
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "مكان للصورة"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Foto-Platz"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Photo slot"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Espacio de foto"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Emplacement photo"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Slot foto"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Слот фото"
+          }
+        }
+      }
+    },
+    "common.error.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Something went wrong"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Что-то пошло не так"
+          }
+        },
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "حدث خطأ ما"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Etwas ist schiefgelaufen"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Algo salió mal"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Une erreur s'est produite"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Qualcosa è andato storto"
+          }
+        }
+      }
+    },
+    "profile.photos.add": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add photo"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Добавить фото"
+          }
+        },
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "إضافة صورة"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Foto hinzufügen"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Añadir foto"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ajouter une photo"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aggiungi foto"
+          }
+        }
+      }
+    },
+    "profile.photos.primary_badge": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Primary"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Основное"
+          }
+        },
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "أساسية"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hauptfoto"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Principal"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Principale"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Principale"
+          }
+        }
+      }
+    },
+    "profile.photos.make_primary": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Make primary"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Сделать основным"
+          }
+        },
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "تعيين كأساسية"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Als Hauptfoto festlegen"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hacer principal"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Définir comme principale"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Imposta come principale"
+          }
+        }
+      }
+    },
+    "profile.photos.delete": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Delete"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Удалить"
+          }
+        },
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "حذف"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Löschen"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Eliminar"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Supprimer"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Elimina"
+          }
+        }
+      }
+    },
+    "profile.photos.delete_confirm_title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Delete photo?"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Удалить фото?"
+          }
+        },
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "حذف الصورة؟"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Foto löschen?"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "¿Eliminar foto?"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Supprimer la photo ?"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Eliminare la foto?"
+          }
+        }
+      }
+    },
+    "profile.photos.delete_confirm_message": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This photo will be removed from your profile."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Это фото будет удалено из профиля."
+          }
+        },
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ستُزال هذه الصورة من ملفك الشخصي."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dieses Foto wird aus deinem Profil entfernt."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Esta foto se eliminará de tu perfil."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cette photo sera retirée de ton profil."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Questa foto verrà rimossa dal tuo profilo."
+          }
+        }
+      }
+    },
+    "profile.photos.error.invalid_image": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Could not process the selected image."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Не удалось обработать выбранное изображение."
+          }
+        },
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "تعذر معالجة الصورة المحددة."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Das ausgewählte Bild konnte nicht verarbeitet werden."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No se pudo procesar la imagen seleccionada."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Impossible de traiter l'image sélectionnée."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Impossibile elaborare l'immagine selezionata."
+          }
+        }
+      }
+    },
+    "profile.photos.error.limit_reached": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "You can upload up to 6 photos."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Можно загрузить не больше 6 фото."
+          }
+        },
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "يمكنك رفع ما يصل إلى 6 صور."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Du kannst bis zu 6 Fotos hochladen."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Puedes subir hasta 6 fotos."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tu peux ajouter jusqu'à 6 photos."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Puoi caricare fino a 6 foto."
+          }
+        }
+      }
+    },
+    "profile.photos.error.unsupported_content_type": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This image format is not supported."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Этот формат изображения не поддерживается."
+          }
+        },
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "تنسيق الصورة هذا غير مدعوم."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dieses Bildformat wird nicht unterstützt."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Este formato de imagen no es compatible."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ce format d'image n'est pas pris en charge."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Questo formato immagine non è supportato."
+          }
+        }
+      }
+    },
+    "profile.photos.error.file_too_large": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This photo is too large. Maximum size is 5 MB."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Фото слишком большое. Максимум 5 МБ."
+          }
+        },
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "هذه الصورة كبيرة جدًا. الحد الأقصى 5 ميجابايت."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dieses Foto ist zu groß. Die maximale Größe beträgt 5 MB."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Esta foto es demasiado grande. El tamaño máximo es 5 MB."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cette photo est trop volumineuse. Taille maximale : 5 Mo."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Questa foto è troppo grande. Dimensione massima: 5 MB."
+          }
+        }
+      }
+    },
+    "profile.photos.error.upload_failed": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Photo upload failed. Please try again."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Не удалось загрузить фото. Попробуй ещё раз."
+          }
+        },
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "فشل رفع الصورة. حاول مرة أخرى."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Foto-Upload fehlgeschlagen. Bitte versuche es erneut."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Error al subir la foto. Inténtalo de nuevo."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Échec du téléversement de la photo. Réessaie."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Caricamento foto non riuscito. Riprova."
+          }
+        }
+      }
+    },
+    "profile.photos.error.upload_not_found": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Upload session was not found."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Сессия загрузки не найдена."
+          }
+        },
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "لم يتم العثور على جلسة الرفع."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Upload-Sitzung wurde nicht gefunden."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No se encontró la sesión de carga."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Session de téléversement introuvable."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sessione di caricamento non trovata."
+          }
+        }
+      }
+    },
+    "profile.photos.error.upload_expired": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Upload session expired. Please try again."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Сессия загрузки истекла. Попробуй ещё раз."
+          }
+        },
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "انتهت صلاحية جلسة الرفع. حاول مرة أخرى."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Upload-Sitzung abgelaufen. Bitte versuche es erneut."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La sesión de carga ha caducado. Inténtalo de nuevo."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La session de téléversement a expiré. Réessaie."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sessione di caricamento scaduta. Riprova."
+          }
+        }
+      }
+    },
+    "profile.photos.error.upload_already_completed": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This upload was already completed."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Эта загрузка уже завершена."
+          }
+        },
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "تم إكمال هذا الرفع بالفعل."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dieser Upload wurde bereits abgeschlossen."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Esta carga ya se completó."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ce téléversement est déjà terminé."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Questo caricamento è già stato completato."
+          }
+        }
+      }
+    },
+    "profile.photos.error.uploaded_object_not_found": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Uploaded file was not found. Please try again."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Загруженный файл не найден. Попробуй ещё раз."
+          }
+        },
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "تعذر العثور على الملف المرفوع. حاول مرة أخرى."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hochgeladene Datei wurde nicht gefunden. Bitte versuche es erneut."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No se encontró el archivo subido. Inténtalo de nuevo."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fichier téléversé introuvable. Réessaie."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "File caricato non trovato. Riprova."
+          }
+        }
+      }
+    },
+    "profile.photos.error.upload_verification_failed": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Uploaded file could not be verified."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Не удалось проверить загруженный файл."
+          }
+        },
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "تعذر التحقق من الملف المرفوع."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hochgeladene Datei konnte nicht verifiziert werden."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No se pudo verificar el archivo subido."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Impossible de vérifier le fichier téléversé."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Impossibile verificare il file caricato."
+          }
+        }
+      }
+    },
+    "profile.photos.error.not_found": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Photo was not found."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Фото не найдено."
+          }
+        },
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "لم يتم العثور على الصورة."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Foto wurde nicht gefunden."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No se encontró la foto."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Photo introuvable."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Foto non trovata."
+          }
+        }
+      }
+    },
+    "profile.photos.error.storage_failed": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Photo storage is temporarily unavailable."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Хранилище фото временно недоступно."
+          }
+        },
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "تخزين الصور غير متاح مؤقتًا."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fotospeicher ist vorübergehend nicht verfügbar."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "El almacenamiento de fotos no está disponible temporalmente."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le stockage des photos est temporairement indisponible."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "L'archivio foto è temporaneamente non disponibile."
+          }
+        }
+      }
+    },
+    "profile.photos.error.avatar_limit_reached": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "You already have 6 photos. Delete one photo before uploading a new avatar."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "У тебя уже 6 фото. Удали одно фото, прежде чем загружать новый аватар."
+          }
+        },
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "لديك 6 صور بالفعل. احذف صورة واحدة قبل رفع صورة شخصية جديدة."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Du hast bereits 6 Fotos. Lösche ein Foto, bevor du einen neuen Avatar hochlädst."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ya tienes 6 fotos. Elimina una antes de subir un nuevo avatar."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tu as déjà 6 photos. Supprime-en une avant d'ajouter un nouvel avatar."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hai già 6 foto. Elimina una foto prima di caricare un nuovo avatar."
+          }
+        }
       }
     }
   },

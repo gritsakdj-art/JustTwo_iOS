@@ -65,6 +65,39 @@
 - Added password reset Universal Link handling for `https://api.jtwo.online/auth/reset-password?token=...`.
 - Added `ResetPasswordView` with new password confirmation, client-side password validation, backend reset submission, and return-to-login flow.
 
+## 2026-06-19
+
+### Auth account lifecycle (verified)
+
+- Confirmed end-to-end password reset magic link flow on staging: forgot password from `AuthView` → Resend email → Universal Link opens `ResetPasswordView` → `POST /auth/reset-password` → return to login with the new password.
+- Confirmed account deletion UI in `ProfileSettingsView` remains wired to `DELETE /me/account`.
+- Updated `Docs/EmailVerification.md` with password reset deep link notes, AASA path for `/auth/reset-password`, and current verified status.
+
+### Profile API alignment + photos
+
+- Added `isVisibleInDiscovery` support in `UserProfileDTO` and `UpsertProfileRequestBody` with safe decode default `true`.
+- Added discovery visibility toggle in `ProfileSettingsView` (`Show my profile in discovery`) with immediate `PUT /profile/me`, optimistic UI, and rollback on error.
+- Added profile photo DTOs in `Core/Models/ProfilePhotoModels.swift`.
+- Added profile photo API requests in `Core/API/ProfilePhotoRequests.swift`:
+  - `POST /profile/me/photos/upload-url`
+  - `POST /profile/me/photos/uploads/:uploadID/complete`
+  - `GET /profile/me/photos`
+  - `PATCH /profile/me/photos/:photoID/primary`
+  - `DELETE /profile/me/photos/:photoID`
+  - `GET /profile/photos/:photoID/download-url`
+- Added `ProfilePhotoService` and `ObjectStorageUploader` for direct `PUT` to presigned Object Storage URLs using exact backend headers (no JWT, no full signed URL logging).
+- Added `ProfilePhotoImagePipeline` (resize to max 1024, JPEG ~0.8) and `ProfilePhotoStore` for runtime photo state.
+- Replaced `ProfilePhotosPlaceholderView` with `ProfilePhotosView`:
+  - 2-column progressive gallery up to 6 photos;
+  - add cell only for the next available slot;
+  - context menu: make primary / delete;
+  - upload/list/primary/delete wired to backend.
+- Wired `ProfileView` avatar to primary photo display and real upload flow through existing `AvatarCropEditorView`.
+- Added `RemoteProfilePhotoView` with reload on expired `downloadUrl`.
+- Added localized profile photo errors and UI strings in `Localizable.xcstrings`.
+- Injected `ProfilePhotoStore` through `RootView` environment; reset store on `SessionStore.clearSession()`.
+- Verified iOS build with `xcodebuild -scheme JustTwo -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/JustTwoDerivedData build`.
+
 ## Notes
 
 - Continue adding completed changes here after each meaningful update.

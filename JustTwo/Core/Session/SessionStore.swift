@@ -57,6 +57,7 @@ final class SessionStore {
         currentUser = nil
         currentProfile = nil
         pendingVerificationEmail = nil
+        ProfilePhotoStore.shared.reset()
     }
 
     func signOut() {

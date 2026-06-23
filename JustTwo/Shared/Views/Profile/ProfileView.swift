@@ -4,8 +4,12 @@ import UIKit
 struct ProfileView: View {
     @Environment(SessionStore.self) private var session
     @Environment(AppRouter.self) private var router
+    @Environment(ProfilePhotoStore.self) private var photoStore
 
-    @State private var avatarImage: UIImage?
+    @State private var pendingLocalAvatar: UIImage?
+    @State private var avatarErrorMessage: String?
+    @State private var isAvatarErrorPresented = false
+    @State private var isUploadingAvatar = false
 
     var body: some View {
         NavigationStack {
@@ -34,6 +38,17 @@ struct ProfileView: View {
             .background(Color.discoverBackgroundGradient.ignoresSafeArea())
             .localizedNavigationTitle("tab.profile")
             .toolbarBackground(.hidden, for: .navigationBar)
+            .task {
+                await photoStore.loadPhotos()
+            }
+            .onChange(of: photoStore.primaryPhoto?.id) { _, _ in
+                pendingLocalAvatar = nil
+            }
+            .alert(Text("common.error.title"), isPresented: $isAvatarErrorPresented) {
+                Button("common.done", role: .cancel) { }
+            } message: {
+                Text(avatarErrorMessage ?? "")
+            }
         }
     }
 
@@ -69,12 +84,12 @@ struct ProfileView: View {
     private var avatarNavigationLink: some View {
         NavigationLink {
             AvatarCropEditorView(
-                initialImage: avatarImage,
+                initialImage: pendingLocalAvatar ?? avatarUIImage,
                 onSave: { avatarData in
-                    avatarImage = UIImage(data: avatarData)
+                    uploadAvatar(data: avatarData)
                 },
                 onDelete: {
-                    avatarImage = nil
+                    deleteAvatar()
                 }
             )
         } label: {
@@ -84,22 +99,44 @@ struct ProfileView: View {
         .accessibilityLabel(Text("profile.avatar.edit"))
     }
 
+    private var avatarUIImage: UIImage? {
+        if let pendingLocalAvatar {
+            return pendingLocalAvatar
+        }
+        return nil
+    }
+
     private var avatarView: some View {
         ZStack(alignment: .bottomTrailing) {
             ZStack {
                 Circle()
                     .fill(Color.discoverMockProfileGradient)
 
-                if let avatarImage {
-                    Image(uiImage: avatarImage)
+                if let pendingLocalAvatar {
+                    Image(uiImage: pendingLocalAvatar)
                         .resizable()
                         .scaledToFill()
                         .frame(width: 118, height: 118)
                         .clipShape(Circle())
+                } else if let primaryPhoto = photoStore.primaryPhoto {
+                    RemoteProfilePhotoView(photo: primaryPhoto) {
+                        await photoStore.refreshDownloadURL(for: primaryPhoto.id)
+                    }
+                    .id(primaryPhoto.id)
+                    .frame(width: 118, height: 118)
+                    .clipShape(Circle())
                 } else {
                     Image(systemName: "person.crop.circle.fill")
                         .font(.system(size: 62, weight: .regular))
                         .foregroundStyle(Color.onAccentText.opacity(0.88))
+                }
+
+                if isUploadingAvatar || photoStore.isUploading {
+                    Circle()
+                        .fill(Color.discoverPrimaryText.opacity(0.28))
+                        .frame(width: 118, height: 118)
+                    ProgressView()
+                        .tint(Color.onAccentText)
                 }
             }
             .frame(width: 118, height: 118)
@@ -127,7 +164,7 @@ struct ProfileView: View {
     private var menuSection: some View {
         VStack(spacing: 10) {
             NavigationLink {
-                ProfilePhotosPlaceholderView()
+                ProfilePhotosView()
             } label: {
                 ProfileMenuRowContent(
                     iconName: "photo.stack.fill",
@@ -158,6 +195,64 @@ struct ProfileView: View {
             }
             .buttonStyle(ProfileMenuRowStyle())
             .accessibilityLabel(Text("profile.menu.profile_settings"))
+        }
+    }
+
+    private func uploadAvatar(data: Data) {
+        guard photoStore.canAddPhoto else {
+            avatarErrorMessage = String(localized: "profile.photos.error.avatar_limit_reached")
+            isAvatarErrorPresented = true
+            return
+        }
+
+        guard let image = UIImage(data: data) else {
+            avatarErrorMessage = String(localized: "profile.photos.error.invalid_image")
+            isAvatarErrorPresented = true
+            return
+        }
+
+        pendingLocalAvatar = image
+        isUploadingAvatar = true
+
+        Task { @MainActor in
+            do {
+                try await photoStore.uploadPhoto(data: data, isPrimary: true)
+                pendingLocalAvatar = nil
+            } catch let error as NetworkError {
+                pendingLocalAvatar = nil
+                avatarErrorMessage = error.userMessage
+                isAvatarErrorPresented = true
+            } catch let error as LocalizedError {
+                pendingLocalAvatar = nil
+                avatarErrorMessage = error.errorDescription ?? error.localizedDescription
+                isAvatarErrorPresented = true
+            } catch {
+                pendingLocalAvatar = nil
+                avatarErrorMessage = error.localizedDescription
+                isAvatarErrorPresented = true
+            }
+
+            isUploadingAvatar = false
+        }
+    }
+
+    private func deleteAvatar() {
+        guard let primaryPhoto = photoStore.primaryPhoto else {
+            pendingLocalAvatar = nil
+            return
+        }
+
+        Task { @MainActor in
+            do {
+                try await photoStore.deletePhoto(photoID: primaryPhoto.id)
+                pendingLocalAvatar = nil
+            } catch let error as NetworkError {
+                avatarErrorMessage = error.userMessage
+                isAvatarErrorPresented = true
+            } catch {
+                avatarErrorMessage = error.localizedDescription
+                isAvatarErrorPresented = true
+            }
         }
     }
 }
@@ -211,12 +306,16 @@ private struct ProfileMenuRowStyle: ButtonStyle {
 
 #Preview {
     ProfileView()
-    .environment(SessionStore.shared)
-    .environment(AppRouter.shared)
+        .environment(SessionStore.shared)
+        .environment(AppRouter.shared)
+        .environment(ProfilePhotoStore.shared)
 }
 
 #Preview("Arabic RTL") {
     ProfileView()
-    .environment(\.locale, Locale(identifier: "ar"))
-    .environment(\.layoutDirection, .rightToLeft)
+        .environment(\.locale, Locale(identifier: "ar"))
+        .environment(\.layoutDirection, .rightToLeft)
+        .environment(SessionStore.shared)
+        .environment(AppRouter.shared)
+        .environment(ProfilePhotoStore.shared)
 }
