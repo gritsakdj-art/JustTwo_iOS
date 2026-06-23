@@ -126,6 +126,7 @@ private struct AppTabBarItem: View {
     let tab: AppTab
     let isSelected: Bool
     let action: () -> Void
+    @AppStorage("app.language") private var selectedLanguageRawValue = AppLanguage.system.rawValue
 
     var body: some View {
         Button(action: action) {
@@ -148,6 +149,7 @@ private struct AppTabBarItem: View {
                     .tracking(-0.1)
                     .lineLimit(1)
                     .minimumScaleFactor(0.85)
+                    .id(selectedLanguageRawValue)
             }
             .frame(maxWidth: .infinity)
             .contentShape(Rectangle())

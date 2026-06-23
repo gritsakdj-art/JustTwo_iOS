@@ -32,8 +32,7 @@ struct ProfileView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(Color.discoverBackgroundGradient.ignoresSafeArea())
-            .navigationTitle(Text("tab.profile"))
-            .navigationBarTitleDisplayMode(.inline)
+            .localizedNavigationTitle("tab.profile")
             .toolbarBackground(.hidden, for: .navigationBar)
         }
     }

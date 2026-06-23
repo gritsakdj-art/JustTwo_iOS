@@ -71,8 +71,7 @@ struct ProfileSettingsView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color.discoverBackgroundGradient.ignoresSafeArea())
         .hideKeyboardOnTap()
-        .navigationTitle(Text(navigationTitle))
-        .navigationBarTitleDisplayMode(.inline)
+        .localizedNavigationTitle(navigationTitle)
         .navigationBarBackButtonHidden(context == .onboarding)
         .onAppear {
             loadExistingProfile()

@@ -31,8 +31,7 @@ struct AvatarCropEditorView: View {
         .padding(.bottom, AppSpacing.xl)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .background(Color.discoverBackgroundGradient.ignoresSafeArea())
-        .navigationTitle(Text("profile.avatar_editor.title"))
-        .navigationBarTitleDisplayMode(.inline)
+        .localizedNavigationTitle("profile.avatar_editor.title")
         .toolbarBackground(.hidden, for: .navigationBar)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {

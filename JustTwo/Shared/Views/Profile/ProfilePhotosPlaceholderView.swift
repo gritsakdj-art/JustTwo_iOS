@@ -19,8 +19,7 @@ struct ProfilePhotosPlaceholderView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color.discoverBackgroundGradient.ignoresSafeArea())
-        .navigationTitle(Text("profile.photos.title"))
-        .navigationBarTitleDisplayMode(.inline)
+        .localizedNavigationTitle("profile.photos.title")
         .toolbarBackground(.hidden, for: .navigationBar)
     }
 
