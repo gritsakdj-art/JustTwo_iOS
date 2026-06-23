@@ -427,6 +427,7 @@ enum AppSpacing {
 
 enum AppCornerRadius {
     static let field: CGFloat = 18
+    static let photoCell: CGFloat = 20
     static let button: CGFloat = 26
     static let card: CGFloat = 24
     static let profileCard: CGFloat = 32

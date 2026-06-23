@@ -3,21 +3,42 @@ import SwiftUI
 import UIKit
 
 struct AvatarCropEditorView: View {
+    let photoID: UUID?
+    let userID: UUID?
     let initialImage: UIImage?
-    let onSave: (Data) -> Void
+    let initialTransform: AvatarCropTransform?
+    let onSave: (AvatarCropSaveResult) -> Void
     let onDelete: () -> Void
 
     @Environment(\.dismiss) private var dismiss
     @State private var selectedItem: PhotosPickerItem?
     @State private var isShowingPhotoPicker = false
     @State private var sourceImage: UIImage?
+    @State private var didReplaceImage = false
     @State private var viewportSize: CGSize = .zero
     @State private var offset: CGSize = .zero
     @State private var accumulatedOffset: CGSize = .zero
     @State private var scale: CGFloat = 1
     @State private var accumulatedScale: CGFloat = 1
+    @State private var hasAppliedInitialTransform = false
 
     private let cropSize: CGFloat = 280
+
+    init(
+        photoID: UUID? = nil,
+        userID: UUID? = nil,
+        initialImage: UIImage?,
+        initialTransform: AvatarCropTransform? = nil,
+        onSave: @escaping (AvatarCropSaveResult) -> Void,
+        onDelete: @escaping () -> Void
+    ) {
+        self.photoID = photoID
+        self.userID = userID
+        self.initialImage = initialImage
+        self.initialTransform = initialTransform
+        self.onSave = onSave
+        self.onDelete = onDelete
+    }
 
     var body: some View {
         VStack(spacing: AppSpacing.xl) {
@@ -46,8 +67,9 @@ struct AvatarCropEditorView: View {
                 .foregroundStyle(sourceImage == nil ? Color.secondaryText : Color.brandPrimary)
             }
         }
-        .task {
+        .onAppear {
             sourceImage = initialImage
+            hasAppliedInitialTransform = false
         }
         .task(id: selectedItem) {
             await loadSelectedImage()
@@ -145,15 +167,14 @@ struct AvatarCropEditorView: View {
                 GeometryReader { geo in
                     let size = min(cropSize, min(geo.size.width, geo.size.height))
                     let viewport = CGSize(width: size, height: size)
-                    let baseSize = baseImageSize(in: viewport, imageSize: sourceImage.size)
 
                     ZStack {
                         Image(uiImage: sourceImage)
                             .resizable()
                             .scaledToFill()
                             .frame(
-                                width: baseSize.width * scale,
-                                height: baseSize.height * scale
+                                width: AvatarCropGeometry.baseImageSize(in: viewport, imageSize: sourceImage.size).width * scale,
+                                height: AvatarCropGeometry.baseImageSize(in: viewport, imageSize: sourceImage.size).height * scale
                             )
                             .offset(offset)
                             .frame(width: size, height: size)
@@ -162,12 +183,14 @@ struct AvatarCropEditorView: View {
                             .position(x: geo.size.width / 2, y: geo.size.height / 2)
                             .onAppear {
                                 viewportSize = viewport
+                                applyInitialTransformIfNeeded()
                             }
                             .onChange(of: geo.size) { _, newSize in
                                 let nextSize = min(cropSize, min(newSize.width, newSize.height))
                                 let nextViewport = CGSize(width: nextSize, height: nextSize)
                                 viewportSize = nextViewport
-                                offset = clampedOffset(
+                                applyInitialTransformIfNeeded()
+                                offset = AvatarCropGeometry.clampedOffset(
                                     offset,
                                     imageSize: sourceImage.size,
                                     viewport: nextViewport,
@@ -254,7 +277,12 @@ struct AvatarCropEditorView: View {
                     height: accumulatedOffset.height + value.translation.height
                 )
                 if let sourceImage {
-                    offset = clampedOffset(candidate, imageSize: sourceImage.size, viewport: viewportSize, scale: scale)
+                    offset = AvatarCropGeometry.clampedOffset(
+                        candidate,
+                        imageSize: sourceImage.size,
+                        viewport: viewportSize,
+                        scale: scale
+                    )
                 } else {
                     offset = candidate
                 }
@@ -270,7 +298,12 @@ struct AvatarCropEditorView: View {
                 let newScale = min(max(accumulatedScale * value, 1), 5)
                 scale = newScale
                 if let sourceImage {
-                    offset = clampedOffset(offset, imageSize: sourceImage.size, viewport: viewportSize, scale: newScale)
+                    offset = AvatarCropGeometry.clampedOffset(
+                        offset,
+                        imageSize: sourceImage.size,
+                        viewport: viewportSize,
+                        scale: newScale
+                    )
                 }
             }
             .onEnded { _ in
@@ -290,12 +323,25 @@ struct AvatarCropEditorView: View {
 
     private func applySelectedImage(_ image: UIImage) {
         selectedItem = nil
-        sourceImage = nil
         sourceImage = image
+        didReplaceImage = true
         resetTransforms()
     }
 
+    private func applyInitialTransformIfNeeded() {
+        guard !hasAppliedInitialTransform,
+              let initialTransform,
+              viewportSize.width > 0 else { return }
+
+        hasAppliedInitialTransform = true
+        scale = initialTransform.scaleValue
+        accumulatedScale = scale
+        offset = initialTransform.offset(in: viewportSize)
+        accumulatedOffset = offset
+    }
+
     private func resetTransforms() {
+        hasAppliedInitialTransform = false
         offset = .zero
         accumulatedOffset = .zero
         scale = 1
@@ -303,69 +349,33 @@ struct AvatarCropEditorView: View {
     }
 
     private func saveCroppedAvatar() {
-        guard let sourceImage,
-              let rendered = renderTransformedImage(sourceImage),
-              let avatarData = AvatarCropImagePipeline.encodeAvatarData(square: rendered)
-        else { return }
+        guard let sourceImage else { return }
 
-        onSave(avatarData)
+        let viewport = viewportSize.width > 0
+            ? viewportSize
+            : CGSize(width: cropSize, height: cropSize)
+        let transform = AvatarCropTransform(offset: offset, scale: scale, viewport: viewport)
+
+        let imageData: Data?
+        if didReplaceImage || initialImage == nil {
+            guard let data = sourceImage.jpegData(compressionQuality: 0.9) else {
+                return
+            }
+            imageData = data
+        } else {
+            imageData = nil
+        }
+
+        onSave(
+            AvatarCropSaveResult(
+                imageData: imageData,
+                transform: transform,
+                didReplaceImage: didReplaceImage
+            )
+        )
         dismiss()
     }
 
-    private func renderTransformedImage(_ image: UIImage) -> UIImage? {
-        let rendererFormat = UIGraphicsImageRendererFormat.default()
-        rendererFormat.scale = UIScreen.main.scale
-        let outputSize = CGSize(width: cropSize, height: cropSize)
-        let renderer = UIGraphicsImageRenderer(size: outputSize, format: rendererFormat)
-        return renderer.image { context in
-            UIColor.clear.setFill()
-            context.fill(CGRect(origin: .zero, size: outputSize))
-
-            let baseSize = baseImageSize(in: outputSize, imageSize: image.size)
-            let scaledWidth = baseSize.width * scale
-            let scaledHeight = baseSize.height * scale
-            let scaledRect = CGRect(
-                x: (outputSize.width - scaledWidth) / 2 + offset.width,
-                y: (outputSize.height - scaledHeight) / 2 + offset.height,
-                width: scaledWidth,
-                height: scaledHeight
-            )
-            image.draw(in: scaledRect)
-        }
-    }
-
-    private func baseImageSize(in viewport: CGSize, imageSize: CGSize) -> CGSize {
-        guard viewport.width > 0, viewport.height > 0, imageSize.width > 0, imageSize.height > 0 else {
-            return viewport
-        }
-        let scale = max(viewport.width / imageSize.width, viewport.height / imageSize.height)
-        return CGSize(width: imageSize.width * scale, height: imageSize.height * scale)
-    }
-
-    private func clampedOffset(_ candidate: CGSize, imageSize: CGSize, viewport: CGSize, scale: CGFloat) -> CGSize {
-        let baseSize = baseImageSize(in: viewport, imageSize: imageSize)
-        let scaledWidth = baseSize.width * scale
-        let scaledHeight = baseSize.height * scale
-        let maxX = max(0, (scaledWidth - viewport.width) / 2)
-        let maxY = max(0, (scaledHeight - viewport.height) / 2)
-        return CGSize(
-            width: min(max(candidate.width, -maxX), maxX),
-            height: min(max(candidate.height, -maxY), maxY)
-        )
-    }
-}
-
-private enum AvatarCropImagePipeline {
-    static func encodeAvatarData(square image: UIImage) -> Data? {
-        let outputSize = CGSize(width: 512, height: 512)
-        let rendererFormat = UIGraphicsImageRendererFormat.default()
-        rendererFormat.scale = 1
-        let renderer = UIGraphicsImageRenderer(size: outputSize, format: rendererFormat)
-        let resized = renderer.image { _ in
-            image.draw(in: CGRect(origin: .zero, size: outputSize))
-        }
-        return resized.jpegData(compressionQuality: 0.82)
-    }
 }
 
 #Preview {

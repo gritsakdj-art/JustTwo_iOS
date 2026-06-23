@@ -528,6 +528,13 @@ Suggested MVP order:
 14. Profile sharing
 15. Subscription features
 
+## Technical Documentation
+
+* [Profile photos and avatar presentation](Docs/ProfilePhotos.md)
+* [Authentication deep links](Docs/EmailVerification.md)
+
+Profile photo gallery order and avatar presentation are synchronized through the backend. Local UI state may be used for previews and caching, but it is not the cross-device source of truth.
+
 ## AI Assistant / Cursor / Codex Context
 
 When working on this project, always preserve the core product idea:

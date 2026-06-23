@@ -7,6 +7,7 @@ struct ProfileView: View {
     @Environment(ProfilePhotoStore.self) private var photoStore
 
     @State private var pendingLocalAvatar: UIImage?
+    @State private var editorSourceImage: UIImage?
     @State private var avatarErrorMessage: String?
     @State private var isAvatarErrorPresented = false
     @State private var isUploadingAvatar = false
@@ -40,8 +41,17 @@ struct ProfileView: View {
             .toolbarBackground(.hidden, for: .navigationBar)
             .task {
                 await photoStore.loadPhotos()
+                await loadEditorSourceImage()
+            }
+            .task(id: photoStore.primaryPhoto?.id) {
+                await loadEditorSourceImage()
             }
             .onChange(of: photoStore.primaryPhoto?.id) { _, _ in
+                guard !isUploadingAvatar else { return }
+                pendingLocalAvatar = nil
+            }
+            .onChange(of: photoStore.primaryPhotoRevision) { _, _ in
+                guard !isUploadingAvatar else { return }
                 pendingLocalAvatar = nil
             }
             .alert(Text("common.error.title"), isPresented: $isAvatarErrorPresented) {
@@ -84,9 +94,12 @@ struct ProfileView: View {
     private var avatarNavigationLink: some View {
         NavigationLink {
             AvatarCropEditorView(
-                initialImage: pendingLocalAvatar ?? avatarUIImage,
-                onSave: { avatarData in
-                    uploadAvatar(data: avatarData)
+                photoID: photoStore.primaryPhoto?.id,
+                userID: session.currentUser?.id,
+                initialImage: editorSourceImage ?? pendingLocalAvatar,
+                initialTransform: currentAvatarTransform,
+                onSave: { result in
+                    handleAvatarSave(result)
                 },
                 onDelete: {
                     deleteAvatar()
@@ -99,11 +112,22 @@ struct ProfileView: View {
         .accessibilityLabel(Text("profile.avatar.edit"))
     }
 
+    private var currentAvatarTransform: AvatarCropTransform? {
+        guard let primaryPhoto = photoStore.primaryPhoto else {
+            return nil
+        }
+        return AvatarCropTransform(primaryPhoto.avatarPresentation)
+    }
+
     private var avatarUIImage: UIImage? {
         if let pendingLocalAvatar {
             return pendingLocalAvatar
         }
-        return nil
+        if let primaryID = photoStore.primaryPhoto?.id,
+           let cached = photoStore.cachedImage(for: primaryID) {
+            return cached
+        }
+        return photoStore.avatarFallbackImage()
     }
 
     private var avatarView: some View {
@@ -113,16 +137,14 @@ struct ProfileView: View {
                     .fill(Color.discoverMockProfileGradient)
 
                 if let pendingLocalAvatar {
-                    Image(uiImage: pendingLocalAvatar)
-                        .resizable()
-                        .scaledToFill()
-                        .frame(width: 118, height: 118)
-                        .clipShape(Circle())
+                    avatarImageView(pendingLocalAvatar, transform: currentAvatarTransform)
+                } else if let image = avatarUIImage {
+                    avatarImageView(image, transform: currentAvatarTransform)
                 } else if let primaryPhoto = photoStore.primaryPhoto {
                     RemoteProfilePhotoView(photo: primaryPhoto) {
                         await photoStore.refreshDownloadURL(for: primaryPhoto.id)
                     }
-                    .id(primaryPhoto.id)
+                    .id("\(primaryPhoto.id.uuidString)-\(photoStore.primaryPhotoRevision)")
                     .frame(width: 118, height: 118)
                     .clipShape(Circle())
                 } else {
@@ -159,6 +181,68 @@ struct ProfileView: View {
                 .offset(x: -2, y: -2)
         }
         .accessibilityLabel(Text("profile.avatar.placeholder"))
+    }
+
+    @ViewBuilder
+    private func avatarImageView(_ image: UIImage, transform: AvatarCropTransform?) -> some View {
+        if let transform, transform != .identity {
+            ProfileAvatarFramedImageView(
+                image: image,
+                transform: transform,
+                size: 118
+            )
+        } else {
+            Image(uiImage: image)
+                .resizable()
+                .scaledToFill()
+                .frame(width: 118, height: 118)
+                .clipShape(Circle())
+        }
+    }
+
+    @MainActor
+    private func loadEditorSourceImage() async {
+        if let pendingLocalAvatar {
+            editorSourceImage = pendingLocalAvatar
+            return
+        }
+
+        guard let primaryPhoto = photoStore.primaryPhoto else {
+            editorSourceImage = photoStore.avatarFallbackImage()
+            return
+        }
+
+        if let cached = photoStore.cachedImage(for: primaryPhoto.id) {
+            editorSourceImage = cached
+            return
+        }
+
+        await photoStore.ensureCachedImage(for: primaryPhoto.id)
+        editorSourceImage = photoStore.cachedImage(for: primaryPhoto.id) ?? photoStore.avatarFallbackImage()
+    }
+
+    private func handleAvatarSave(_ result: AvatarCropSaveResult) {
+        if let imageData = result.imageData {
+            uploadAvatar(data: imageData, transform: result.transform)
+            return
+        }
+
+        guard let photoID = photoStore.primaryPhoto?.id else { return }
+        Task { @MainActor in
+            do {
+                try await photoStore.updateAvatarPresentation(
+                    photoID: photoID,
+                    transform: result.transform
+                )
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            } catch let error as NetworkError {
+                avatarErrorMessage = error.userMessage
+                isAvatarErrorPresented = true
+            } catch {
+                avatarErrorMessage = error.localizedDescription
+                isAvatarErrorPresented = true
+            }
+        }
     }
 
     private var menuSection: some View {
@@ -198,7 +282,7 @@ struct ProfileView: View {
         }
     }
 
-    private func uploadAvatar(data: Data) {
+    private func uploadAvatar(data: Data, transform: AvatarCropTransform = .identity) {
         guard photoStore.canAddPhoto else {
             avatarErrorMessage = String(localized: "profile.photos.error.avatar_limit_reached")
             isAvatarErrorPresented = true
@@ -216,7 +300,11 @@ struct ProfileView: View {
 
         Task { @MainActor in
             do {
-                try await photoStore.uploadPhoto(data: data, isPrimary: true)
+                let uploaded = try await photoStore.uploadPhoto(data: data, isPrimary: true)
+                try await photoStore.updateAvatarPresentation(
+                    photoID: uploaded.id,
+                    transform: transform
+                )
                 pendingLocalAvatar = nil
             } catch let error as NetworkError {
                 pendingLocalAvatar = nil
@@ -246,6 +334,7 @@ struct ProfileView: View {
             do {
                 try await photoStore.deletePhoto(photoID: primaryPhoto.id)
                 pendingLocalAvatar = nil
+                editorSourceImage = nil
             } catch let error as NetworkError {
                 avatarErrorMessage = error.userMessage
                 isAvatarErrorPresented = true
@@ -310,6 +399,7 @@ private struct ProfileMenuRowStyle: ButtonStyle {
         .environment(SessionStore.shared)
         .environment(AppRouter.shared)
         .environment(ProfilePhotoStore.shared)
+        .environment(ProfileAvatarCropStore.shared)
 }
 
 #Preview("Arabic RTL") {
@@ -320,4 +410,5 @@ private struct ProfileMenuRowStyle: ButtonStyle {
         .environment(SessionStore.shared)
         .environment(AppRouter.shared)
         .environment(ProfilePhotoStore.shared)
+        .environment(ProfileAvatarCropStore.shared)
 }

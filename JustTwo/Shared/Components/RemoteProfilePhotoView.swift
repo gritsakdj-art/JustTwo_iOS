@@ -1,52 +1,38 @@
 import SwiftUI
+import UIKit
 
 struct RemoteProfilePhotoView: View {
     let photo: ProfilePhotoDTO
     var onLoadFailure: (() async -> Void)?
 
-    @State private var reloadToken = 0
-    @State private var resolvedURL: URL?
+    @State private var displayedImage: UIImage?
+    @State private var isLoadingRemote = false
     @State private var didRetry = false
+    @State private var loadToken = 0
 
     var body: some View {
-        Group {
-            if let resolvedURL {
-                AsyncImage(url: resolvedURL, transaction: Transaction(animation: .easeInOut(duration: 0.2))) { phase in
-                    switch phase {
-                    case .success(let image):
-                        image
-                            .resizable()
-                            .scaledToFill()
-                    case .failure:
-                        failurePlaceholder
-                            .task {
-                                await handleLoadFailure()
-                            }
-                    case .empty:
-                        ProgressView()
-                            .tint(Color.brandPrimary)
-                    @unknown default:
-                        failurePlaceholder
-                    }
-                }
-                .id("\(photo.id.uuidString)-\(reloadToken)")
+        ZStack {
+            if let displayedImage {
+                Image(uiImage: displayedImage)
+                    .resizable()
+                    .scaledToFill()
             } else {
                 failurePlaceholder
             }
+
+            if isLoadingRemote, displayedImage == nil {
+                ProgressView()
+                    .tint(Color.brandPrimary)
+            }
         }
-        .onAppear {
-            resolvedURL = URL(string: photo.downloadUrl)
+        .clipped()
+        .task(id: loadTaskID) {
+            await loadImage()
         }
-        .onChange(of: photo.downloadUrl) { _, newValue in
-            resolvedURL = URL(string: newValue)
-            reloadToken += 1
-            didRetry = false
-        }
-        .onChange(of: photo.id) { _, _ in
-            resolvedURL = URL(string: photo.downloadUrl)
-            reloadToken += 1
-            didRetry = false
-        }
+    }
+
+    private var loadTaskID: String {
+        "\(photo.id.uuidString)-\(photo.downloadUrl)-\(loadToken)"
     }
 
     private var failurePlaceholder: some View {
@@ -58,9 +44,48 @@ struct RemoteProfilePhotoView: View {
         }
     }
 
-    private func handleLoadFailure() async {
+    @MainActor
+    private func loadImage() async {
+        if let cached = ProfilePhotoImageCache.shared.image(for: photo.id) {
+            displayedImage = cached
+            if photo.isPrimary {
+                ProfilePhotoImageCache.shared.saveAvatarFallback(cached)
+            }
+        }
+
+        guard let url = URL(string: photo.downloadUrl) else {
+            await handleLoadFailureIfNeeded()
+            return
+        }
+
+        isLoadingRemote = displayedImage == nil
+        defer { isLoadingRemote = false }
+
+        do {
+            let (data, response) = try await URLSession.shared.data(from: url)
+            guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode),
+                  let image = UIImage(data: data) else {
+                await handleLoadFailureIfNeeded()
+                return
+            }
+
+            ProfilePhotoImageCache.shared.save(image, for: photo.id)
+            if photo.isPrimary {
+                ProfilePhotoImageCache.shared.saveAvatarFallback(image)
+            }
+            displayedImage = image
+            didRetry = false
+        } catch {
+            await handleLoadFailureIfNeeded()
+        }
+    }
+
+    @MainActor
+    private func handleLoadFailureIfNeeded() async {
+        guard displayedImage == nil else { return }
         guard !didRetry else { return }
         didRetry = true
         await onLoadFailure?()
+        loadToken += 1
     }
 }

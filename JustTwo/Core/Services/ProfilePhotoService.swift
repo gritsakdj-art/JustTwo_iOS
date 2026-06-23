@@ -49,6 +49,23 @@ enum ProfilePhotoService {
         return response.photo
     }
 
+    static func reorderPhotos(photoIDs: [UUID]) async throws -> [ProfilePhotoDTO] {
+        let response = try await NetworkExecutor.shared.send(
+            ReorderProfilePhotosRequest(photoIDs: photoIDs)
+        )
+        return response.photos
+    }
+
+    static func updateAvatarPresentation(
+        photoID: UUID,
+        presentation: AvatarPresentationDTO
+    ) async throws -> ProfilePhotoDTO {
+        let response = try await NetworkExecutor.shared.send(
+            UpdateAvatarPresentationRequest(photoID: photoID, presentation: presentation)
+        )
+        return response.photo
+    }
+
     static func deletePhoto(photoID: UUID) async throws {
         _ = try await NetworkExecutor.shared.send(DeleteProfilePhotoRequest(photoID: photoID))
     }

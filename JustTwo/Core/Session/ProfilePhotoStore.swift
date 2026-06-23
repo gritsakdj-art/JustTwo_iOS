@@ -1,4 +1,5 @@
 import Foundation
+import UIKit
 
 @MainActor
 @Observable
@@ -11,11 +12,25 @@ final class ProfilePhotoStore {
     private(set) var isUploading = false
     private(set) var isMutating = false
     private(set) var lastErrorMessage: String?
+    private(set) var primaryPhotoRevision = 0
 
     private var hasLoaded = false
+    private let imageCache = ProfilePhotoImageCache.shared
 
     var primaryPhoto: ProfilePhotoDTO? {
         photos.first(where: \.isPrimary) ?? photos.first
+    }
+
+    /// Gallery order is owned by the backend and is independent from primary status.
+    var galleryPhotos: [ProfilePhotoDTO] {
+        photos.sorted(by: Self.photoOrder)
+    }
+
+    func ensureCachedImage(for photoID: UUID) async {
+        if imageCache.image(for: photoID) != nil {
+            return
+        }
+        await downloadAndCachePhoto(photoID: photoID, asAvatarFallback: false)
     }
 
     var canAddPhoto: Bool {
@@ -31,6 +46,20 @@ final class ProfilePhotoStore {
         isUploading = false
         isMutating = false
         lastErrorMessage = nil
+        primaryPhotoRevision = 0
+        imageCache.clear()
+    }
+
+    func cachedImage(for photoID: UUID) -> UIImage? {
+        imageCache.image(for: photoID)
+    }
+
+    func avatarFallbackImage() -> UIImage? {
+        if let primaryPhoto,
+           let cached = imageCache.image(for: primaryPhoto.id) {
+            return cached
+        }
+        return imageCache.avatarFallback()
     }
 
     func loadPhotos(force: Bool = false) async {
@@ -42,6 +71,7 @@ final class ProfilePhotoStore {
         do {
             photos = try await fetchPhotosFromServer()
             hasLoaded = true
+            await cachePrimaryPhotoIfNeeded()
         } catch let error as NetworkError {
             lastErrorMessage = error.userMessage
         } catch {
@@ -79,6 +109,7 @@ final class ProfilePhotoStore {
             isPrimary: shouldBePrimary
         )
 
+        cacheUploadedImage(prepared, for: photo.id, isPrimary: photo.isPrimary || shouldBePrimary)
         await reloadPhotos()
         return photo
     }
@@ -88,8 +119,46 @@ final class ProfilePhotoStore {
         lastErrorMessage = nil
         defer { isMutating = false }
 
+        promoteToAvatarFallback(photoID: photoID)
+
         _ = try await ProfilePhotoService.setPrimary(photoID: photoID)
         await reloadPhotos()
+        primaryPhotoRevision += 1
+
+        if imageCache.avatarFallback() == nil {
+            await downloadAndCachePhoto(photoID: photoID, asAvatarFallback: true)
+        }
+    }
+
+    func reorderPhotos(photoIDs: [UUID]) async throws {
+        isMutating = true
+        lastErrorMessage = nil
+        defer { isMutating = false }
+
+        let reordered = try await ProfilePhotoService.reorderPhotos(photoIDs: photoIDs)
+        photos = reordered.sorted(by: Self.photoOrder)
+    }
+
+    @discardableResult
+    func updateAvatarPresentation(
+        photoID: UUID,
+        transform: AvatarCropTransform
+    ) async throws -> ProfilePhotoDTO {
+        isMutating = true
+        lastErrorMessage = nil
+        defer { isMutating = false }
+
+        let updated = try await ProfilePhotoService.updateAvatarPresentation(
+            photoID: photoID,
+            presentation: AvatarPresentationDTO(transform)
+        )
+        if let index = photos.firstIndex(where: { $0.id == updated.id }) {
+            photos[index] = updated
+        }
+        if updated.isPrimary {
+            primaryPhotoRevision += 1
+        }
+        return updated
     }
 
     func deletePhoto(photoID: UUID) async throws {
@@ -97,14 +166,30 @@ final class ProfilePhotoStore {
         lastErrorMessage = nil
         defer { isMutating = false }
 
+        let wasPrimary = photos.first(where: { $0.id == photoID })?.isPrimary == true
+        imageCache.remove(photoID: photoID)
+
         try await ProfilePhotoService.deletePhoto(photoID: photoID)
         await reloadPhotos()
+
+        if wasPrimary {
+            if let newPrimary = primaryPhoto {
+                promoteToAvatarFallback(photoID: newPrimary.id)
+                if imageCache.image(for: newPrimary.id) == nil {
+                    await downloadAndCachePhoto(photoID: newPrimary.id, asAvatarFallback: true)
+                }
+            } else {
+                imageCache.clearAvatarFallback()
+            }
+            primaryPhotoRevision += 1
+        }
     }
 
     func reloadPhotos() async {
         do {
             photos = try await fetchPhotosFromServer()
             hasLoaded = true
+            await cachePrimaryPhotoIfNeeded()
         } catch let error as NetworkError {
             lastErrorMessage = error.userMessage
         } catch {
@@ -118,7 +203,14 @@ final class ProfilePhotoStore {
     }
 
     private func fetchPhotosFromServer() async throws -> [ProfilePhotoDTO] {
-        try await ProfilePhotoService.listPhotos()
+        (try await ProfilePhotoService.listPhotos()).sorted(by: Self.photoOrder)
+    }
+
+    private static func photoOrder(_ lhs: ProfilePhotoDTO, _ rhs: ProfilePhotoDTO) -> Bool {
+        if lhs.position != rhs.position {
+            return lhs.position < rhs.position
+        }
+        return (lhs.createdAt ?? .distantFuture) < (rhs.createdAt ?? .distantFuture)
     }
 
     private func ensureCanAddPhoto(isPrimary: Bool) throws {
@@ -132,6 +224,53 @@ final class ProfilePhotoStore {
     private static func nextAvailablePosition(in photos: [ProfilePhotoDTO]) -> Int? {
         let usedPositions = Set(photos.map(\.position))
         return (0..<ProfilePhotoService.maxPhotoCount).first { !usedPositions.contains($0) }
+    }
+
+    private func cacheUploadedImage(_ prepared: PreparedProfilePhoto, for photoID: UUID, isPrimary: Bool) {
+        imageCache.saveJPEGData(prepared.data, for: photoID)
+        if isPrimary, let image = UIImage(data: prepared.data) {
+            imageCache.saveAvatarFallback(image)
+            primaryPhotoRevision += 1
+        }
+    }
+
+    private func promoteToAvatarFallback(photoID: UUID) {
+        if let image = imageCache.image(for: photoID) {
+            imageCache.saveAvatarFallback(image)
+        }
+    }
+
+    private func cachePrimaryPhotoIfNeeded() async {
+        guard let primaryPhoto else { return }
+
+        if imageCache.image(for: primaryPhoto.id) != nil {
+            promoteToAvatarFallback(photoID: primaryPhoto.id)
+            return
+        }
+
+        await downloadAndCachePhoto(photoID: primaryPhoto.id, asAvatarFallback: true)
+    }
+
+    private func downloadAndCachePhoto(photoID: UUID, asAvatarFallback: Bool) async {
+        guard let photo = photos.first(where: { $0.id == photoID }) ?? primaryPhoto,
+              let url = URL(string: photo.downloadUrl) else {
+            return
+        }
+
+        do {
+            let (data, response) = try await URLSession.shared.data(from: url)
+            guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode),
+                  let image = UIImage(data: data) else {
+                return
+            }
+
+            imageCache.save(image, for: photo.id)
+            if asAvatarFallback {
+                imageCache.saveAvatarFallback(image)
+            }
+        } catch {
+            return
+        }
     }
 }
 

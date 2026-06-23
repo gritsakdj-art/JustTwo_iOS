@@ -50,6 +50,42 @@ struct SetPrimaryProfilePhotoRequest: APIRequest {
     var requiresAuth: Bool { true }
 }
 
+struct ReorderProfilePhotosRequest: EncodableAPIRequest {
+    typealias Response = ProfilePhotosResponse
+    typealias Body = ReorderProfilePhotosRequestBody
+
+    let bodyValue: ReorderProfilePhotosRequestBody?
+
+    var path: String { "profile/me/photos/reorder" }
+    var method: HTTPMethod { .patch }
+    var requiresAuth: Bool { true }
+
+    init(photoIDs: [UUID]) {
+        bodyValue = ReorderProfilePhotosRequestBody(photoIds: photoIDs)
+    }
+}
+
+struct UpdateAvatarPresentationRequest: EncodableAPIRequest {
+    typealias Response = CompleteProfilePhotoUploadResponse
+    typealias Body = UpdateAvatarPresentationRequestBody
+
+    let photoID: UUID
+    let bodyValue: UpdateAvatarPresentationRequestBody?
+
+    var path: String { "profile/me/photos/\(photoID.uuidString)/presentation" }
+    var method: HTTPMethod { .patch }
+    var requiresAuth: Bool { true }
+
+    init(photoID: UUID, presentation: AvatarPresentationDTO) {
+        self.photoID = photoID
+        bodyValue = UpdateAvatarPresentationRequestBody(
+            offsetX: presentation.offsetX,
+            offsetY: presentation.offsetY,
+            scale: presentation.scale
+        )
+    }
+}
+
 struct DeleteProfilePhotoRequest: APIRequest {
     typealias Response = DeleteProfilePhotoResponse
 

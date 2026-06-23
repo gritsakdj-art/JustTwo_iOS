@@ -4,6 +4,7 @@ struct RootView: View {
     @State private var router = AppRouter.shared
     @State private var session = SessionStore.shared
     @State private var photoStore = ProfilePhotoStore.shared
+    @State private var avatarCropStore = ProfileAvatarCropStore.shared
     @Environment(\.layoutDirection) private var systemLayoutDirection
     @AppStorage("app.language") private var selectedLanguageRawValue = AppLanguage.system.rawValue
     @AppStorage("app.theme") private var selectedThemeRawValue = AppTheme.system.rawValue
@@ -14,6 +15,7 @@ struct RootView: View {
             .environment(router)
             .environment(session)
             .environment(photoStore)
+            .environment(avatarCropStore)
             .environment(\.locale, selectedLanguage.locale)
             .environment(\.layoutDirection, selectedLanguage.layoutDirection(system: systemLayoutDirection))
             .preferredColorScheme(selectedTheme.colorScheme)

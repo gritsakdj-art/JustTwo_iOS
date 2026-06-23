@@ -98,6 +98,26 @@
 - Injected `ProfilePhotoStore` through `RootView` environment; reset store on `SessionStore.clearSession()`.
 - Verified iOS build with `xcodebuild -scheme JustTwo -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/JustTwoDerivedData build`.
 
+## 2026-06-23
+
+### Server-synchronized photo order and avatar presentation
+
+- Added `avatarPresentation` decoding to `ProfilePhotoDTO` using camelCase `offsetX`, `offsetY`, and `scale` fields.
+- Added iOS API support for:
+  - `PATCH /profile/me/photos/reorder`;
+  - `PATCH /profile/me/photos/:photoID/presentation`.
+- Changed the gallery source of truth from locally persisted order to backend `position` values.
+- Connected drag-and-drop completion to the atomic backend reorder endpoint using the complete active photo ID list.
+- Kept gallery position and `isPrimary` independent; primary changes still use their dedicated endpoint.
+- Changed avatar rendering and editor initialization to use presentation returned in the primary photo DTO.
+- Changed avatar save to persist normalized presentation on the backend.
+- Changed new avatar uploads to upload the full prepared image first and save presentation separately, avoiding double crop/transform.
+- Normalized outgoing avatar presentation to offsets `-2...2` and scale `1...5`.
+- Preserved server-confirmed photo state when reorder or presentation requests fail.
+- Added `Docs/ProfilePhotos.md` with DTOs, endpoint contracts, synchronization rules, security notes, and a manual smoke test.
+- Manually verified gallery order and avatar presentation persistence.
+- Verified Debug iOS Simulator build with `xcodebuild`; build succeeded.
+
 ## Notes
 
 - Continue adding completed changes here after each meaningful update.

@@ -53,6 +53,10 @@ final class SessionStore {
     }
 
     func clearSession() {
+        if let userID = currentUser?.id {
+            ProfilePhotoLocalOrderStore.shared.clear(userID: userID)
+            ProfileAvatarCropStore.shared.clear(userID: userID)
+        }
         APIAuth.clear()
         currentUser = nil
         currentProfile = nil

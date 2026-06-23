@@ -1,5 +1,13 @@
 import Foundation
 
+struct AvatarPresentationDTO: Codable, Equatable, Sendable {
+    let offsetX: Double
+    let offsetY: Double
+    let scale: Double
+
+    static let identity = AvatarPresentationDTO(offsetX: 0, offsetY: 0, scale: 1)
+}
+
 struct ProfilePhotoDTO: Decodable, Identifiable, Equatable, Sendable {
     let id: UUID
     let position: Int
@@ -9,12 +17,23 @@ struct ProfilePhotoDTO: Decodable, Identifiable, Equatable, Sendable {
     let width: Int?
     let height: Int?
     let downloadUrl: String
+    let avatarPresentation: AvatarPresentationDTO
     let createdAt: Date?
     let updatedAt: Date?
 }
 
 struct ProfilePhotosResponse: Decodable {
     let photos: [ProfilePhotoDTO]
+}
+
+struct ReorderProfilePhotosRequestBody: Encodable {
+    let photoIds: [UUID]
+}
+
+struct UpdateAvatarPresentationRequestBody: Encodable {
+    let offsetX: Double
+    let offsetY: Double
+    let scale: Double
 }
 
 struct CreateProfilePhotoUploadURLRequestBody: Encodable {
