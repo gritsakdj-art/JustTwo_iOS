@@ -389,11 +389,11 @@ struct DiscoverView: View {
     private var moodPill: some View {
         Text(localizedUppercase(profile.moodTag))
             .font(Font.App.manrope(size: 10, weight: .semibold))
-            .foregroundStyle(Color.onAccentText)
+            .foregroundStyle(Color.discoverOnPhotoText)
             .padding(.horizontal, 12)
             .padding(.vertical, 6)
-            .background(.ultraThinMaterial, in: Capsule())
-            .overlay(Capsule().stroke(Color.onAccentText.opacity(0.28), lineWidth: 1))
+            .background(Color.discoverCardScrim.opacity(0.42), in: Capsule())
+            .overlay(Capsule().stroke(Color.discoverOnPhotoText.opacity(0.22), lineWidth: 1))
             .tracking(0.6)
     }
 
@@ -402,7 +402,7 @@ struct DiscoverView: View {
             VStack(alignment: .leading, spacing: 6) {
                 Text(profileTitle)
                     .font(Font.App.manrope(size: 26, weight: .bold))
-                    .foregroundStyle(Color.onAccentText)
+                    .foregroundStyle(Color.discoverOnPhotoText)
                     .tracking(-0.6)
 
                 HStack(spacing: 6) {
@@ -412,12 +412,12 @@ struct DiscoverView: View {
                         .shadow(color: Color.discoverOnline, radius: 4)
                     Text(distanceText)
                         .font(Font.App.manrope(size: 13, weight: .medium))
-                        .foregroundStyle(Color.onAccentText.opacity(0.75))
+                        .foregroundStyle(Color.discoverOnPhotoText.opacity(0.82))
                 }
 
                 Text(profile.bio)
                     .font(Font.App.manrope(size: 14, weight: .regular))
-                    .foregroundStyle(Color.onAccentText.opacity(0.68))
+                    .foregroundStyle(Color.discoverOnPhotoText.opacity(0.78))
                     .lineLimit(2)
                     .frame(maxWidth: 220, alignment: .leading)
             }
@@ -434,11 +434,11 @@ struct DiscoverView: View {
                 )
                 .frame(width: 52, height: 52)
             Circle()
-                .fill(Color.discoverPrimaryText.opacity(0.75))
+                .fill(Color.discoverCardScrim.opacity(0.88))
                 .frame(width: 46, height: 46)
             Text("\(profile.matchPercent)%")
                 .font(Font.App.manrope(size: 14, weight: .bold))
-                .foregroundStyle(Color.onAccentText)
+                .foregroundStyle(Color.discoverOnPhotoText)
                 .tracking(-0.4)
         }
         .shadow(color: Color.discoverViolet.opacity(0.4), radius: 16, x: 0, y: 4)

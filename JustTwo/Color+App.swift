@@ -11,58 +11,70 @@ import AppKit
 extension Color {
     // MARK: Base
 
-    private static let lightSurface = Color(hex: "#FFFFFF")
+    private static let lightSurface = Color(hex: "#FFF8F5")
     private static let darkSurface = Color(hex: "#171421")
 
     private static let lightOnAccentText = Color(hex: "#FFFFFF")
     private static let darkOnAccentText = Color(hex: "#FFFFFF")
 
     private static let lightBrandPrimary = Color(hex: "#7C4DDB")
-    private static let darkBrandPrimary = Color(hex: "#A47CFF")
+    private static let darkBrandPrimary = Color(hex: "#7A62B5")
 
     private static let lightBrandPrimaryPressed = Color(hex: "#6738C8")
-    private static let darkBrandPrimaryPressed = Color(hex: "#8F63F2")
+    private static let darkBrandPrimaryPressed = Color(hex: "#6650A0")
+
+    private static let lightBrandGradientEnd = Color(hex: "#B06DE8")
+    private static let darkBrandGradientEnd = Color(hex: "#8F78C6")
+
+    private static let lightBrandPrimaryGlow = Color(hex: "#7C4DDB")
+    private static let darkBrandPrimaryGlow = Color(hex: "#000000")
 
     // MARK: Discover
 
-    private static let lightDiscoverBackgroundTop = Color(hex: "#F0EBFF")
+    private static let lightDiscoverBackgroundTop = Color(hex: "#F8F3EF")
     private static let darkDiscoverBackgroundTop = Color(hex: "#161221")
 
-    private static let lightDiscoverBackgroundMiddle = Color(hex: "#FCE8F3")
+    private static let lightDiscoverBackgroundMiddle = Color(hex: "#FADADD")
     private static let darkDiscoverBackgroundMiddle = Color(hex: "#231524")
 
-    private static let lightDiscoverBackgroundBottom = Color(hex: "#E8F0FF")
+    private static let lightDiscoverBackgroundBottom = Color(hex: "#F3E7E2")
     private static let darkDiscoverBackgroundBottom = Color(hex: "#101A2A")
 
-    private static let lightDiscoverPrimaryText = Color(hex: "#12103A")
+    private static let lightDiscoverPrimaryText = Color(hex: "#2B2B2B")
     private static let darkDiscoverPrimaryText = Color(hex: "#F8F4FF")
 
-    private static let lightDiscoverSecondaryText = Color(hex: "#7A7499")
+    private static let lightDiscoverSecondaryText = Color(hex: "#6E6A68")
     private static let darkDiscoverSecondaryText = Color(hex: "#BDB4D6")
 
     private static let lightDiscoverViolet = Color(hex: "#7C4DDB")
-    private static let darkDiscoverViolet = Color(hex: "#A47CFF")
+    private static let darkDiscoverViolet = Color(hex: "#8E7AB8")
 
     private static let lightDiscoverVioletLight = Color(hex: "#B06DE8")
-    private static let darkDiscoverVioletLight = Color(hex: "#C39BFF")
+    private static let darkDiscoverVioletLight = Color(hex: "#A08FC8")
 
     private static let lightDiscoverPink = Color(hex: "#E55A7A")
-    private static let darkDiscoverPink = Color(hex: "#FF7EA3")
+    private static let darkDiscoverPink = Color(hex: "#C96B88")
 
     private static let lightDiscoverPinkLight = Color(hex: "#F59AC9")
-    private static let darkDiscoverPinkLight = Color(hex: "#FFB0D3")
+    private static let darkDiscoverPinkLight = Color(hex: "#D8849C")
 
-    private static let lightDiscoverCardShadow = Color(hex: "#501EA0")
-    private static let darkDiscoverCardShadow = Color(hex: "#A47CFF")
+    private static let lightDiscoverCardShadow = Color(hex: "#6E6A68")
+    private static let darkDiscoverCardShadow = Color(hex: "#1A1525")
 
-    private static let lightDiscoverMockLavender = Color(hex: "#C9BEED")
+    private static let lightDiscoverMockLavender = Color(hex: "#FFF8F5")
     private static let darkDiscoverMockLavender = Color(hex: "#4B3F6D")
 
-    private static let lightDiscoverMockPeach = Color(hex: "#FFE0C4")
+    private static let lightDiscoverMockPeach = Color(hex: "#FADADD")
     private static let darkDiscoverMockPeach = Color(hex: "#5A3B3B")
 
     private static let lightDiscoverOnline = Color(hex: "#5DFFA0")
     private static let darkDiscoverOnline = Color(hex: "#6DFFB0")
+
+    private static let lightDiscoverCardScrim = Color(hex: "#12103A")
+    private static let darkDiscoverCardScrim = Color(hex: "#05040A")
+
+    private static let lightGlassBorderHighlight = Color(hex: "#FFFFFF")
+    private static let darkGlassBorderHighlight = Color(hex: "#E8E2F0")
 
     // MARK: Semantic
 
@@ -80,6 +92,18 @@ extension Color {
 
     static var brandPrimaryPressed: Color {
         dynamic(light: lightBrandPrimaryPressed, dark: darkBrandPrimaryPressed)
+    }
+
+    static var brandGradientEnd: Color {
+        dynamic(light: lightBrandGradientEnd, dark: darkBrandGradientEnd)
+    }
+
+    static var brandPrimaryGlow: Color {
+        dynamic(light: lightBrandPrimaryGlow, dark: darkBrandPrimaryGlow)
+    }
+
+    static var glassBorderHighlight: Color {
+        dynamic(light: lightGlassBorderHighlight, dark: darkGlassBorderHighlight)
     }
 
     static var discoverPrimaryText: Color {
@@ -120,6 +144,16 @@ extension Color {
 
     static var discoverOnline: Color {
         dynamic(light: lightDiscoverOnline, dark: darkDiscoverOnline)
+    }
+
+    /// Darkening layer for profile photos — always a deep tone, independent of screen text color.
+    static var discoverCardScrim: Color {
+        dynamic(light: lightDiscoverCardScrim, dark: darkDiscoverCardScrim)
+    }
+
+    /// Text placed on top of profile photos over `discoverCardScrim`.
+    static var discoverOnPhotoText: Color {
+        onAccentText
     }
 
     // MARK: Gradients
@@ -184,7 +218,7 @@ extension Color {
 
     static var discoverMockProfileGradient: LinearGradient {
         LinearGradient(
-            colors: [.discoverMockLavender, .discoverPinkLight, .discoverMockPeach],
+            colors: [.discoverMockLavender, .discoverMockPeach],
             startPoint: .topLeading,
             endPoint: .bottomTrailing
         )
@@ -194,8 +228,8 @@ extension Color {
         LinearGradient(
             stops: [
                 .init(color: .clear, location: 0.35),
-                .init(color: discoverPrimaryText.opacity(0.55), location: 0.65),
-                .init(color: discoverPrimaryText.opacity(0.88), location: 1)
+                .init(color: discoverCardScrim.opacity(0.55), location: 0.65),
+                .init(color: discoverCardScrim.opacity(0.90), location: 1)
             ],
             startPoint: .top,
             endPoint: .bottom
@@ -204,7 +238,7 @@ extension Color {
 
     static var discoverCardTopVignette: LinearGradient {
         LinearGradient(
-            colors: [discoverPrimaryText.opacity(0.18), .clear],
+            colors: [discoverCardScrim.opacity(0.22), .clear],
             startPoint: .top,
             endPoint: .bottom
         )
@@ -212,7 +246,7 @@ extension Color {
 
     static var brandPrimaryGradient: LinearGradient {
         LinearGradient(
-            colors: [.brandPrimary, .discoverVioletLight],
+            colors: [.brandPrimary, .brandGradientEnd],
             startPoint: .topLeading,
             endPoint: .bottomTrailing
         )

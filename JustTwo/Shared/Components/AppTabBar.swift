@@ -107,7 +107,7 @@ private struct AppTabBarGlassBackground: View {
                 .strokeBorder(
                     LinearGradient(
                         colors: [
-                            Color.white.opacity(0.30),
+                            Color.glassBorderHighlight.opacity(0.28),
                             Color.discoverVioletLight.opacity(0.14),
                             Color.discoverPink.opacity(0.08)
                         ],

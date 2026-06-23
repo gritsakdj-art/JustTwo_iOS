@@ -65,7 +65,7 @@ enum ObjectStorageUploader {
             return "<object-storage-url>"
         }
 
-        if var queryItems = components.queryItems, !queryItems.isEmpty {
+        if let queryItems = components.queryItems, !queryItems.isEmpty {
             components.queryItems = queryItems.map {
                 URLQueryItem(name: $0.name, value: "<redacted>")
             }

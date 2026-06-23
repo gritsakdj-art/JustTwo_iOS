@@ -125,13 +125,13 @@ struct AvatarCropEditorView: View {
                         Text("profile.avatar_editor.delete")
                             .font(Font.App.manrope(size: 15, weight: .semibold))
                     }
-                    .foregroundStyle(Color.red)
+                    .foregroundStyle(Color.discoverPink)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 14)
                     .background(Color.surface.opacity(0.74), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
                     .overlay(
                         RoundedRectangle(cornerRadius: 16, style: .continuous)
-                            .stroke(Color.red.opacity(0.24), lineWidth: 1)
+                            .stroke(Color.discoverPink.opacity(0.24), lineWidth: 1)
                     )
                 }
                 .buttonStyle(.spring(pressedScale: 0.98, response: 0.2, dampingFraction: 0.75))

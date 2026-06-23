@@ -45,7 +45,7 @@ struct PrimaryButton: View {
             .frame(height: 54)
             .background(backgroundStyle, in: RoundedRectangle(cornerRadius: 16))
             .opacity(isDisabled ? 0.65 : 1)
-            .shadow(color: Color.brandPrimary.opacity(isDisabled ? 0.12 : 0.26), radius: 18, x: 0, y: 8)
+            .shadow(color: Color.brandPrimaryGlow.opacity(isDisabled ? 0.12 : 0.28), radius: 18, x: 0, y: 8)
         }
         .buttonStyle(PrimaryButtonStyle(isDisabled: isDisabled || isLoading))
         .disabled(isDisabled || isLoading)
