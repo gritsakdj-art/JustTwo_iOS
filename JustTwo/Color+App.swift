@@ -102,6 +102,9 @@ extension Color {
     private static let lightError = Color(hex: "#C9364F")
     private static let darkError = Color(hex: "#FF6B7E")
 
+    private static let lightChatBubbleMine = Color(hex: "#E8DEFF")
+    private static let darkChatBubbleMine = Color(hex: "#3A2F56")
+
     // MARK: Semantic — Core UI
 
     static var surface: Color {
@@ -154,6 +157,14 @@ extension Color {
 
     static var error: Color {
         dynamic(light: lightError, dark: darkError)
+    }
+
+    static var chatBubbleMine: Color {
+        dynamic(light: lightChatBubbleMine, dark: darkChatBubbleMine)
+    }
+
+    static var chatBubbleOther: Color {
+        cardSurface
     }
 
     // MARK: Semantic — Discover
