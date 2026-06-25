@@ -117,6 +117,10 @@ enum APIErrorCode: String {
     case photoNotFound = "photo_not_found"
     case storageSigningFailed = "storage_signing_failed"
     case storageHeadFailed = "storage_head_failed"
+    case conversationNotFound = "conversation_not_found"
+    case messageNotFound = "message_not_found"
+    case notConversationParticipant = "not_conversation_participant"
+    case userBlocked = "user_blocked"
 }
 
 struct APIErrorResponse: Decodable, Error {
@@ -181,6 +185,14 @@ struct APIErrorResponse: Decodable, Error {
             return String(localized: "profile.photos.error.not_found")
         case .storageSigningFailed, .storageHeadFailed:
             return String(localized: "profile.photos.error.storage_failed")
+        case .conversationNotFound:
+            return String(localized: "chats.error.conversation_not_found")
+        case .messageNotFound:
+            return String(localized: "chats.error.message_not_found")
+        case .notConversationParticipant:
+            return String(localized: "chats.error.not_participant")
+        case .userBlocked:
+            return String(localized: "chats.error.user_blocked")
         case .validationFailed, .none:
             return errorCode == .validationFailed ? String(localized: "common.error.validation_failed") : message
         }

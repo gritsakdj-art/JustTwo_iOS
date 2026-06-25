@@ -4,11 +4,15 @@ enum ChatUIMockData {
     private static let emmaID = UUID(uuidString: "A1000001-0000-4000-8000-000000000001")!
     private static let markID = UUID(uuidString: "A1000002-0000-4000-8000-000000000002")!
     private static let mayaID = UUID(uuidString: "A1000003-0000-4000-8000-000000000003")!
+    private static let elizabethID = UUID(uuidString: "A1000004-0000-4000-8000-000000000004")!
+    private static let alexID = UUID(uuidString: "A1000005-0000-4000-8000-000000000005")!
 
     static let conversations: [ChatConversationPreview] = [
         ChatConversationPreview(
             id: emmaID,
             title: "Emma",
+            avatarURL: nil,
+            avatarPhotoID: nil,
             lastMessageText: "Saturday works for me too!",
             lastSenderName: String(localized: "chats.you"),
             lastMessageAt: Date().addingTimeInterval(-1_200),
@@ -17,20 +21,50 @@ enum ChatUIMockData {
         ChatConversationPreview(
             id: markID,
             title: "Mark",
+            avatarURL: nil,
+            avatarPhotoID: nil,
             lastMessageText: "Are you free for a walk by the canal?",
             lastSenderName: "Mark",
             lastMessageAt: Date().addingTimeInterval(-8_600),
             unreadCount: 2
         ),
         ChatConversationPreview(
+            id: elizabethID,
+            title: "Elizabeth",
+            avatarURL: nil,
+            avatarPhotoID: nil,
+            lastMessageText: "That rooftop bar sounds perfect.",
+            lastSenderName: "Elizabeth",
+            lastMessageAt: Date().addingTimeInterval(-21_000),
+            unreadCount: 5
+        ),
+        ChatConversationPreview(
+            id: alexID,
+            title: "Alex",
+            avatarURL: nil,
+            avatarPhotoID: nil,
+            lastMessageText: String(localized: "chats.messageDeleted"),
+            lastSenderName: String(localized: "chats.you"),
+            lastMessageAt: Date().addingTimeInterval(-96_000),
+            unreadCount: 0
+        ),
+        ChatConversationPreview(
             id: mayaID,
             title: "Maya",
+            avatarURL: nil,
+            avatarPhotoID: nil,
             lastMessageText: nil,
             lastSenderName: nil,
             lastMessageAt: nil,
             unreadCount: 0
         )
     ]
+
+    static let empty: [ChatConversationPreview] = []
+
+    static var richThread: [ChatMessage] {
+        emmaThread
+    }
 
     static func messages(for conversationID: UUID) -> [ChatMessage] {
         switch conversationID {
@@ -46,54 +80,72 @@ enum ChatUIMockData {
     private static let emmaThread: [ChatMessage] = [
         ChatMessage(
             id: UUID(uuidString: "B1000001-0000-4000-8000-000000000001")!,
-            text: "Hey! I liked your mood tag — coffee sounds perfect.",
+            displayText: "Hey! I liked your mood tag — coffee sounds perfect.",
+            rawBody: "Hey! I liked your mood tag — coffee sounds perfect.",
             createdAt: Date().addingTimeInterval(-7_200),
-            isMine: false
+            isMine: false,
+            isDeleted: false,
+            isEdited: false,
+            replyPreview: nil,
+            reactions: []
         ),
         ChatMessage(
             id: UUID(uuidString: "B1000002-0000-4000-8000-000000000002")!,
-            text: "Thanks! I know a cozy place near Vondelpark.",
-            createdAt: Date().addingTimeInterval(-6_800),
-            isMine: true
+            displayText: "Want to grab coffee this weekend?",
+            rawBody: "Want to grab coffee this weekend?",
+            createdAt: Date().addingTimeInterval(-3_600),
+            isMine: false,
+            isDeleted: false,
+            isEdited: false,
+            replyPreview: nil,
+            reactions: [
+                ChatMessageReaction(emoji: "👍", count: 1, reactedByMe: true)
+            ]
         ),
         ChatMessage(
             id: UUID(uuidString: "B1000003-0000-4000-8000-000000000003")!,
-            text: "Want to grab coffee this weekend?",
-            createdAt: Date().addingTimeInterval(-3_600),
-            isMine: false
+            displayText: "Sounds great — Saturday works for me.",
+            rawBody: "Sounds great — Saturday works for me.",
+            createdAt: Date().addingTimeInterval(-1_800),
+            isMine: true,
+            isDeleted: false,
+            isEdited: false,
+            replyPreview: ChatReplyPreview(
+                id: UUID(uuidString: "B1000002-0000-4000-8000-000000000002")!,
+                body: "Want to grab coffee this weekend?",
+                isDeleted: false
+            ),
+            reactions: [
+                ChatMessageReaction(emoji: "❤️", count: 1, reactedByMe: false)
+            ]
         ),
         ChatMessage(
             id: UUID(uuidString: "B1000004-0000-4000-8000-000000000004")!,
-            text: "Sounds great — Saturday works for me.",
-            createdAt: Date().addingTimeInterval(-1_800),
-            isMine: true
-        ),
-        ChatMessage(
-            id: UUID(uuidString: "B1000005-0000-4000-8000-000000000005")!,
-            text: "Saturday works for me too!",
+            displayText: "Saturday works for me too!",
+            rawBody: "Saturday works for me too!",
             createdAt: Date().addingTimeInterval(-1_200),
-            isMine: false
+            isMine: false,
+            isDeleted: false,
+            isEdited: true,
+            replyPreview: nil,
+            reactions: [
+                ChatMessageReaction(emoji: "👍", count: 2, reactedByMe: true),
+                ChatMessageReaction(emoji: "😂", count: 1, reactedByMe: false)
+            ]
         )
     ]
 
     private static let markThread: [ChatMessage] = [
         ChatMessage(
-            id: UUID(uuidString: "C1000001-0000-4000-8000-000000000001")!,
-            text: "Hi! We matched on the walk mood.",
-            createdAt: Date().addingTimeInterval(-86_400),
-            isMine: false
-        ),
-        ChatMessage(
-            id: UUID(uuidString: "C1000002-0000-4000-8000-000000000002")!,
-            text: "Nice to meet you — I love evening walks.",
-            createdAt: Date().addingTimeInterval(-85_000),
-            isMine: true
-        ),
-        ChatMessage(
             id: UUID(uuidString: "C1000003-0000-4000-8000-000000000003")!,
-            text: "Are you free for a walk by the canal?",
+            displayText: "Are you free for a walk by the canal?",
+            rawBody: "Are you free for a walk by the canal?",
             createdAt: Date().addingTimeInterval(-8_600),
-            isMine: false
+            isMine: false,
+            isDeleted: false,
+            isEdited: false,
+            replyPreview: nil,
+            reactions: []
         )
     ]
 }

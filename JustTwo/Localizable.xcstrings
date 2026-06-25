@@ -1319,6 +1319,13 @@
         }
       }
     },
+    "chats.attach" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Attach file" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Прикрепить файл" } }
+      }
+    },
     "chats.messagePlaceholder" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3706,6 +3713,273 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Требуется авторизация"
+          }
+        }
+      }
+    },
+    "chats.action.copy" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Copy" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Копировать" } }
+      }
+    },
+    "chats.action.delete" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Delete" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Удалить" } }
+      }
+    },
+    "chats.action.delete_confirm_message" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "This message will be removed for everyone in the chat." } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Сообщение будет удалено для всех в этом чате." } }
+      }
+    },
+    "chats.action.delete_confirm_title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Delete message?" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Удалить сообщение?" } }
+      }
+    },
+    "chats.action.edit" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Edit" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Изменить" } }
+      }
+    },
+    "chats.action.react" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Add reaction" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Добавить реакцию" } }
+      }
+    },
+    "chats.action.reply" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Reply" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Ответить" } }
+      }
+    },
+    "chats.compose.editing" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Editing message" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Редактирование" } }
+      }
+    },
+    "chats.compose.replying_to_format" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Replying to %@" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Ответ %@" } }
+      }
+    },
+    "chats.edited" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "edited"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "изменено"
+          }
+        }
+      }
+    },
+    "chats.error.conversation_not_found" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This conversation is no longer available."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Этот диалог больше недоступен."
+          }
+        }
+      }
+    },
+    "chats.error.message_not_found" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This message is no longer available."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Это сообщение больше недоступно."
+          }
+        }
+      }
+    },
+    "chats.error.message_too_long" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Message is too long."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Сообщение слишком длинное."
+          }
+        }
+      }
+    },
+    "chats.error.missing_profile" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Complete your profile before using messages."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Заполни профиль, чтобы пользоваться сообщениями."
+          }
+        }
+      }
+    },
+    "chats.error.not_participant" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You no longer have access to this conversation."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "У тебя больше нет доступа к этому диалогу."
+          }
+        }
+      }
+    },
+    "chats.error.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Messages error"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ошибка сообщений"
+          }
+        }
+      }
+    },
+    "chats.error.user_blocked" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Messaging is not available between these profiles."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Переписка между этими профилями недоступна."
+          }
+        }
+      }
+    },
+    "chats.loading" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Loading conversations…"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Загрузка диалогов…"
+          }
+        }
+      }
+    },
+    "chats.loadingMessages" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Loading messages…"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Загрузка сообщений…"
+          }
+        }
+      }
+    },
+    "chats.messageDeleted" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Message deleted"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Сообщение удалено"
+          }
+        }
+      }
+    },
+    "chats.unknownParticipant" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unknown"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Неизвестный"
           }
         }
       }

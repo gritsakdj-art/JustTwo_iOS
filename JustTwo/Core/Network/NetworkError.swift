@@ -178,6 +178,18 @@ extension NetworkError {
         apiErrorCode == "validation_failed"
     }
 
+    var isUserBlocked: Bool {
+        apiErrorCode == "user_blocked"
+    }
+
+    var isConversationNotFound: Bool {
+        apiErrorCode == "conversation_not_found"
+    }
+
+    var isMessageNotFound: Bool {
+        apiErrorCode == "message_not_found"
+    }
+
     var isUnauthorized: Bool {
         switch self {
         case .unauthorized:

@@ -1,24 +1,59 @@
 import SwiftUI
 
 struct ChatsView: View {
+    @State private var listViewModel: ConversationListViewModel
     @State private var route: ChatRoute?
+
+    @Environment(SessionStore.self) private var session
+    @Environment(AppRouter.self) private var router
+
+    private let usesPreviewData: Bool
 
     private struct ChatRoute: Identifiable, Hashable {
         let conversation: ChatConversationPreview
         var id: UUID { conversation.id }
     }
 
+    init(previewViewModel: ConversationListViewModel? = nil) {
+        _listViewModel = State(initialValue: previewViewModel ?? ConversationListViewModel())
+        usesPreviewData = previewViewModel != nil
+    }
+
     var body: some View {
         NavigationStack {
-            VStack(spacing: 0) {
-                header
-                conversationsList
+            ZStack {
+                Color.discoverBackgroundGradient
+                    .ignoresSafeArea()
+
+                VStack(spacing: 0) {
+                    header
+                    content
+                }
             }
-            .discoverShellBackground()
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .navigationStackHostingBackgroundClear()
             .navigationDestination(item: $route) { route in
                 PrivateChatView(conversation: route.conversation)
-                    .discoverShellBackground()
             }
+            .task {
+                guard !usesPreviewData else { return }
+                await listViewModel.loadIfNeeded(session: session, router: router)
+            }
+            .refreshable {
+                guard !usesPreviewData else { return }
+                await listViewModel.refresh(session: session, router: router)
+            }
+            .onChange(of: route?.id) { _, newValue in
+                guard newValue == nil, !usesPreviewData else { return }
+                Task {
+                    await listViewModel.refresh(session: session, router: router)
+                }
+            }
+            .toolbarBackground(.hidden, for: .navigationBar)
+        }
+        .background {
+            Color.discoverBackgroundGradient
+                .ignoresSafeArea()
         }
     }
 
@@ -40,31 +75,130 @@ struct ChatsView: View {
         )
     }
 
-    private var conversationsList: some View {
-        List {
-            ForEach(ChatUIMockData.conversations) { conversation in
-                ChatConversationRow(conversation: conversation) {
-                    route = ChatRoute(conversation: conversation)
-                }
-                .listRowInsets(.init())
-                .listRowSeparatorTint(Color.hairline)
-                .listRowBackground(Color.clear)
-            }
+    @ViewBuilder
+    private var content: some View {
+        if listViewModel.isLoading, listViewModel.conversations.isEmpty {
+            loadingView
+        } else if let errorMessage = listViewModel.errorMessage, listViewModel.conversations.isEmpty {
+            errorView(message: errorMessage)
+        } else {
+            conversationsList
+        }
+    }
 
-            if ChatUIMockData.conversations.isEmpty {
-                Text("chats.empty")
-                    .font(Font.App.subheadline())
-                    .foregroundStyle(Color.secondaryText)
-                    .listRowBackground(Color.clear)
+    private var conversationsList: some View {
+        ScrollView {
+            LazyVStack(spacing: 0) {
+                ForEach(listViewModel.conversations) { conversation in
+                    ChatConversationRow(conversation: conversation) {
+                        route = ChatRoute(conversation: conversation)
+                    }
+
+                    Divider()
+                        .overlay(Color.hairline)
+                }
+
+                if listViewModel.conversations.isEmpty {
+                    Text("chats.empty")
+                        .font(Font.App.subheadline())
+                        .foregroundStyle(Color.secondaryText)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, AppSpacing.xl)
+                }
             }
         }
-        .listStyle(.plain)
+        .scrollIndicators(.hidden)
         .scrollContentBackground(.hidden)
+        .background(Color.clear)
+    }
+
+    private var loadingView: some View {
+        VStack(spacing: AppSpacing.sm) {
+            ProgressView()
+                .tint(Color.brandPrimary)
+            Text("chats.loading")
+                .font(Font.App.subheadline())
+                .foregroundStyle(Color.secondaryText)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private func errorView(message: String) -> some View {
+        VStack(spacing: AppSpacing.lg) {
+            Image(systemName: "exclamationmark.triangle")
+                .font(.system(size: 40, weight: .semibold))
+                .foregroundStyle(Color.brandPrimary)
+
+            Text("chats.error.title")
+                .font(Font.App.manrope(size: 20, weight: .bold))
+                .foregroundStyle(Color.primaryText)
+                .multilineTextAlignment(.center)
+
+            Text(message)
+                .font(Font.App.subtitle)
+                .foregroundStyle(Color.secondaryText)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, AppSpacing.xl)
+
+            PrimaryButton("common.retry") {
+                Task {
+                    await listViewModel.refresh(session: session, router: router)
+                }
+            }
+            .padding(.horizontal, AppSpacing.xl)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
 
-#Preview {
-    ChatsView()
-        .environment(\.isDiscoverShell, true)
-        .background(Color.discoverBackgroundGradient.ignoresSafeArea())
+#Preview("Chats - Loaded") {
+    ChatsView(previewViewModel: .preview(conversations: ChatUIMockData.conversations))
+        .environment(SessionStore.shared)
+        .environment(AppRouter.shared)
+}
+
+#Preview("Chats - Loading") {
+    ChatsView(previewViewModel: .preview(isLoading: true))
+        .environment(SessionStore.shared)
+        .environment(AppRouter.shared)
+}
+
+#Preview("Chats - Empty") {
+    ChatsView(previewViewModel: .preview(conversations: ChatUIMockData.empty))
+        .environment(SessionStore.shared)
+        .environment(AppRouter.shared)
+}
+
+#Preview("Chats - Error") {
+    ChatsView(
+        previewViewModel: .preview(
+            conversations: ChatUIMockData.empty,
+            errorMessage: String(localized: "network.error.no_internet")
+        )
+    )
+    .environment(SessionStore.shared)
+    .environment(AppRouter.shared)
+}
+
+#Preview("Chats - In Discover Shell") {
+    ZStack {
+        Color.discoverBackgroundGradient
+            .ignoresSafeArea()
+
+        VStack(spacing: 0) {
+            ChatsView(previewViewModel: .preview(conversations: ChatUIMockData.conversations))
+                .environment(\.isDiscoverShell, true)
+
+            AppTabBar(selection: .constant(.chats))
+        }
+    }
+    .environment(SessionStore.shared)
+    .environment(AppRouter.shared)
+}
+
+#Preview("Chats - Dark") {
+    ChatsView(previewViewModel: .preview(conversations: ChatUIMockData.conversations))
+        .environment(SessionStore.shared)
+        .environment(AppRouter.shared)
+        .preferredColorScheme(.dark)
 }

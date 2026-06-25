@@ -3,17 +3,31 @@ import SwiftUI
 struct MessageRow: View {
     let message: ChatMessage
     let senderName: String?
+    let onLongPress: () -> Void
+    var onReactionTap: ((ChatMessageReaction) -> Void)?
 
     var body: some View {
         HStack {
             if message.isMine { Spacer() }
 
             ChatBubbleView(
-                text: message.text,
+                text: message.displayText,
                 senderName: senderName,
                 createdAt: message.createdAt,
-                isMine: message.isMine
+                isMine: message.isMine,
+                replyPreview: message.replyPreview?.body,
+                isEdited: message.isEdited,
+                isDeleted: message.isDeleted,
+                reactions: message.reactions,
+                onReactionTap: onReactionTap
             )
+            .contentShape(Rectangle())
+            .onLongPressGesture(minimumDuration: 0.35) {
+                guard message.canReply || message.canCopy || message.canEdit || message.canDelete || message.canReact else {
+                    return
+                }
+                onLongPress()
+            }
 
             if !message.isMine { Spacer() }
         }
@@ -27,21 +41,39 @@ struct MessageRow: View {
             MessageRow(
                 message: ChatMessage(
                     id: UUID(),
-                    text: "Hey! Want to grab coffee this weekend?",
+                    displayText: "Hey! Want to grab coffee this weekend?",
+                    rawBody: "Hey! Want to grab coffee this weekend?",
                     createdAt: Date().addingTimeInterval(-3_600),
-                    isMine: false
+                    isMine: false,
+                    isDeleted: false,
+                    isEdited: false,
+                    replyPreview: nil,
+                    reactions: [
+                        ChatMessageReaction(emoji: "👍", count: 1, reactedByMe: false)
+                    ]
                 ),
-                senderName: "Emma"
+                senderName: "Emma",
+                onLongPress: {}
             )
 
             MessageRow(
                 message: ChatMessage(
                     id: UUID(),
-                    text: "Sounds great — Saturday works for me.",
+                    displayText: "Sounds great — Saturday works for me.",
+                    rawBody: "Sounds great — Saturday works for me.",
                     createdAt: Date(),
-                    isMine: true
+                    isMine: true,
+                    isDeleted: false,
+                    isEdited: true,
+                    replyPreview: ChatReplyPreview(
+                        id: UUID(),
+                        body: "Want to grab coffee?",
+                        isDeleted: false
+                    ),
+                    reactions: []
                 ),
-                senderName: nil
+                senderName: nil,
+                onLongPress: {}
             )
         }
         .padding(.vertical, 8)
