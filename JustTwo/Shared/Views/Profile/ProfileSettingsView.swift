@@ -674,6 +674,7 @@ struct ProfileSettingsView: View {
                 switch context {
                 case .onboarding:
                     router.resetTo(.main)
+                    router.presentPendingInviteIfNeeded()
                 case .settings:
                     dismiss()
                 }

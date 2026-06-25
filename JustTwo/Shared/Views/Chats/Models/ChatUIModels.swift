@@ -146,7 +146,7 @@ enum ChatUIMapping {
         return otherName
     }
 
-    private static func avatarURL(from photo: MessengerProfilePhotoSummaryDTO?) -> URL? {
+    static func avatarURL(from photo: MessengerProfilePhotoSummaryDTO?) -> URL? {
         guard let photo else { return nil }
         return URL(string: photo.downloadUrl)
     }

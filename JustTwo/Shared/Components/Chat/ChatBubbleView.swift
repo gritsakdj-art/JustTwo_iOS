@@ -21,6 +21,16 @@ struct ChatBubbleView: View {
         static let bottomInset: CGFloat = 8
         static let maxWidth: CGFloat = 320
         static let sideInset: CGFloat = 48
+        static let minWidth: CGFloat = 120
+        static let minWidthEdited: CGFloat = 156
+        static let timeClusterWidth: CGFloat = 54
+        static let editedLabelWidth: CGFloat = 52
+    }
+
+    private var bubbleMinWidth: CGFloat {
+        let horizontalInsets = bottomLeadingInset + bottomTrailingInset
+        let metadataWidth = UI.timeClusterWidth + (isEdited ? UI.editedLabelWidth + 4 : 0)
+        return max(isEdited ? UI.minWidthEdited : UI.minWidth, horizontalInsets + metadataWidth + 12)
     }
 
     var body: some View {
@@ -84,6 +94,7 @@ struct ChatBubbleView: View {
         .padding(.bottom, contentBottomPadding)
         .padding(.leading, UI.textHPad + (isMine ? 0 : UI.tailWidth))
         .padding(.trailing, UI.textHPad + (isMine ? UI.tailWidth : 0))
+        .frame(minWidth: bubbleMinWidth, alignment: .leading)
         .background(
             ChatBubbleShape(isMine: isMine)
                 .fill(isMine ? Color.chatBubbleMine : Color.chatBubbleOther)
@@ -113,13 +124,16 @@ struct ChatBubbleView: View {
                         Text("chats.edited")
                             .font(Font.App.caption(size: 11))
                             .foregroundStyle(Color.secondaryText.opacity(0.75))
+                            .lineLimit(1)
                     }
 
                     Text(createdAt, style: .time)
                         .font(Font.App.caption(size: 11))
                         .foregroundStyle(Color.secondaryText.opacity(0.75))
                         .monospacedDigit()
+                        .lineLimit(1)
                 }
+                .fixedSize(horizontal: true, vertical: false)
                 .allowsHitTesting(false)
             }
             .padding(.leading, bottomLeadingInset)
@@ -152,6 +166,27 @@ struct ChatBubbleView: View {
             reactions: [
                 ChatMessageReaction(emoji: "😂", count: 1, reactedByMe: true)
             ]
+        )
+
+        ChatBubbleView(
+            text: "Hi",
+            senderName: nil,
+            createdAt: Date(),
+            isMine: true
+        )
+
+        ChatBubbleView(
+            text: "Hi",
+            senderName: "Emma",
+            createdAt: Date(),
+            isMine: false
+        )
+
+        ChatBubbleView(
+            text: "!",
+            senderName: nil,
+            createdAt: Date(),
+            isMine: true
         )
     }
     .padding()

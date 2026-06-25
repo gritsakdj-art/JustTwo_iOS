@@ -3,6 +3,7 @@ import SwiftUI
 struct ChatsView: View {
     @State private var listViewModel: ConversationListViewModel
     @State private var route: ChatRoute?
+    @State private var isInviteSheetPresented = false
 
     @Environment(SessionStore.self) private var session
     @Environment(AppRouter.self) private var router
@@ -49,6 +50,22 @@ struct ChatsView: View {
                     await listViewModel.refresh(session: session, router: router)
                 }
             }
+            .onChange(of: router.pendingChatConversation?.id) { _, newValue in
+                if newValue != nil {
+                    isInviteSheetPresented = false
+                }
+                guard !usesPreviewData, let conversation = router.pendingChatConversation else { return }
+                route = ChatRoute(conversation: conversation)
+                router.clearPendingChatConversation()
+            }
+            .sheet(isPresented: $isInviteSheetPresented) {
+                InviteLinkView()
+            }
+            .onAppear {
+                guard !usesPreviewData, let conversation = router.pendingChatConversation else { return }
+                route = ChatRoute(conversation: conversation)
+                router.clearPendingChatConversation()
+            }
             .toolbarBackground(.hidden, for: .navigationBar)
         }
         .background {
@@ -64,6 +81,16 @@ struct ChatsView: View {
                 .foregroundStyle(Color.primaryText)
 
             Spacer()
+
+            Button {
+                isInviteSheetPresented = true
+            } label: {
+                Image(systemName: "plus")
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(Color.discoverViolet)
+                    .frame(width: 36, height: 36)
+            }
+            .accessibilityLabel(Text("accessibility.create_invite"))
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)

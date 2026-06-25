@@ -10,6 +10,11 @@ final class AppRouter {
     var splashError: NetworkError?
     var reloadID = UUID()
 
+    var pendingInviteToken: String?
+    var presentedInvitePreviewToken: String?
+    var selectedMainTab: AppTab = .discover
+    var pendingChatConversation: ChatConversationPreview?
+
     private init() {}
 
     func goTo(_ screen: AppScreen) {
@@ -42,6 +47,7 @@ final class AppRouter {
                 resetTo(.profileSetup)
             case .ready:
                 resetTo(.main)
+                presentPendingInviteIfNeeded()
             }
         }
     }
@@ -70,5 +76,56 @@ final class AppRouter {
 
     func showResetPasswordError(_ message: String) {
         resetTo(.resetPasswordError(message: message))
+    }
+
+    func handleIncomingInvite(token: String, session: SessionStore) {
+        pendingInviteToken = token
+
+        guard session.hasActiveSession else {
+            resetTo(.auth)
+            return
+        }
+
+        guard session.isEmailVerified else {
+            if let email = session.pendingVerificationEmail ?? session.currentUser?.email {
+                showCheckEmail(
+                    email: email,
+                    message: String(localized: "invite.error.login_required")
+                )
+            } else {
+                resetTo(.auth)
+            }
+            return
+        }
+
+        if screen == .main {
+            presentedInvitePreviewToken = token
+        } else if screen == .profileSetup {
+            // Profile setup can finish before showing invite preview.
+            presentedInvitePreviewToken = token
+        } else {
+            retrySplash()
+        }
+    }
+
+    func presentPendingInviteIfNeeded() {
+        guard let token = pendingInviteToken else { return }
+        presentedInvitePreviewToken = token
+    }
+
+    func dismissInvitePreview() {
+        presentedInvitePreviewToken = nil
+        pendingInviteToken = nil
+    }
+
+    func openChatAfterInviteAccept(_ conversation: ChatConversationPreview) {
+        pendingChatConversation = conversation
+        selectedMainTab = .chats
+        presentedInvitePreviewToken = nil
+        pendingInviteToken = nil
+    }
+
+    func clearPendingChatConversation() {
+        pendingChatConversation = nil
     }
 }

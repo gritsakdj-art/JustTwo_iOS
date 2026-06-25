@@ -105,6 +105,7 @@ enum DiscoverMood: CaseIterable {
 
 struct DiscoverView: View {
 
+    @Environment(AppRouter.self) private var router
     @State private var selectedMode: DiscoverMode = .vibe
     @State private var selectedMood: DiscoverMood = .coffee
     @State private var selectedTab: AppTab = .discover
@@ -149,6 +150,29 @@ struct DiscoverView: View {
                 .ignoresSafeArea()
         }
         .statusBarHidden(false)
+        .onAppear {
+            selectedTab = router.selectedMainTab
+        }
+        .onChange(of: router.selectedMainTab) { _, newTab in
+            selectedTab = newTab
+        }
+        .onChange(of: selectedTab) { _, newTab in
+            router.selectedMainTab = newTab
+        }
+        .fullScreenCover(
+            isPresented: Binding(
+                get: { router.presentedInvitePreviewToken != nil },
+                set: { isPresented in
+                    if !isPresented {
+                        router.dismissInvitePreview()
+                    }
+                }
+            )
+        ) {
+            if let token = router.presentedInvitePreviewToken {
+                InvitePreviewView(token: token)
+            }
+        }
     }
 
     @ViewBuilder

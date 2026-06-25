@@ -65,6 +65,23 @@
 - Added password reset Universal Link handling for `https://api.jtwo.online/auth/reset-password?token=...`.
 - Added `ResetPasswordView` with new password confirmation, client-side password validation, backend reset submission, and return-to-login flow.
 
+### Invite links, QR flow, and chat polish
+
+- Added direct invite creation UI in `InviteLinkView` from the Chats `+` action.
+- Added server-backed invite sharing with copy link, share link, share QR image, and refresh actions.
+- Added client-side QR generation in `QRCodeGenerator` from backend `inviteURL` only.
+- Added `InvitePreviewView` for Universal Link and pasted invite URLs with accept, decline, and block actions.
+- Added invite deep link parsing for `https://api.jtwo.online/invite/{token}` in `DeepLinkParser`.
+- Added `AppDeepLinkHandler` and router state for pending invite tokens and post-accept chat navigation.
+- Added `InviteService` API wiring for create, preview, accept, and delete invite endpoints.
+- Added `ProfileBlockService` and `BlockProfileRequest` for invite preview blocking.
+- Added localized invite strings for English, Russian, German, Spanish, French, Italian, and Arabic.
+- Added `JustTwoTests` target with parser, QR, and invite view model coverage.
+- Refined `PrivateChatView` with partner avatar in the navigation bar and `ChatPatternBackground` wallpaper.
+- Refined `ChatBubbleView` minimum width so edited-message timestamps stay inside the bubble.
+- Added `Docs/InviteLinks.md` with endpoint contracts, deep link rules, file map, and manual test notes.
+- Verified iOS build with `xcodebuild`.
+
 ## 2026-06-19
 
 ### Auth account lifecycle (verified)

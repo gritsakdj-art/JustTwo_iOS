@@ -20,7 +20,7 @@ struct RootView: View {
             .environment(\.layoutDirection, selectedLanguage.layoutDirection(system: systemLayoutDirection))
             .preferredColorScheme(selectedTheme.colorScheme)
             .onOpenURL { url in
-                EmailVerificationDeepLinkHandler.handle(url, router: router)
+                AppDeepLinkHandler.handle(url, router: router, session: session)
             }
     }
 

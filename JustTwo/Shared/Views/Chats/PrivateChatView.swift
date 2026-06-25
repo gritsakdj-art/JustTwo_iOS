@@ -228,7 +228,7 @@ struct PrivateChatView: View {
     }
 
     private var chatBackground: some View {
-        Color.discoverBackgroundGradient
+        ChatPatternBackground()
     }
 
     @ToolbarContentBuilder
@@ -238,11 +238,22 @@ struct PrivateChatView: View {
                 Text(viewModel.conversation.title)
                     .font(Font.App.headline(size: 17, weight: .semibold))
                     .foregroundStyle(Color.primaryText)
+                    .lineLimit(1)
 
                 Text("chats.personal")
                     .font(Font.App.caption())
                     .foregroundStyle(Color.secondaryText)
             }
+        }
+
+        ToolbarItem(placement: .topBarTrailing) {
+            ChatAvatarView(
+                title: viewModel.conversation.title,
+                photoURL: viewModel.conversation.avatarURL,
+                photoID: viewModel.conversation.avatarPhotoID,
+                size: 34
+            )
+            .accessibilityLabel(Text(viewModel.conversation.title))
         }
     }
 

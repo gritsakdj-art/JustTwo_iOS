@@ -121,6 +121,12 @@ enum APIErrorCode: String {
     case messageNotFound = "message_not_found"
     case notConversationParticipant = "not_conversation_participant"
     case userBlocked = "user_blocked"
+    case invalidInviteToken = "invalid_invite_token"
+    case inviteExpired = "invite_expired"
+    case inviteRevoked = "invite_revoked"
+    case inviteAlreadyUsed = "invite_already_used"
+    case cannotAcceptOwnInvite = "cannot_accept_own_invite"
+    case messagePrivacyRestricted = "message_privacy_restricted"
 }
 
 struct APIErrorResponse: Decodable, Error {
@@ -193,6 +199,16 @@ struct APIErrorResponse: Decodable, Error {
             return String(localized: "chats.error.not_participant")
         case .userBlocked:
             return String(localized: "chats.error.user_blocked")
+        case .invalidInviteToken:
+            return String(localized: "invite.error.invalid")
+        case .inviteExpired:
+            return String(localized: "invite.error.expired")
+        case .inviteRevoked, .inviteAlreadyUsed:
+            return String(localized: "invite.error.unavailable")
+        case .cannotAcceptOwnInvite:
+            return String(localized: "invite.error.own_invite")
+        case .messagePrivacyRestricted:
+            return String(localized: "invite.error.privacy_restricted")
         case .validationFailed, .none:
             return errorCode == .validationFailed ? String(localized: "common.error.validation_failed") : message
         }

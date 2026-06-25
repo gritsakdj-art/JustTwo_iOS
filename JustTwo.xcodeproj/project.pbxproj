@@ -6,8 +6,19 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXContainerItemProxy section */
+		A10000052FBF1FEC004180BF /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 3666B1392FBF1FEC004180BF /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 3666B1402FBF1FEC004180BF;
+			remoteInfo = JustTwo;
+		};
+/* End PBXContainerItemProxy section */
+
 /* Begin PBXFileReference section */
 		3666B1412FBF1FEC004180BF /* JustTwo.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = JustTwo.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		A10000012FBF1FEC004180BF /* JustTwoTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = JustTwoTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -16,10 +27,22 @@
 			path = JustTwo;
 			sourceTree = "<group>";
 		};
+		A10000022FBF1FEC004180BF /* JustTwoTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = JustTwoTests;
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
 		3666B13E2FBF1FEC004180BF /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A100000A2FBF1FEC004180BF /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -33,6 +56,7 @@
 			isa = PBXGroup;
 			children = (
 				3666B1432FBF1FEC004180BF /* JustTwo */,
+				A10000022FBF1FEC004180BF /* JustTwoTests */,
 				3666B1422FBF1FEC004180BF /* Products */,
 			);
 			sourceTree = "<group>";
@@ -41,6 +65,7 @@
 			isa = PBXGroup;
 			children = (
 				3666B1412FBF1FEC004180BF /* JustTwo.app */,
+				A10000012FBF1FEC004180BF /* JustTwoTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -69,6 +94,29 @@
 			productName = JustTwo;
 			productReference = 3666B1412FBF1FEC004180BF /* JustTwo.app */;
 			productType = "com.apple.product-type.application";
+		};
+		A10000032FBF1FEC004180BF /* JustTwoTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A10000062FBF1FEC004180BF /* Build configuration list for PBXNativeTarget "JustTwoTests" */;
+			buildPhases = (
+				A10000092FBF1FEC004180BF /* Sources */,
+				A100000A2FBF1FEC004180BF /* Frameworks */,
+				A100000B2FBF1FEC004180BF /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				A10000042FBF1FEC004180BF /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				A10000022FBF1FEC004180BF /* JustTwoTests */,
+			);
+			name = JustTwoTests;
+			packageProductDependencies = (
+			);
+			productName = JustTwoTests;
+			productReference = A10000012FBF1FEC004180BF /* JustTwoTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
 		};
 /* End PBXNativeTarget section */
 
@@ -106,12 +154,20 @@
 			projectRoot = "";
 			targets = (
 				3666B1402FBF1FEC004180BF /* JustTwo */,
+				A10000032FBF1FEC004180BF /* JustTwoTests */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
 		3666B13F2FBF1FEC004180BF /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A100000B2FBF1FEC004180BF /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -128,7 +184,22 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		A10000092FBF1FEC004180BF /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		A10000042FBF1FEC004180BF /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 3666B1402FBF1FEC004180BF /* JustTwo */;
+			targetProxy = A10000052FBF1FEC004180BF /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		3666B14C2FBF1FEE004180BF /* Debug */ = {
@@ -326,6 +397,48 @@
 			};
 			name = Release;
 		};
+		A10000072FBF1FEC004180BF /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = TQ873YGCDK;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.6;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = pro.sda.justtwo.JustTwoTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/JustTwo.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/JustTwo";
+			};
+			name = Debug;
+		};
+		A10000082FBF1FEC004180BF /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = TQ873YGCDK;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.6;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = pro.sda.justtwo.JustTwoTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/JustTwo.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/JustTwo";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -343,6 +456,15 @@
 			buildConfigurations = (
 				3666B14F2FBF1FEE004180BF /* Debug */,
 				3666B1502FBF1FEE004180BF /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		A10000062FBF1FEC004180BF /* Build configuration list for PBXNativeTarget "JustTwoTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A10000072FBF1FEC004180BF /* Debug */,
+				A10000082FBF1FEC004180BF /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

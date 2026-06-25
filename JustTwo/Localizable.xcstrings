@@ -3916,6 +3916,462 @@
         }
       }
     },
+    "accessibility.create_invite" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : { "stringUnit" : { "state" : "translated", "value" : "إنشاء دعوة" } },
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Einladung erstellen" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Create invite" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Crear invitación" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Créer une invitation" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Crea invito" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Создать приглашение" } }
+      }
+    },
+    "invite.link.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : { "stringUnit" : { "state" : "translated", "value" : "دعوة للدردشة" } },
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Zum Chat einladen" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Invite to chat" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Invitar al chat" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Inviter à discuter" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Invita alla chat" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Пригласить в чат" } }
+      }
+    },
+    "invite.link.subtitle" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : { "stringUnit" : { "state" : "translated", "value" : "شارك هذا الرابط أو رمز QR لبدء محادثة." } },
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Teile diesen Link oder QR-Code, um ein Gespräch zu starten." } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Share this link or QR code to start a conversation." } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Comparte este enlace o código QR para iniciar una conversación." } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Partagez ce lien ou ce QR code pour démarrer une conversation." } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Condividi questo link o codice QR per iniziare una conversazione." } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Поделитесь ссылкой или QR-кодом, чтобы начать переписку." } }
+      }
+    },
+    "invite.link.loading" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : { "stringUnit" : { "state" : "translated", "value" : "جارٍ إنشاء رابط الدعوة…" } },
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Einladungslink wird erstellt…" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Creating your invite link…" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Creando tu enlace de invitación…" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Création de votre lien d'invitation…" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Creazione del link di invito…" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Создаём ссылку-приглашение…" } }
+      }
+    },
+    "invite.link.copy" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : { "stringUnit" : { "state" : "translated", "value" : "نسخ الرابط" } },
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Link kopieren" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Copy Link" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Copiar enlace" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Copier le lien" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Copia link" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Копировать ссылку" } }
+      }
+    },
+    "invite.link.copied" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : { "stringUnit" : { "state" : "translated", "value" : "تم نسخ الرابط" } },
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Link kopiert" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Link copied" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Enlace copiado" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Lien copié" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Link copiato" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Ссылка скопирована" } }
+      }
+    },
+    "invite.link.share" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : { "stringUnit" : { "state" : "translated", "value" : "مشاركة الرابط" } },
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Link teilen" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Share Link" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Compartir enlace" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Partager le lien" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Condividi link" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Поделиться ссылкой" } }
+      }
+    },
+    "invite.link.share_qr" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : { "stringUnit" : { "state" : "translated", "value" : "مشاركة رمز QR" } },
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "QR-Code teilen" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Share QR Code" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Compartir código QR" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Partager le QR code" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Condividi codice QR" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Поделиться QR-кодом" } }
+      }
+    },
+    "invite.link.refresh" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : { "stringUnit" : { "state" : "translated", "value" : "إنشاء رابط جديد" } },
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Neuen Link erstellen" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Create New Link" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Crear nuevo enlace" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Créer un nouveau lien" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Crea nuovo link" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Создать новую ссылку" } }
+      }
+    },
+    "invite.link.valid_until_format" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : { "stringUnit" : { "state" : "translated", "value" : "صالح حتى %@" } },
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Gültig bis %@" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Valid until %@" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Válido hasta %@" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Valable jusqu'au %@" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Valido fino al %@" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Действует до %@" } }
+      }
+    },
+    "invite.preview.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : { "stringUnit" : { "state" : "translated", "value" : "دعوة للدردشة" } },
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Chat-Einladung" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Chat invitation" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Invitación al chat" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Invitation au chat" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Invito alla chat" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Приглашение в чат" } }
+      }
+    },
+    "invite.preview.loading" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : { "stringUnit" : { "state" : "translated", "value" : "جارٍ تحميل الدعوة…" } },
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Einladung wird geladen…" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Loading invitation…" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Cargando invitación…" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Chargement de l'invitation…" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Caricamento invito…" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Загрузка приглашения…" } }
+      }
+    },
+    "invite.preview.accepting" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : { "stringUnit" : { "state" : "translated", "value" : "جارٍ قبول الدعوة…" } },
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Einladung wird angenommen…" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Accepting invitation…" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Aceptando invitación…" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Acceptation de l'invitation…" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Accettazione invito…" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Принимаем приглашение…" } }
+      }
+    },
+    "invite.preview.invited_you" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : { "stringUnit" : { "state" : "translated", "value" : "دعاك للدردشة على JustTwo" } },
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "hat dich zu einem Chat auf JustTwo eingeladen" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "invited you to chat on JustTwo" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "te invitó a chatear en JustTwo" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "vous a invité à discuter sur JustTwo" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "ti ha invitato a chattare su JustTwo" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "пригласил(а) вас в чат в JustTwo" } }
+      }
+    },
+    "invite.preview.accept" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : { "stringUnit" : { "state" : "translated", "value" : "قبول" } },
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Annehmen" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Accept" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Aceptar" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Accepter" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Accetta" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Принять" } }
+      }
+    },
+    "invite.preview.decline" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : { "stringUnit" : { "state" : "translated", "value" : "رفض" } },
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Ablehnen" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Decline" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Rechazar" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Refuser" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Rifiuta" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Отклонить" } }
+      }
+    },
+    "invite.preview.block" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : { "stringUnit" : { "state" : "translated", "value" : "حظر" } },
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Blockieren" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Block" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Bloquear" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Bloquer" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Blocca" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Заблокировать" } }
+      }
+    },
+    "invite.preview.block.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : { "stringUnit" : { "state" : "translated", "value" : "هل تريد حظر هذا المستخدم؟" } },
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Diesen Nutzer blockieren?" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Block this user?" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "¿Bloquear a este usuario?" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Bloquer cet utilisateur ?" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Bloccare questo utente?" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Заблокировать этого пользователя?" } }
+      }
+    },
+    "invite.preview.block.message" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : { "stringUnit" : { "state" : "translated", "value" : "لن يتمكن من مراسلتك." } },
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Diese Person kann dir keine Nachrichten mehr senden." } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "They will not be able to message you." } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "No podrá enviarte mensajes." } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Cette personne ne pourra plus vous envoyer de messages." } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Non potrà inviarti messaggi." } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Он не сможет писать вам сообщения." } }
+      }
+    },
+    "invite.preview.block.confirm" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : { "stringUnit" : { "state" : "translated", "value" : "حظر" } },
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Blockieren" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Block" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Bloquear" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Bloquer" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Blocca" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Заблокировать" } }
+      }
+    },
+    "invite.preview.unavailable.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : { "stringUnit" : { "state" : "translated", "value" : "الدعوة غير متاحة" } },
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Einladung nicht verfügbar" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Invite unavailable" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Invitación no disponible" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Invitation indisponible" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Invito non disponibile" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Приглашение недоступно" } }
+      }
+    },
+    "invite.preview.blocked.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : { "stringUnit" : { "state" : "translated", "value" : "تم حظر المستخدم" } },
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Nutzer blockiert" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "User blocked" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Usuario bloqueado" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Utilisateur bloqué" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Utente bloccato" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Пользователь заблокирован" } }
+      }
+    },
+    "invite.preview.blocked.message" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : { "stringUnit" : { "state" : "translated", "value" : "تم حظر هذا المستخدم." } },
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Dieser Nutzer wurde blockiert." } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "This user has been blocked." } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Este usuario ha sido bloqueado." } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Cet utilisateur a été bloqué." } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Questo utente è stato bloccato." } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Этот пользователь заблокирован." } }
+      }
+    },
+    "invite.error.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : { "stringUnit" : { "state" : "translated", "value" : "حدث خطأ ما" } },
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Etwas ist schiefgelaufen" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Something went wrong" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Algo salió mal" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Une erreur s'est produite" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Qualcosa è andato storto" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Что-то пошло не так" } }
+      }
+    },
+    "invite.error.invalid" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : { "stringUnit" : { "state" : "translated", "value" : "رابط الدعوة هذا غير صالح." } },
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Dieser Einladungslink ist ungültig." } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "This invite link is invalid." } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Este enlace de invitación no es válido." } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Ce lien d'invitation n'est pas valide." } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Questo link di invito non è valido." } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Эта ссылка-приглашение недействительна." } }
+      }
+    },
+    "invite.error.expired" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : { "stringUnit" : { "state" : "translated", "value" : "انتهت صلاحية رابط الدعوة هذا." } },
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Dieser Einladungslink ist abgelaufen." } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "This invite link has expired." } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Este enlace de invitación ha caducado." } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Ce lien d'invitation a expiré." } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Questo link di invito è scaduto." } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Срок действия ссылки-приглашения истёк." } }
+      }
+    },
+    "invite.error.unavailable" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : { "stringUnit" : { "state" : "translated", "value" : "هذه الدعوة لم تعد متاحة." } },
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Diese Einladung ist nicht mehr verfügbar." } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "This invite is no longer available." } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Esta invitación ya no está disponible." } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Cette invitation n'est plus disponible." } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Questo invito non è più disponibile." } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Это приглашение больше недоступно." } }
+      }
+    },
+    "invite.error.own_invite" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : { "stringUnit" : { "state" : "translated", "value" : "لا يمكنك قبول دعوتك الخاصة." } },
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Du kannst deine eigene Einladung nicht annehmen." } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "You cannot accept your own invite." } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "No puedes aceptar tu propia invitación." } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Vous ne pouvez pas accepter votre propre invitation." } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Non puoi accettare il tuo invito." } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Нельзя принять собственное приглашение." } }
+      }
+    },
+    "invite.error.privacy_restricted" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : { "stringUnit" : { "state" : "translated", "value" : "هذا المستخدم لا يقبل دعوات جديدة حالياً." } },
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Dieser Nutzer nimmt derzeit keine neuen Einladungen an." } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "This user is not accepting new invites right now." } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Este usuario no acepta nuevas invitaciones en este momento." } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Cet utilisateur n'accepte pas de nouvelles invitations pour le moment." } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Questo utente non accetta nuovi inviti al momento." } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Этот пользователь сейчас не принимает новые приглашения." } }
+      }
+    },
+    "invite.error.login_required" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : { "stringUnit" : { "state" : "translated", "value" : "يجب تسجيل الدخول لقبول هذه الدعوة." } },
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Melde dich an, um diese Einladung anzunehmen." } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "You need to log in to accept this invite." } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Inicia sesión para aceptar esta invitación." } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Connectez-vous pour accepter cette invitation." } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Accedi per accettare questo invito." } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Войдите в аккаунт, чтобы принять приглашение." } }
+      }
+    },
+    "invite.error.missing_url" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : { "stringUnit" : { "state" : "translated", "value" : "لم يُرجع الخادم رابط دعوة." } },
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Der Server hat keinen Einladungslink zurückgegeben." } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "The server did not return an invite link." } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "El servidor no devolvió un enlace de invitación." } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Le serveur n'a pas renvoyé de lien d'invitation." } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Il server non ha restituito un link di invito." } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Сервер не вернул ссылку-приглашение." } }
+      }
+    },
+    "invite.error.qr_generation_failed" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : { "stringUnit" : { "state" : "translated", "value" : "تعذّر إنشاء رمز QR لهذه الدعوة." } },
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "QR-Code für diese Einladung konnte nicht erstellt werden." } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Could not generate a QR code for this invite." } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "No se pudo generar un código QR para esta invitación." } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Impossible de générer un QR code pour cette invitation." } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Impossibile generare un codice QR per questo invito." } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Не удалось сгенерировать QR-код для этого приглашения." } }
+      }
+    },
+    "invite.link.paste.section" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : { "stringUnit" : { "state" : "translated", "value" : "فتح دعوة من رابط" } },
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Einladung per Link öffnen" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Open an invite link" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Abrir enlace de invitación" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Ouvrir un lien d'invitation" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Apri un link di invito" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Открыть чужое приглашение" } }
+      }
+    },
+    "invite.link.paste.hint" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : { "stringUnit" : { "state" : "translated", "value" : "الصق رابط دعوة من JustTwo." } },
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Füge einen JustTwo-Einladungslink ein." } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Paste an invite link from JustTwo." } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Pega un enlace de invitación de JustTwo." } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Collez un lien d'invitation JustTwo." } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Incolla un link di invito JustTwo." } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Вставьте ссылку-приглашение JustTwo." } }
+      }
+    },
+    "invite.link.paste.placeholder" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : { "stringUnit" : { "state" : "translated", "value" : "https://api.jtwo.online/invite/..." } },
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "https://api.jtwo.online/invite/..." } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "https://api.jtwo.online/invite/..." } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "https://api.jtwo.online/invite/..." } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "https://api.jtwo.online/invite/..." } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "https://api.jtwo.online/invite/..." } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "https://api.jtwo.online/invite/..." } }
+      }
+    },
+    "invite.link.paste.clipboard" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : { "stringUnit" : { "state" : "translated", "value" : "لصق من الحافظة" } },
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Aus Zwischenablage einfügen" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Paste from clipboard" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Pegar del portapapeles" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Coller depuis le presse-papiers" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Incolla dagli appunti" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Вставить из буфера" } }
+      }
+    },
+    "invite.link.paste.open" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : { "stringUnit" : { "state" : "translated", "value" : "فتح الدعوة" } },
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Einladung öffnen" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Open invite" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Abrir invitación" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Ouvrir l'invitation" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Apri invito" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Открыть приглашение" } }
+      }
+    },
+    "invite.error.invalid_pasted_link" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : { "stringUnit" : { "state" : "translated", "value" : "أدخل رابط دعوة JustTwo صالحاً." } },
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Bitte einen gültigen JustTwo-Einladungslink eingeben." } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Enter a valid JustTwo invite link." } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Introduce un enlace de invitación de JustTwo válido." } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Saisissez un lien d'invitation JustTwo valide." } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Inserisci un link di invito JustTwo valido." } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Введите корректную ссылку-приглашение JustTwo." } }
+      }
+    },
     "chats.loading" : {
       "extractionState" : "manual",
       "localizations" : {

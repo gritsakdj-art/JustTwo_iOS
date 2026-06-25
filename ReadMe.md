@@ -532,6 +532,7 @@ Suggested MVP order:
 
 * [Profile photos and avatar presentation](Docs/ProfilePhotos.md)
 * [Authentication deep links](Docs/EmailVerification.md)
+* [Invite links and QR flow](Docs/InviteLinks.md)
 
 Profile photo gallery order and avatar presentation are synchronized through the backend. Local UI state may be used for previews and caching, but it is not the cross-device source of truth.
 
