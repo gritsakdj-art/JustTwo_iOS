@@ -106,6 +106,7 @@ enum DiscoverMood: CaseIterable {
 struct DiscoverView: View {
 
     @Environment(AppRouter.self) private var router
+    @Environment(SessionStore.self) private var session
     @State private var selectedMode: DiscoverMode = .vibe
     @State private var selectedMood: DiscoverMood = .coffee
     @State private var selectedTab: AppTab = .discover
@@ -159,20 +160,24 @@ struct DiscoverView: View {
         .onChange(of: selectedTab) { _, newTab in
             router.selectedMainTab = newTab
         }
-        .fullScreenCover(
-            isPresented: Binding(
-                get: { router.presentedInvitePreviewToken != nil },
-                set: { isPresented in
-                    if !isPresented {
-                        router.dismissInvitePreview()
-                    }
-                }
-            )
-        ) {
-            if let token = router.presentedInvitePreviewToken {
-                InvitePreviewView(token: token)
-            }
+        .fullScreenCover(item: invitePreviewPresentation) { presentation in
+            InvitePreviewView(token: presentation.token)
+                .environment(session)
+                .environment(router)
         }
+    }
+
+    private var invitePreviewPresentation: Binding<InvitePreviewPresentation?> {
+        Binding(
+            get: {
+                router.presentedInvitePreviewToken.map(InvitePreviewPresentation.init(token:))
+            },
+            set: { newValue in
+                if newValue == nil {
+                    router.dismissInvitePreview()
+                }
+            }
+        )
     }
 
     @ViewBuilder
@@ -676,6 +681,12 @@ private extension DiscoverView {
     var profileCardShadowOpacity: Double {
         colorScheme == .dark ? 0.45 : 0.22
     }
+}
+
+private struct InvitePreviewPresentation: Identifiable {
+    let token: String
+
+    var id: String { token }
 }
 
 #Preview("Discover - Vibe") {
