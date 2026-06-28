@@ -6,6 +6,7 @@ struct RootView: View {
     @State private var photoStore = ProfilePhotoStore.shared
     @State private var avatarCropStore = ProfileAvatarCropStore.shared
     @Environment(\.layoutDirection) private var systemLayoutDirection
+    @Environment(\.scenePhase) private var scenePhase
     @AppStorage("app.language") private var selectedLanguageRawValue = AppLanguage.system.rawValue
     @AppStorage("app.theme") private var selectedThemeRawValue = AppTheme.system.rawValue
 
@@ -21,6 +22,18 @@ struct RootView: View {
             .preferredColorScheme(selectedTheme.colorScheme)
             .onOpenURL { url in
                 AppDeepLinkHandler.handle(url, router: router, session: session)
+            }
+            .onChange(of: scenePhase) { _, newPhase in
+                switch newPhase {
+                case .active:
+                    session.applicationDidBecomeActive()
+                case .background:
+                    session.applicationDidEnterBackground()
+                case .inactive:
+                    break
+                @unknown default:
+                    break
+                }
             }
     }
 

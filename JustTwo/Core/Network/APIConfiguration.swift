@@ -10,6 +10,13 @@ enum APIEnvironment: Sendable {
             return URL(string: "https://api.jtwo.online")!
         }
     }
+
+    nonisolated var realtimeWebSocketURL: URL {
+        switch self {
+        case .staging, .production:
+            return URL(string: "wss://api.jtwo.online/ws/realtime")!
+        }
+    }
 }
 
 struct APIConfiguration: Sendable {
@@ -18,6 +25,7 @@ struct APIConfiguration: Sendable {
     let environment: APIEnvironment
 
     nonisolated var baseURL: URL { environment.baseURL }
+    nonisolated var realtimeWebSocketURL: URL { environment.realtimeWebSocketURL }
     nonisolated var requestTimeout: TimeInterval { 20 }
     nonisolated var resourceTimeout: TimeInterval { 60 }
 }

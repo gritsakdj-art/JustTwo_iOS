@@ -130,6 +130,7 @@ final class SplashViewModel {
             setPhase(.finishing)
             await ensureMinimumDisplayDuration(since: startedAt, token: token)
             guard flowToken == token else { return }
+            session.connectRealtimeIfEligible()
             setState(.result(profile == nil ? .needProfileSetup : .ready))
         } catch is CancellationError {
             return

@@ -9,6 +9,7 @@ final class SessionStore {
     private(set) var currentUser: UserResponse?
     private(set) var currentProfile: UserProfileDTO?
     private(set) var pendingVerificationEmail: String?
+    let realtimeClient = RealtimeClient.shared
 
     var isEmailVerified: Bool {
         currentUser?.emailVerified == true
@@ -33,6 +34,8 @@ final class SessionStore {
         currentUser = user
         currentProfile = nil
         pendingVerificationEmail = user.emailVerified ? nil : user.email
+
+        connectRealtimeIfEligible()
     }
 
     func setCurrentUser(_ user: UserResponse) {
@@ -41,6 +44,7 @@ final class SessionStore {
 
         if !user.emailVerified {
             currentProfile = nil
+            realtimeClient.disconnect()
         }
     }
 
@@ -53,6 +57,8 @@ final class SessionStore {
     }
 
     func clearSession() {
+        realtimeClient.disconnect()
+
         if let userID = currentUser?.id {
             ProfilePhotoLocalOrderStore.shared.clear(userID: userID)
             ProfileAvatarCropStore.shared.clear(userID: userID)
@@ -66,6 +72,30 @@ final class SessionStore {
 
     func signOut() {
         clearSession()
+    }
+
+    func connectRealtimeIfEligible() {
+        guard isFullyAuthenticated else {
+            realtimeClient.disconnect()
+            return
+        }
+
+        Task { @MainActor [realtimeClient] in
+            await realtimeClient.connectIfPossible()
+        }
+    }
+
+    func applicationDidBecomeActive() {
+        guard isFullyAuthenticated else {
+            realtimeClient.disconnect()
+            return
+        }
+
+        realtimeClient.applicationDidBecomeActive()
+    }
+
+    func applicationDidEnterBackground() {
+        realtimeClient.applicationDidEnterBackground()
     }
 }
 
