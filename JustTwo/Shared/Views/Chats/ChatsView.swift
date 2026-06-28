@@ -39,15 +39,18 @@ struct ChatsView: View {
             .task {
                 guard !usesPreviewData else { return }
                 await listViewModel.loadIfNeeded(session: session, router: router)
+                listViewModel.activateRealtime(session: session, router: router)
             }
             .refreshable {
                 guard !usesPreviewData else { return }
                 await listViewModel.refresh(session: session, router: router)
+                listViewModel.activateRealtime(session: session, router: router)
             }
             .onChange(of: route?.id) { _, newValue in
                 guard newValue == nil, !usesPreviewData else { return }
                 Task {
                     await listViewModel.refresh(session: session, router: router)
+                    listViewModel.activateRealtime(session: session, router: router)
                 }
             }
             .onChange(of: router.pendingChatConversation?.id) { _, newValue in
@@ -62,7 +65,10 @@ struct ChatsView: View {
                 InviteLinkView()
             }
             .onAppear {
-                guard !usesPreviewData, let conversation = router.pendingChatConversation else { return }
+                guard !usesPreviewData else { return }
+                listViewModel.activateRealtime(session: session, router: router)
+
+                guard let conversation = router.pendingChatConversation else { return }
                 route = ChatRoute(conversation: conversation)
                 router.clearPendingChatConversation()
             }

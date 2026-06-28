@@ -1,6 +1,8 @@
 import SwiftUI
 
 struct PrivateChatView: View {
+    private static let bottomAnchorID = "private-chat-bottom-anchor"
+
     @State private var viewModel: ChatViewModel
 
     @Environment(SessionStore.self) private var session
@@ -53,6 +55,15 @@ struct PrivateChatView: View {
         .task {
             guard !usesPreviewData else { return }
             await viewModel.open(session: session, router: router)
+            viewModel.activateRealtime(session: session, router: router)
+        }
+        .onAppear {
+            guard !usesPreviewData else { return }
+            viewModel.activateRealtime(session: session, router: router)
+        }
+        .onDisappear {
+            guard !usesPreviewData else { return }
+            viewModel.deactivateRealtime()
         }
         .sheet(isPresented: actionMenuPresented) {
             if let message = viewModel.actionMenuMessage {
@@ -209,10 +220,14 @@ struct PrivateChatView: View {
                         )
                         .id(message.id)
                     }
+
+                    Color.clear
+                        .frame(height: max(24, bottomInset + 16))
+                        .id(Self.bottomAnchorID)
                 }
                 .padding(.horizontal, 12)
                 .padding(.top, 8)
-                .padding(.bottom, 8 + bottomInset)
+                .padding(.bottom, 8)
             }
             .scrollIndicators(.hidden)
             .onChange(of: viewModel.messages.count) { _, _ in
@@ -258,13 +273,13 @@ struct PrivateChatView: View {
     }
 
     private func scrollToBottom(_ proxy: ScrollViewProxy, animated: Bool) {
-        guard let lastID = viewModel.messages.last?.id else { return }
+        guard !viewModel.messages.isEmpty else { return }
         if animated {
             withAnimation(.easeOut(duration: 0.25)) {
-                proxy.scrollTo(lastID, anchor: .bottom)
+                proxy.scrollTo(Self.bottomAnchorID, anchor: .bottom)
             }
         } else {
-            proxy.scrollTo(lastID, anchor: .bottom)
+            proxy.scrollTo(Self.bottomAnchorID, anchor: .bottom)
         }
     }
 }

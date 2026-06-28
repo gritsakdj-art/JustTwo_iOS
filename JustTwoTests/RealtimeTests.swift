@@ -202,6 +202,233 @@ struct RealtimeTests {
         #expect(unknown?.type == "future.event")
     }
 
+    @MainActor
+    @Test("messenger realtime message created deduplicates websocket echo")
+    func messengerRealtimeMessageCreatedDeduplicatesEcho() throws {
+        let conversationID = fixedConversationID()
+        let currentProfileID = fixedCurrentProfileID()
+        let message = try makeMessageDTO(
+            id: fixedMessageID(),
+            conversationID: conversationID,
+            senderProfileID: fixedOtherProfileID(),
+            body: "Realtime hello"
+        )
+        let viewModel = ChatViewModel.preview(
+            conversation: makeConversation(id: conversationID),
+            messages: []
+        )
+
+        #expect(viewModel.applyRealtimeMessage(message, currentProfileID: currentProfileID))
+        #expect(!viewModel.applyRealtimeMessage(message, currentProfileID: currentProfileID))
+        #expect(viewModel.messages.count == 1)
+        #expect(viewModel.messages.first?.displayText == "Realtime hello")
+    }
+
+    @MainActor
+    @Test("messenger realtime edited message replaces existing body")
+    func messengerRealtimeEditedMessageReplacesExistingBody() throws {
+        let conversationID = fixedConversationID()
+        let currentProfileID = fixedCurrentProfileID()
+        let original = try makeMessageDTO(
+            id: fixedMessageID(),
+            conversationID: conversationID,
+            senderProfileID: fixedOtherProfileID(),
+            body: "Before"
+        )
+        let edited = try makeMessageDTO(
+            id: fixedMessageID(),
+            conversationID: conversationID,
+            senderProfileID: fixedOtherProfileID(),
+            body: "After",
+            editedAt: "2026-06-26T13:19:00Z"
+        )
+        let viewModel = ChatViewModel.preview(
+            conversation: makeConversation(id: conversationID),
+            messages: []
+        )
+
+        #expect(viewModel.applyRealtimeMessage(original, currentProfileID: currentProfileID))
+        #expect(!viewModel.applyRealtimeMessage(edited, currentProfileID: currentProfileID))
+        #expect(viewModel.messages.count == 1)
+        #expect(viewModel.messages.first?.displayText == "After")
+        #expect(viewModel.messages.first?.isEdited == true)
+    }
+
+    @MainActor
+    @Test("messenger realtime deleted message hides body")
+    func messengerRealtimeDeletedMessageHidesBody() throws {
+        let conversationID = fixedConversationID()
+        let currentProfileID = fixedCurrentProfileID()
+        let message = try makeMessageDTO(
+            id: fixedMessageID(),
+            conversationID: conversationID,
+            senderProfileID: currentProfileID,
+            body: "Secret"
+        )
+        let viewModel = ChatViewModel.preview(
+            conversation: makeConversation(id: conversationID),
+            messages: []
+        )
+
+        _ = viewModel.applyRealtimeMessage(message, currentProfileID: currentProfileID)
+        #expect(viewModel.applyRealtimeDeletedMessage(
+            MessageDeletedPayload(
+                messageID: fixedMessageID(),
+                deletedAt: ISO8601DateFormatter().date(from: "2026-06-26T13:20:00Z"),
+                isDeleted: true
+            )
+        ))
+
+        #expect(viewModel.messages.first?.isDeleted == true)
+        #expect(viewModel.messages.first?.rawBody == nil)
+    }
+
+    @MainActor
+    @Test("messenger realtime reactions are idempotent and removable")
+    func messengerRealtimeReactionsAreIdempotentAndRemovable() throws {
+        let conversationID = fixedConversationID()
+        let currentProfileID = fixedCurrentProfileID()
+        let message = try makeMessageDTO(
+            id: fixedMessageID(),
+            conversationID: conversationID,
+            senderProfileID: fixedOtherProfileID(),
+            body: "React to me"
+        )
+        let viewModel = ChatViewModel.preview(
+            conversation: makeConversation(id: conversationID),
+            messages: []
+        )
+        let addPayload = ReactionAddedPayload(
+            messageID: fixedMessageID(),
+            reaction: RealtimeReactionDTO(emoji: "❤️", count: .bool(true), reactedByMe: true)
+        )
+
+        _ = viewModel.applyRealtimeMessage(message, currentProfileID: currentProfileID)
+        #expect(viewModel.applyRealtimeReactionAdded(addPayload))
+        #expect(viewModel.applyRealtimeReactionAdded(addPayload))
+        #expect(viewModel.messages.first?.reactions.count == 1)
+        #expect(viewModel.messages.first?.reactions.first?.count == 1)
+
+        #expect(viewModel.applyRealtimeReactionRemoved(
+            ReactionRemovedPayload(
+                messageID: fixedMessageID(),
+                profileID: currentProfileID,
+                emoji: "❤️"
+            ),
+            currentProfileID: currentProfileID
+        ))
+        #expect(viewModel.messages.first?.reactions.isEmpty == true)
+    }
+
+    @MainActor
+    @Test("messenger realtime conversation list applies read and reorder")
+    func messengerRealtimeConversationListAppliesReadAndReorder() {
+        let firstID = fixedConversationID()
+        let secondID = UUID(uuidString: "22222222-2222-4222-8222-222222222222")!
+        let currentProfileID = fixedCurrentProfileID()
+        let older = Date(timeIntervalSince1970: 1_000)
+        let newer = Date(timeIntervalSince1970: 2_000)
+        let viewModel = ConversationListViewModel.preview(conversations: [
+            makeConversation(id: firstID, title: "First", lastMessageAt: newer, unreadCount: 3),
+            makeConversation(id: secondID, title: "Second", lastMessageAt: older, unreadCount: 1)
+        ])
+
+        #expect(viewModel.applyRealtimeConversationRead(
+            conversationID: firstID,
+            profileID: currentProfileID,
+            currentProfileID: currentProfileID
+        ))
+        #expect(viewModel.conversations.first(where: { $0.id == firstID })?.unreadCount == 0)
+
+        #expect(viewModel.applyRealtimeConversationUpdated(
+            ConversationUpdatedPayload(
+                conversationID: secondID,
+                updatedAt: Date(timeIntervalSince1970: 3_000),
+                lastMessageAt: Date(timeIntervalSince1970: 3_000)
+            )
+        ))
+        #expect(viewModel.conversations.first?.id == secondID)
+    }
+
+    @MainActor
+    @Test("messenger realtime conversation list updates preview and unread once")
+    func messengerRealtimeConversationListUpdatesPreviewAndUnreadOnce() throws {
+        let conversationID = fixedConversationID()
+        let currentProfileID = fixedCurrentProfileID()
+        let message = try makeMessageDTO(
+            id: fixedMessageID(),
+            conversationID: conversationID,
+            senderProfileID: fixedOtherProfileID(),
+            body: "New realtime message"
+        )
+        let viewModel = ConversationListViewModel.preview(conversations: [
+            makeConversation(id: conversationID, title: "Taylor", unreadCount: 2)
+        ])
+
+        #expect(viewModel.applyRealtimeMessage(
+            message,
+            currentProfileID: currentProfileID,
+            activeConversationID: nil
+        ))
+        #expect(viewModel.conversations.first?.lastMessageText == "New realtime message")
+        #expect(viewModel.conversations.first?.lastSenderName == "Taylor")
+        #expect(viewModel.conversations.first?.unreadCount == 3)
+
+        #expect(viewModel.applyRealtimeMessage(
+            message,
+            currentProfileID: currentProfileID,
+            activeConversationID: nil
+        ))
+        #expect(viewModel.conversations.first?.unreadCount == 3)
+    }
+
+    @MainActor
+    @Test("messenger realtime active conversation does not increment unread")
+    func messengerRealtimeActiveConversationDoesNotIncrementUnread() throws {
+        let conversationID = fixedConversationID()
+        let currentProfileID = fixedCurrentProfileID()
+        let message = try makeMessageDTO(
+            id: fixedMessageID(),
+            conversationID: conversationID,
+            senderProfileID: fixedOtherProfileID(),
+            body: "Open chat message"
+        )
+        let viewModel = ConversationListViewModel.preview(conversations: [
+            makeConversation(id: conversationID, title: "Taylor", unreadCount: 2)
+        ])
+
+        #expect(viewModel.applyRealtimeMessage(
+            message,
+            currentProfileID: currentProfileID,
+            activeConversationID: conversationID
+        ))
+        #expect(viewModel.conversations.first?.lastMessageText == "Open chat message")
+        #expect(viewModel.conversations.first?.unreadCount == 2)
+    }
+
+    @MainActor
+    @Test("messenger realtime unknown conversation returns false for REST refresh fallback")
+    func messengerRealtimeUnknownConversationReturnsFalseForRefreshFallback() throws {
+        let currentProfileID = fixedCurrentProfileID()
+        let knownConversationID = fixedConversationID()
+        let unknownConversationID = UUID(uuidString: "99999999-9999-4999-8999-999999999999")!
+        let message = try makeMessageDTO(
+            id: fixedMessageID(),
+            conversationID: unknownConversationID,
+            senderProfileID: fixedOtherProfileID(),
+            body: "Unknown conversation"
+        )
+        let viewModel = ConversationListViewModel.preview(conversations: [
+            makeConversation(id: knownConversationID)
+        ])
+
+        #expect(!viewModel.applyRealtimeMessage(
+            message,
+            currentProfileID: currentProfileID,
+            activeConversationID: nil
+        ))
+    }
+
     private func jsonObject(for message: RealtimeClientMessageDTO) throws -> [String: Any] {
         let data = try JSONCoding.encoder.encode(message)
         let object = try JSONSerialization.jsonObject(with: data)
@@ -210,6 +437,68 @@ struct RealtimeTests {
 
     private func decodeEvent(_ json: String) throws -> RealtimeEvent {
         try JSONCoding.decoder.decode(RealtimeEventDTO.self, from: Data(json.utf8)).event
+    }
+
+    private func makeMessageDTO(
+        id: UUID,
+        conversationID: UUID,
+        senderProfileID: UUID,
+        body: String?,
+        editedAt: String? = nil,
+        deletedAt: String? = nil
+    ) throws -> MessageDTO {
+        let bodyJSON = body.map { #""\#($0)""# } ?? "null"
+        let editedAtJSON = editedAt.map { #""\#($0)""# } ?? "null"
+        let deletedAtJSON = deletedAt.map { #""\#($0)""# } ?? "null"
+
+        return try JSONCoding.decoder.decode(MessageDTO.self, from: Data("""
+        {
+          "id": "\(id.uuidString)",
+          "conversationID": "\(conversationID.uuidString)",
+          "senderProfileID": "\(senderProfileID.uuidString)",
+          "kind": "text",
+          "body": \(bodyJSON),
+          "replyTo": null,
+          "reactions": [],
+          "createdAt": "2026-06-26T13:18:31Z",
+          "editedAt": \(editedAtJSON),
+          "deletedAt": \(deletedAtJSON)
+        }
+        """.utf8))
+    }
+
+    private func makeConversation(
+        id: UUID,
+        title: String = "Taylor",
+        lastMessageAt: Date? = Date(timeIntervalSince1970: 1_000),
+        unreadCount: Int = 0
+    ) -> ChatConversationPreview {
+        ChatConversationPreview(
+            id: id,
+            title: title,
+            avatarURL: nil,
+            avatarPhotoID: nil,
+            lastMessageText: nil,
+            lastSenderName: nil,
+            lastMessageAt: lastMessageAt,
+            unreadCount: unreadCount
+        )
+    }
+
+    private func fixedConversationID() -> UUID {
+        UUID(uuidString: "11111111-1111-4111-8111-111111111111")!
+    }
+
+    private func fixedMessageID() -> UUID {
+        UUID(uuidString: "33333333-3333-4333-8333-333333333333")!
+    }
+
+    private func fixedCurrentProfileID() -> UUID {
+        UUID(uuidString: "44444444-4444-4444-8444-444444444444")!
+    }
+
+    private func fixedOtherProfileID() -> UUID {
+        UUID(uuidString: "55555555-5555-4555-8555-555555555555")!
     }
 
     @MainActor

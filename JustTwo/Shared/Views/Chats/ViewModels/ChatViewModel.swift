@@ -22,6 +22,7 @@ final class ChatViewModel {
 
     private var currentProfileID: UUID?
     private var didOpen = false
+    private var isRealtimeActive = false
 
     init(conversation: ChatConversationPreview) {
         self.conversation = conversation
@@ -58,8 +59,25 @@ final class ChatViewModel {
         await markRead(session: session, router: router)
     }
 
+    func activateRealtime(session: SessionStore, router: AppRouter) {
+        guard !isRealtimeActive else { return }
+        isRealtimeActive = true
+        MessengerRealtimeCoordinator.shared.activateChat(self, session: session, router: router)
+    }
+
+    func deactivateRealtime() {
+        guard isRealtimeActive else { return }
+        isRealtimeActive = false
+        MessengerRealtimeCoordinator.shared.deactivateChat(self)
+    }
+
     func reload(session: SessionStore, router: AppRouter) async {
         await loadMessages(session: session, router: router)
+    }
+
+    func refreshFromRealtime(session: SessionStore, router: AppRouter) async {
+        await loadMessages(session: session, router: router)
+        await markRead(session: session, router: router)
     }
 
     func openActionMenu(for message: ChatMessage) {
@@ -258,11 +276,105 @@ final class ChatViewModel {
         }
     }
 
-    private func appendOrReplace(_ message: ChatMessage) {
+    @discardableResult
+    func applyRealtimeMessage(_ dto: MessageDTO, currentProfileID: UUID) -> Bool {
+        self.currentProfileID = currentProfileID
+        return appendOrReplace(ChatUIMapping.message(from: dto, currentProfileID: currentProfileID))
+    }
+
+    @discardableResult
+    func applyRealtimeDeletedMessage(_ payload: MessageDeletedPayload) -> Bool {
+        guard let index = messages.firstIndex(where: { $0.id == payload.messageID }) else {
+            return false
+        }
+
+        messages[index] = messages[index].markingDeleted(deletedAt: payload.deletedAt)
+
+        if editingMessage?.id == payload.messageID {
+            cancelCompose()
+            draftText = ""
+        }
+        if replyTarget?.id == payload.messageID {
+            cancelCompose()
+        }
+
+        return true
+    }
+
+    @discardableResult
+    func applyRealtimeReactionAdded(_ payload: ReactionAddedPayload) -> Bool {
+        guard let index = messages.firstIndex(where: { $0.id == payload.messageID }) else {
+            return false
+        }
+
+        let normalizedEmoji = ReactionEmoji.normalized(payload.reaction.emoji)
+        var reactions = messages[index].reactions
+
+        if let reactionIndex = reactions.firstIndex(where: { ReactionEmoji.normalized($0.emoji) == normalizedEmoji }) {
+            let current = reactions[reactionIndex]
+            let nextCount = payload.reaction.count.intValue ?? max(current.count, 1)
+            reactions[reactionIndex] = current.replacing(
+                count: max(current.count, nextCount),
+                reactedByMe: current.reactedByMe
+            )
+        } else {
+            reactions.append(
+                ChatMessageReaction(
+                    emoji: normalizedEmoji,
+                    count: payload.reaction.count.intValue ?? 1,
+                    reactedByMe: false
+                )
+            )
+        }
+
+        messages[index] = messages[index].replacingReactions(reactions.sorted { $0.displayEmoji < $1.displayEmoji })
+        return true
+    }
+
+    @discardableResult
+    func applyRealtimeReactionRemoved(
+        _ payload: ReactionRemovedPayload,
+        currentProfileID: UUID?
+    ) -> Bool {
+        guard let index = messages.firstIndex(where: { $0.id == payload.messageID }) else {
+            return false
+        }
+
+        let normalizedEmoji = ReactionEmoji.normalized(payload.emoji)
+        var reactions = messages[index].reactions
+        guard let reactionIndex = reactions.firstIndex(where: { ReactionEmoji.normalized($0.emoji) == normalizedEmoji }) else {
+            return true
+        }
+
+        let current = reactions[reactionIndex]
+        let nextCount = max(0, current.count - 1)
+        let nextReactedByMe = payload.profileID == currentProfileID ? false : current.reactedByMe
+
+        if nextCount == 0 {
+            reactions.remove(at: reactionIndex)
+        } else {
+            reactions[reactionIndex] = current.replacing(
+                count: nextCount,
+                reactedByMe: nextReactedByMe
+            )
+        }
+
+        messages[index] = messages[index].replacingReactions(reactions)
+        return true
+    }
+
+    @discardableResult
+    private func appendOrReplace(_ message: ChatMessage) -> Bool {
         if let index = messages.firstIndex(where: { $0.id == message.id }) {
+            guard messages[index] != message else {
+                NetworkDebug.log("Duplicate realtime message ignored: \(message.id)")
+                return false
+            }
             messages[index] = message
+            return false
         } else {
             messages.append(message)
+            return true
         }
     }
 }

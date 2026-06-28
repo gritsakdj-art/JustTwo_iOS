@@ -10,6 +10,16 @@ struct ChatMessageReaction: Identifiable, Equatable, Hashable {
     var id: String { displayEmoji }
 }
 
+extension ChatMessageReaction {
+    func replacing(count: Int? = nil, reactedByMe: Bool? = nil) -> ChatMessageReaction {
+        ChatMessageReaction(
+            emoji: emoji,
+            count: max(0, count ?? self.count),
+            reactedByMe: reactedByMe ?? self.reactedByMe
+        )
+    }
+}
+
 struct ChatReplyPreview: Equatable, Hashable {
     let id: UUID
     let body: String
@@ -36,6 +46,36 @@ struct ChatMessage: Identifiable, Equatable, Hashable {
     var canReact: Bool { !isDeleted }
 }
 
+extension ChatMessage {
+    func markingDeleted(deletedAt: Date?) -> ChatMessage {
+        ChatMessage(
+            id: id,
+            displayText: String(localized: "chats.messageDeleted"),
+            rawBody: nil,
+            createdAt: createdAt,
+            isMine: isMine,
+            isDeleted: true,
+            isEdited: false,
+            replyPreview: replyPreview,
+            reactions: reactions
+        )
+    }
+
+    func replacingReactions(_ reactions: [ChatMessageReaction]) -> ChatMessage {
+        ChatMessage(
+            id: id,
+            displayText: displayText,
+            rawBody: rawBody,
+            createdAt: createdAt,
+            isMine: isMine,
+            isDeleted: isDeleted,
+            isEdited: isEdited,
+            replyPreview: replyPreview,
+            reactions: reactions
+        )
+    }
+}
+
 struct ChatConversationPreview: Identifiable, Equatable, Hashable {
     let id: UUID
     let title: String
@@ -45,6 +85,26 @@ struct ChatConversationPreview: Identifiable, Equatable, Hashable {
     let lastSenderName: String?
     let lastMessageAt: Date?
     let unreadCount: Int
+}
+
+extension ChatConversationPreview {
+    func replacingActivity(
+        lastMessageText: String? = nil,
+        lastSenderName: String? = nil,
+        lastMessageAt: Date? = nil,
+        unreadCount: Int? = nil
+    ) -> ChatConversationPreview {
+        ChatConversationPreview(
+            id: id,
+            title: title,
+            avatarURL: avatarURL,
+            avatarPhotoID: avatarPhotoID,
+            lastMessageText: lastMessageText ?? self.lastMessageText,
+            lastSenderName: lastSenderName ?? self.lastSenderName,
+            lastMessageAt: lastMessageAt ?? self.lastMessageAt,
+            unreadCount: max(0, unreadCount ?? self.unreadCount)
+        )
+    }
 }
 
 enum ChatUIMapping {
@@ -149,6 +209,23 @@ enum ChatUIMapping {
     static func avatarURL(from photo: MessengerProfilePhotoSummaryDTO?) -> URL? {
         guard let photo else { return nil }
         return URL(string: photo.downloadUrl)
+    }
+
+    static func realtimeLastMessageText(from dto: MessageDTO) -> String? {
+        if dto.deletedAt != nil {
+            return String(localized: "chats.messageDeleted")
+        }
+        return dto.body
+    }
+
+    static func realtimeLastSenderName(
+        from dto: MessageDTO,
+        currentProfileID: UUID,
+        fallbackOtherName: String
+    ) -> String {
+        dto.senderProfileID == currentProfileID
+            ? String(localized: "chats.you")
+            : fallbackOtherName
     }
 }
 

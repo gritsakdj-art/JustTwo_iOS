@@ -57,6 +57,7 @@ final class SessionStore {
     }
 
     func clearSession() {
+        MessengerRealtimeCoordinator.shared.stop()
         realtimeClient.disconnect()
 
         if let userID = currentUser?.id {
