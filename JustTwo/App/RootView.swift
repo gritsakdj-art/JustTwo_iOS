@@ -22,13 +22,21 @@ struct RootView: View {
             .environment(\.locale, selectedLanguage.locale)
             .environment(\.layoutDirection, selectedLanguage.layoutDirection(system: systemLayoutDirection))
             .preferredColorScheme(selectedTheme.colorScheme)
+            .onAppear {
+                MessengerNotificationService.shared.configure(router: router)
+            }
             .onOpenURL { url in
                 AppDeepLinkHandler.handle(url, router: router, session: session)
             }
             .onChange(of: scenePhase) { _, newPhase in
+                MessengerNotificationService.isAppInBackground = newPhase == .background
+
                 switch newPhase {
                 case .active:
                     session.applicationDidBecomeActive()
+                    Task {
+                        await MessengerNotificationService.shared.requestAuthIfNeeded()
+                    }
                 case .background:
                     session.applicationDidEnterBackground()
                 case .inactive:

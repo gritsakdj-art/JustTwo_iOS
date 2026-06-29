@@ -41,7 +41,12 @@ final class MessengerRealtimeCoordinator {
         conversationListViewModel = viewModel
         updateContext(session: session, router: router)
         startListeningIfNeeded()
-        syncConversationListSubscriptions()
+        session.connectRealtimeIfEligible()
+
+        Task { [weak self] in
+            await self?.session?.realtimeClient.connectIfPossible()
+            self?.syncConversationListSubscriptions()
+        }
     }
 
     func deactivateConversationList(_ viewModel: ConversationListViewModel) {
@@ -173,7 +178,8 @@ final class MessengerRealtimeCoordinator {
                     let applied = self.conversationListViewModel?.applyRealtimeMessage(
                         message,
                         currentProfileID: profileID,
-                        activeConversationID: self.activeConversationID
+                        activeConversationID: self.activeConversationID,
+                        router: self.router
                     ) ?? false
                     if !applied {
                         self.refreshConversationsFromRealtime()
@@ -296,12 +302,20 @@ final class MessengerRealtimeCoordinator {
         isRefreshingAfterReconnect = true
         NetworkDebug.log("Messenger realtime reconnect reconcile started")
 
+        resetTrackedSubscriptions()
+
         await refreshConversations()
         await refreshActiveChat()
         await subscribeActiveConversationIfNeeded(force: true)
 
         isRefreshingAfterReconnect = false
         NetworkDebug.log("Messenger realtime reconnect reconcile completed")
+    }
+
+    private func resetTrackedSubscriptions() {
+        conversationListSubscriptionIDs.removeAll()
+        subscribedConversationID = nil
+        NetworkDebug.log("Messenger realtime tracked subscriptions reset")
     }
 
     private func refreshConversationsFromRealtime() {
@@ -340,8 +354,12 @@ final class MessengerRealtimeCoordinator {
         }
     }
 
-    private func syncConversationListSubscriptions() {
+    private func syncConversationListSubscriptions(force: Bool = false) {
         guard let conversationListViewModel else { return }
+
+        if force {
+            resetTrackedSubscriptions()
+        }
 
         let visibleConversationIDs = Set(conversationListViewModel.conversations.map(\.id))
         let idsToSubscribe = visibleConversationIDs.subtracting(conversationListSubscriptionIDs)
@@ -350,6 +368,7 @@ final class MessengerRealtimeCoordinator {
         guard !idsToSubscribe.isEmpty || !idsToUnsubscribe.isEmpty else { return }
 
         Task { [weak self] in
+            await self?.session?.realtimeClient.connectIfPossible()
             await self?.subscribeConversationList(idsToSubscribe)
             await self?.unsubscribeConversationList(idsToUnsubscribe)
         }

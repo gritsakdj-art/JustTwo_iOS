@@ -14,6 +14,7 @@ final class AppRouter {
     var presentedInvitePreviewToken: String?
     var selectedMainTab: AppTab = .discover
     var pendingChatConversation: ChatConversationPreview?
+    var pendingChatMessageID: UUID?
 
     private init() {}
 
@@ -119,13 +120,23 @@ final class AppRouter {
     }
 
     func openChatAfterInviteAccept(_ conversation: ChatConversationPreview) {
-        pendingChatConversation = conversation
-        selectedMainTab = .chats
+        openChat(conversation)
         presentedInvitePreviewToken = nil
         pendingInviteToken = nil
     }
 
-    func clearPendingChatConversation() {
+    func openChat(_ conversation: ChatConversationPreview, messageID: UUID? = nil) {
+        pendingChatConversation = conversation
+        pendingChatMessageID = messageID
+        selectedMainTab = .chats
+    }
+
+    func clearPendingChatNavigation() {
         pendingChatConversation = nil
+        pendingChatMessageID = nil
+    }
+
+    func clearPendingChatConversation() {
+        clearPendingChatNavigation()
     }
 }

@@ -12,6 +12,7 @@ struct ChatsView: View {
 
     private struct ChatRoute: Identifiable, Hashable {
         let conversation: ChatConversationPreview
+        var targetMessageID: UUID?
         var id: UUID { conversation.id }
     }
 
@@ -37,7 +38,10 @@ struct ChatsView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .navigationStackHostingBackgroundClear()
             .navigationDestination(item: $route) { route in
-                PrivateChatView(conversation: route.conversation)
+                PrivateChatView(
+                    conversation: route.conversation,
+                    targetMessageID: route.targetMessageID
+                )
             }
             .task {
                 guard !usesPreviewData else { return }
@@ -61,8 +65,11 @@ struct ChatsView: View {
                     isInviteSheetPresented = false
                 }
                 guard !usesPreviewData, let conversation = router.pendingChatConversation else { return }
-                route = ChatRoute(conversation: conversation)
-                router.clearPendingChatConversation()
+                route = ChatRoute(
+                    conversation: conversation,
+                    targetMessageID: router.pendingChatMessageID
+                )
+                router.clearPendingChatNavigation()
             }
             .sheet(isPresented: $isInviteSheetPresented) {
                 InviteLinkView()
@@ -72,8 +79,11 @@ struct ChatsView: View {
                 listViewModel.activateRealtime(session: session, router: router)
 
                 guard let conversation = router.pendingChatConversation else { return }
-                route = ChatRoute(conversation: conversation)
-                router.clearPendingChatConversation()
+                route = ChatRoute(
+                    conversation: conversation,
+                    targetMessageID: router.pendingChatMessageID
+                )
+                router.clearPendingChatNavigation()
             }
             .toolbarBackground(.hidden, for: .navigationBar)
         }

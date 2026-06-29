@@ -10,6 +10,9 @@ final class ConversationListViewModel {
     private(set) var isLoading = false
     var errorMessage: String?
 
+    var totalUnreadCount: Int {
+        conversations.reduce(0) { $0 + $1.unreadCount }
+    }
     private var didLoad = false
     private var refreshTask: Task<Void, Never>?
     private var appliedRealtimeMessageIDs: Set<UUID> = []
@@ -115,7 +118,8 @@ final class ConversationListViewModel {
     func applyRealtimeMessage(
         _ dto: MessageDTO,
         currentProfileID: UUID,
-        activeConversationID: UUID?
+        activeConversationID: UUID?,
+        router: AppRouter? = nil
     ) -> Bool {
         guard let index = conversations.firstIndex(where: { $0.id == dto.conversationID }) else {
             return false
@@ -140,6 +144,26 @@ final class ConversationListViewModel {
         conversations.insert(updated, at: 0)
         sortConversations()
         syncMessengerBadge()
+
+        if shouldIncrementUnread {
+            let selectedTab = router?.selectedMainTab ?? AppRouter.shared.selectedMainTab
+            if MessengerNotificationService.shouldPresentIncomingMessage(
+                conversationID: dto.conversationID,
+                senderProfileID: dto.senderProfileID,
+                currentProfileID: currentProfileID,
+                activeConversationID: activeConversationID,
+                selectedTab: selectedTab
+            ) {
+                MessengerNotificationService.shared.presentIncomingMessage(
+                    conversationID: dto.conversationID,
+                    messageID: dto.id,
+                    partnerName: current.title,
+                    previewText: ChatUIMapping.realtimeLastMessageText(from: dto),
+                    avatarPhotoID: current.avatarPhotoID
+                )
+            }
+        }
+
         return true
     }
 
@@ -194,6 +218,6 @@ final class ConversationListViewModel {
     }
 
     private func syncMessengerBadge() {
-        MessengerBadgeStore.shared.setUnreadCount(conversations.reduce(0) { $0 + $1.unreadCount })
+        MessengerBadgeStore.shared.setUnreadCount(totalUnreadCount)
     }
 }

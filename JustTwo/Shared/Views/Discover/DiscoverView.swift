@@ -107,7 +107,6 @@ struct DiscoverView: View {
 
     @Environment(AppRouter.self) private var router
     @Environment(SessionStore.self) private var session
-    @Environment(MessengerBadgeStore.self) private var messengerBadgeStore
     @State private var selectedMode: DiscoverMode = .vibe
     @State private var selectedMood: DiscoverMood = .coffee
     @State private var selectedTab: AppTab = .discover
@@ -146,7 +145,7 @@ struct DiscoverView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .environment(\.isDiscoverShell, true)
 
-            AppTabBar(selection: $selectedTab, chatsBadgeCount: messengerBadgeStore.unreadCount)
+            AppTabBar(selection: $selectedTab, chatsBadgeCount: chatsViewModel.totalUnreadCount)
         }
         .background {
             Color.discoverBackgroundGradient

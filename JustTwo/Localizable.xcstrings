@@ -9657,6 +9657,90 @@
         }
       }
     },
+    "settings.notifications.messages.subtitle" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : { "stringUnit" : { "state" : "translated", "value" : "تنبيهات الرسائل الجديدة" } },
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Benachrichtigungen über neue Nachrichten" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Get notified about new messages" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Recibe avisos de mensajes nuevos" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Recevoir des alertes pour les nouveaux messages" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Ricevi avvisi per i nuovi messaggi" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Уведомления о новых сообщениях" } }
+      }
+    },
+    "settings.notifications.messages.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : { "stringUnit" : { "state" : "translated", "value" : "إشعارات الرسائل" } },
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Nachrichtenbenachrichtigungen" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Message notifications" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Notificaciones de mensajes" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Notifications de messages" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Notifiche messaggi" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Уведомления о сообщениях" } }
+      }
+    },
+    "settings.notifications.permission_denied" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : { "stringUnit" : { "state" : "translated", "value" : "الإشعارات معطلة في إعدادات النظام." } },
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Benachrichtigungen sind in den Systemeinstellungen deaktiviert." } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Notifications are disabled in system settings." } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Las notificaciones están desactivadas en los ajustes del sistema." } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Les notifications sont désactivées dans les réglages système." } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Le notifiche sono disattivate nelle impostazioni di sistema." } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Уведомления отключены в системных настройках." } }
+      }
+    },
+    "settings.notifications.preview.subtitle" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : { "stringUnit" : { "state" : "translated", "value" : "إظهار نص الرسالة في الإشعار" } },
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Nachrichtentext in der Benachrichtigung anzeigen" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Show message text in the notification" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Mostrar el texto del mensaje en la notificación" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Afficher le texte du message dans la notification" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Mostra il testo del messaggio nella notifica" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Показывать текст сообщения в уведомлении" } }
+      }
+    },
+    "settings.notifications.preview.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : { "stringUnit" : { "state" : "translated", "value" : "معاينة الرسالة" } },
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Nachrichtenvorschau" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Message preview" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Vista previa del mensaje" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Aperçu du message" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Anteprima messaggio" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Превью сообщения" } }
+      }
+    },
+    "settings.notifications.section" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : { "stringUnit" : { "state" : "translated", "value" : "الإشعارات" } },
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Benachrichtigungen" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Notifications" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Notificaciones" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Notifications" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Notifiche" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Уведомления" } }
+      }
+    },
+    "notifications.message.new" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : { "stringUnit" : { "state" : "translated", "value" : "رسالة جديدة" } },
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Neue Nachricht" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "New message" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Nuevo mensaje" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Nouveau message" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Nuovo messaggio" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Новое сообщение" } }
+      }
+    },
     "settings.language.section" : {
       "extractionState" : "manual",
       "localizations" : {

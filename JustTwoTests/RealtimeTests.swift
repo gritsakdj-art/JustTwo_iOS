@@ -502,6 +502,27 @@ struct RealtimeTests {
     }
 
     @MainActor
+    @Test("receive timeout with notifications enabled schedules reconnect")
+    func receiveTimeoutWithNotificationsEnabledSchedulesReconnect() {
+        let previous = MessageNotificationPreferences.messagesEnabled
+        defer { MessageNotificationPreferences.messagesEnabled = previous }
+
+        MessageNotificationPreferences.messagesEnabled = true
+        let client = makeRealtimeClientForLifecycleTests()
+
+        client.simulateActiveConnectionForTesting()
+        client.simulateReceiveErrorForTesting(URLError(.timedOut))
+
+        guard case .reconnecting(let attempt) = client.state else {
+            Issue.record("Expected reconnecting state")
+            return
+        }
+
+        #expect(attempt == 1)
+        #expect(client.hasPendingReconnectForTesting)
+    }
+
+    @MainActor
     private func makeRealtimeClientForLifecycleTests() -> RealtimeClient {
         RealtimeClient(
             router: .shared,
