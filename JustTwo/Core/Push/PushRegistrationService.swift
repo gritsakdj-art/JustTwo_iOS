@@ -10,6 +10,7 @@ protocol PushRegistrationServicing {
     func handleDidRegister(deviceToken: Data)
     func handleDidFailToRegister(error: Error)
     func syncCurrentTokenIfPossible() async
+    func syncCurrentTokenIfPossible(userID: UUID?) async
     func unregisterCurrentDevice() async
     func unregisterCurrentDevice(accessToken: String?) async
 }
@@ -36,7 +37,8 @@ final class PushRegistrationService: NSObject, PushRegistrationServicing {
     private let center = UNUserNotificationCenter.current()
     private let installationIDProvider: InstallationIDProviding
     private var currentToken: String?
-    private var isSyncing = false
+    private var inFlightSyncKey: PushDeviceSyncKey?
+    private var lastSuccessfulSyncKey: PushDeviceSyncKey?
 
     init(installationIDProvider: InstallationIDProviding = InstallationIDProvider.shared) {
         self.installationIDProvider = installationIDProvider
@@ -84,7 +86,7 @@ final class PushRegistrationService: NSObject, PushRegistrationServicing {
         NetworkDebug.log("APNs token received: \(token.safeTokenDescription)")
 
         Task { @MainActor [weak self] in
-            await self?.syncCurrentTokenIfPossible()
+            await self?.syncCurrentTokenIfPossible(userID: SessionStore.shared.currentUser?.id)
         }
     }
 
@@ -93,9 +95,16 @@ final class PushRegistrationService: NSObject, PushRegistrationServicing {
     }
 
     func syncCurrentTokenIfPossible() async {
-        guard !isSyncing else { return }
+        await syncCurrentTokenIfPossible(userID: SessionStore.shared.currentUser?.id)
+    }
+
+    func syncCurrentTokenIfPossible(userID: UUID?) async {
         guard APIAuth.accessToken != nil else {
             NetworkDebug.log("Push device sync skipped: missing JWT")
+            return
+        }
+        guard let userID else {
+            NetworkDebug.log("Push device sync skipped: missing user id")
             return
         }
         guard let token = currentToken, !token.isEmpty else {
@@ -115,15 +124,32 @@ final class PushRegistrationService: NSObject, PushRegistrationServicing {
             return
         }
 
-        isSyncing = true
-        defer { isSyncing = false }
+        let syncKey = PushDeviceSyncKey(
+            userID: userID,
+            token: token,
+            environment: PushEnvironment.current.rawValue,
+            installationID: installationID
+        )
+
+        guard inFlightSyncKey == nil else {
+            NetworkDebug.log("Push device sync skipped: sync already in flight")
+            return
+        }
+
+        guard lastSuccessfulSyncKey != syncKey else {
+            NetworkDebug.log("Push device sync skipped: token already synced")
+            return
+        }
+
+        inFlightSyncKey = syncKey
+        defer { inFlightSyncKey = nil }
 
         let body = RegisterPushDeviceRequestBody(
             platform: "ios",
             token: token,
-            environment: PushEnvironment.current.rawValue,
+            environment: syncKey.environment,
             bundleId: bundleID,
-            installationId: installationID,
+            installationId: syncKey.installationID,
             appVersion: Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String,
             buildNumber: Bundle.main.infoDictionary?["CFBundleVersion"] as? String,
             deviceModel: UIDevice.current.model,
@@ -135,6 +161,7 @@ final class PushRegistrationService: NSObject, PushRegistrationServicing {
 
         do {
             _ = try await NetworkExecutor.shared.send(RegisterPushDeviceRequest(bodyValue: body))
+            lastSuccessfulSyncKey = syncKey
             NetworkDebug.log("Push device sync succeeded")
         } catch {
             NetworkDebug.logError(error, prefix: "Push device sync failed")
@@ -168,11 +195,19 @@ final class PushRegistrationService: NSObject, PushRegistrationServicing {
             _ = try await NetworkExecutor.shared.send(
                 UnregisterPushDeviceRequest(bodyValue: body, accessToken: accessToken)
             )
+            lastSuccessfulSyncKey = nil
             NetworkDebug.log("Push device unregister succeeded")
         } catch {
             NetworkDebug.logError(error, prefix: "Push device unregister failed")
         }
     }
+}
+
+private struct PushDeviceSyncKey: Equatable {
+    let userID: UUID
+    let token: String
+    let environment: String
+    let installationID: String
 }
 
 extension PushRegistrationService: UNUserNotificationCenterDelegate {

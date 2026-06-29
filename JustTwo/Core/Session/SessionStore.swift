@@ -101,7 +101,7 @@ final class SessionStore {
 
         Task { @MainActor in
             await PushRegistrationService.shared.requestAuthorizationIfNeeded()
-            await PushRegistrationService.shared.syncCurrentTokenIfPossible()
+            await PushRegistrationService.shared.syncCurrentTokenIfPossible(userID: currentUser?.id)
         }
     }
 
