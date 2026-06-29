@@ -5,6 +5,7 @@ struct RootView: View {
     @State private var session = SessionStore.shared
     @State private var photoStore = ProfilePhotoStore.shared
     @State private var avatarCropStore = ProfileAvatarCropStore.shared
+    @State private var messengerBadgeStore = MessengerBadgeStore.shared
     @Environment(\.layoutDirection) private var systemLayoutDirection
     @Environment(\.scenePhase) private var scenePhase
     @AppStorage("app.language") private var selectedLanguageRawValue = AppLanguage.system.rawValue
@@ -17,6 +18,7 @@ struct RootView: View {
             .environment(session)
             .environment(photoStore)
             .environment(avatarCropStore)
+            .environment(messengerBadgeStore)
             .environment(\.locale, selectedLanguage.locale)
             .environment(\.layoutDirection, selectedLanguage.layoutDirection(system: systemLayoutDirection))
             .preferredColorScheme(selectedTheme.colorScheme)

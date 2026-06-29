@@ -44,6 +44,7 @@ final class SessionStore {
 
         if !user.emailVerified {
             currentProfile = nil
+            MessengerBadgeStore.shared.reset()
             realtimeClient.disconnect()
         }
     }
@@ -59,6 +60,7 @@ final class SessionStore {
     func clearSession() {
         MessengerRealtimeCoordinator.shared.stop()
         realtimeClient.disconnect()
+        MessengerBadgeStore.shared.reset()
 
         if let userID = currentUser?.id {
             ProfilePhotoLocalOrderStore.shared.clear(userID: userID)
@@ -68,6 +70,7 @@ final class SessionStore {
         currentUser = nil
         currentProfile = nil
         pendingVerificationEmail = nil
+        AppStartupWarmupStore.shared.reset()
         ProfilePhotoStore.shared.reset()
     }
 
@@ -77,6 +80,7 @@ final class SessionStore {
 
     func connectRealtimeIfEligible() {
         guard isFullyAuthenticated else {
+            MessengerBadgeStore.shared.reset()
             realtimeClient.disconnect()
             return
         }
@@ -88,6 +92,7 @@ final class SessionStore {
 
     func applicationDidBecomeActive() {
         guard isFullyAuthenticated else {
+            MessengerBadgeStore.shared.reset()
             realtimeClient.disconnect()
             return
         }

@@ -4,12 +4,23 @@ import Foundation
 @Observable
 final class ConversationListViewModel {
 
+    static let shared = ConversationListViewModel()
+
     private(set) var conversations: [ChatConversationPreview] = []
     private(set) var isLoading = false
     var errorMessage: String?
 
     private var didLoad = false
     private var appliedRealtimeMessageIDs: Set<UUID> = []
+
+    func reset() {
+        conversations = []
+        isLoading = false
+        errorMessage = nil
+        didLoad = false
+        appliedRealtimeMessageIDs = []
+        syncMessengerBadge()
+    }
 
     static func preview(
         conversations: [ChatConversationPreview] = ChatUIMockData.conversations,
@@ -50,6 +61,7 @@ final class ConversationListViewModel {
             conversations = response.conversations.map {
                 ChatUIMapping.conversationPreview(from: $0, currentProfileID: profileID)
             }
+            syncMessengerBadge()
             didLoad = true
         } catch let error as NetworkError {
             if let message = MessengerSessionSupport.handleNetworkError(error, session: session, router: router) {
@@ -96,6 +108,7 @@ final class ConversationListViewModel {
         conversations.remove(at: index)
         conversations.insert(updated, at: 0)
         sortConversations()
+        syncMessengerBadge()
         return true
     }
 
@@ -111,6 +124,22 @@ final class ConversationListViewModel {
         }
 
         conversations[index] = conversations[index].replacingActivity(unreadCount: 0)
+        syncMessengerBadge()
+        return true
+    }
+
+    @discardableResult
+    func markConversationReadLocally(conversationID: UUID) -> Bool {
+        guard let index = conversations.firstIndex(where: { $0.id == conversationID }) else {
+            return false
+        }
+
+        guard conversations[index].unreadCount > 0 else {
+            return true
+        }
+
+        conversations[index] = conversations[index].replacingActivity(unreadCount: 0)
+        syncMessengerBadge()
         return true
     }
 
@@ -131,5 +160,9 @@ final class ConversationListViewModel {
         conversations.sort {
             ($0.lastMessageAt ?? .distantPast) > ($1.lastMessageAt ?? .distantPast)
         }
+    }
+
+    private func syncMessengerBadge() {
+        MessengerBadgeStore.shared.setUnreadCount(conversations.reduce(0) { $0 + $1.unreadCount })
     }
 }

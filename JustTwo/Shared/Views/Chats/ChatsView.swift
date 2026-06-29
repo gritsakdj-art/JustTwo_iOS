@@ -15,8 +15,11 @@ struct ChatsView: View {
         var id: UUID { conversation.id }
     }
 
-    init(previewViewModel: ConversationListViewModel? = nil) {
-        _listViewModel = State(initialValue: previewViewModel ?? ConversationListViewModel())
+    init(
+        viewModel: ConversationListViewModel? = nil,
+        previewViewModel: ConversationListViewModel? = nil
+    ) {
+        _listViewModel = State(initialValue: viewModel ?? previewViewModel ?? ConversationListViewModel.shared)
         usesPreviewData = previewViewModel != nil
     }
 

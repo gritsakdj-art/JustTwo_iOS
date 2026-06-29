@@ -92,8 +92,11 @@ struct PrivateChatView: View {
             isPresented: deleteAlertPresented
         ) {
             Button("chats.action.delete", role: .destructive) {
+                let message = viewModel.pendingDeleteMessage
+                viewModel.pendingDeleteMessage = nil
+
                 Task {
-                    await viewModel.deletePendingMessage(session: session, router: router)
+                    await viewModel.deleteConfirmedMessage(message, session: session, router: router)
                 }
             }
             Button("common.cancel", role: .cancel) {

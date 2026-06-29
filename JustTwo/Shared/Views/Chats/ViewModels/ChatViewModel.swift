@@ -114,8 +114,12 @@ final class ChatViewModel {
     }
 
     func requestDelete(_ message: ChatMessage) {
-        pendingDeleteMessage = message
         dismissActionMenu()
+
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(250))
+            pendingDeleteMessage = message
+        }
     }
 
     func send(session: SessionStore, router: AppRouter) async {
@@ -166,6 +170,15 @@ final class ChatViewModel {
     func deletePendingMessage(session: SessionStore, router: AppRouter) async {
         guard let message = pendingDeleteMessage else { return }
         pendingDeleteMessage = nil
+        await deleteConfirmedMessage(message, session: session, router: router)
+    }
+
+    func deleteConfirmedMessage(
+        _ message: ChatMessage?,
+        session: SessionStore,
+        router: AppRouter
+    ) async {
+        guard let message else { return }
         await deleteMessage(message, session: session, router: router)
     }
 

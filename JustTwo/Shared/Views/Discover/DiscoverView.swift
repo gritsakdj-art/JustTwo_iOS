@@ -107,6 +107,7 @@ struct DiscoverView: View {
 
     @Environment(AppRouter.self) private var router
     @Environment(SessionStore.self) private var session
+    @Environment(MessengerBadgeStore.self) private var messengerBadgeStore
     @State private var selectedMode: DiscoverMode = .vibe
     @State private var selectedMood: DiscoverMood = .coffee
     @State private var selectedTab: AppTab = .discover
@@ -115,6 +116,7 @@ struct DiscoverView: View {
     @State private var cardRotation: Double = 0
     @State private var isLiked: Bool = false
     @State private var isPassed: Bool = false
+    @State private var chatsViewModel = ConversationListViewModel.shared
     @Environment(\.colorScheme) private var colorScheme
 
     let profiles: [Profile]
@@ -144,7 +146,7 @@ struct DiscoverView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .environment(\.isDiscoverShell, true)
 
-            AppTabBar(selection: $selectedTab)
+            AppTabBar(selection: $selectedTab, chatsBadgeCount: messengerBadgeStore.unreadCount)
         }
         .background {
             Color.discoverBackgroundGradient
@@ -153,6 +155,11 @@ struct DiscoverView: View {
         .statusBarHidden(false)
         .onAppear {
             selectedTab = router.selectedMainTab
+        }
+        .task {
+            guard session.isFullyAuthenticated else { return }
+            await chatsViewModel.loadIfNeeded(session: session, router: router)
+            chatsViewModel.activateRealtime(session: session, router: router)
         }
         .onChange(of: router.selectedMainTab) { _, newTab in
             selectedTab = newTab
@@ -188,7 +195,7 @@ struct DiscoverView: View {
         case .matches:
             MatchesView()
         case .chats:
-            ChatsView()
+            ChatsView(viewModel: chatsViewModel)
         case .plans:
             PlansView()
         case .profile:

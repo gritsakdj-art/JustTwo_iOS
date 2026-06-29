@@ -50,6 +50,7 @@ final class MessengerRealtimeCoordinator {
     ) {
         activeChatViewModel = viewModel
         activeConversationID = viewModel.conversation.id
+        _ = conversationListViewModel?.markConversationReadLocally(conversationID: viewModel.conversation.id)
         updateContext(session: session, router: router)
         startListeningIfNeeded()
 

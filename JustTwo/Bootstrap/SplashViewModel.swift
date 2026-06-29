@@ -128,9 +128,17 @@ final class SplashViewModel {
             guard flowToken == token else { return }
 
             setPhase(.finishing)
+            if profile != nil {
+                session.connectRealtimeIfEligible()
+                await AppStartupWarmupStore.shared.warmupAuthenticatedHome(
+                    session: session,
+                    router: router
+                )
+            }
+            guard flowToken == token else { return }
+
             await ensureMinimumDisplayDuration(since: startedAt, token: token)
             guard flowToken == token else { return }
-            session.connectRealtimeIfEligible()
             setState(.result(profile == nil ? .needProfileSetup : .ready))
         } catch is CancellationError {
             return

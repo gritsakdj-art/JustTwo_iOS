@@ -55,13 +55,18 @@ enum AppTab: CaseIterable {
 
 struct AppTabBar: View {
     @Binding var selection: AppTab
+    var chatsBadgeCount = 0
 
     private let barCornerRadius: CGFloat = 26
 
     var body: some View {
         HStack(spacing: 0) {
             ForEach(AppTab.allCases, id: \.self) { tab in
-                AppTabBarItem(tab: tab, isSelected: selection == tab) {
+                AppTabBarItem(
+                    tab: tab,
+                    isSelected: selection == tab,
+                    badgeCount: badgeCount(for: tab)
+                ) {
                     withAnimation(.spring(response: 0.25, dampingFraction: 0.72)) {
                         selection = tab
                     }
@@ -77,6 +82,10 @@ struct AppTabBar: View {
         .padding(.horizontal, AppSpacing.lg)
         .padding(.top, 4)
         .padding(.bottom, 6)
+    }
+
+    private func badgeCount(for tab: AppTab) -> Int {
+        tab == .chats ? chatsBadgeCount : 0
     }
 }
 
@@ -125,23 +134,43 @@ private struct AppTabBarGlassBackground: View {
 private struct AppTabBarItem: View {
     let tab: AppTab
     let isSelected: Bool
+    let badgeCount: Int
     let action: () -> Void
     @AppStorage("app.language") private var selectedLanguageRawValue = AppLanguage.system.rawValue
 
     var body: some View {
         Button(action: action) {
             VStack(spacing: 2) {
-                Image(systemName: isSelected ? tab.selectedIcon : tab.icon)
-                    .font(.system(size: 16, weight: isSelected ? .semibold : .regular))
-                    .foregroundStyle(isSelected ? Color.onAccentText : Color.primaryText.opacity(0.42))
-                    .frame(width: 30, height: 30)
-                    .background {
-                        if isSelected {
-                            Color.discoverSelectedGradient
-                                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-                                .shadow(color: Color.discoverViolet.opacity(0.26), radius: 8, x: 0, y: 3)
+                ZStack(alignment: .topTrailing) {
+                    Image(systemName: isSelected ? tab.selectedIcon : tab.icon)
+                        .font(.system(size: 16, weight: isSelected ? .semibold : .regular))
+                        .foregroundStyle(isSelected ? Color.onAccentText : Color.primaryText.opacity(0.42))
+                        .frame(width: 30, height: 30)
+                        .background {
+                            if isSelected {
+                                Color.discoverSelectedGradient
+                                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                                    .shadow(color: Color.discoverViolet.opacity(0.26), radius: 8, x: 0, y: 3)
+                            }
                         }
+
+                    if badgeCount > 0 {
+                        Text(badgeText)
+                            .font(Font.App.manrope(size: 9, weight: .bold))
+                            .foregroundStyle(Color.onAccentText)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.7)
+                            .padding(.horizontal, badgeCount > 9 ? 4 : 0)
+                            .frame(minWidth: 16, minHeight: 16)
+                            .background(Capsule().fill(Color.brandPrimary))
+                            .overlay {
+                                Capsule()
+                                    .stroke(Color.white.opacity(0.85), lineWidth: 1)
+                            }
+                            .offset(x: 8, y: -6)
+                            .accessibilityLabel(Text("\(badgeCount)"))
                     }
+                }
 
                 Text(tab.title)
                     .font(Font.App.manrope(size: 9, weight: isSelected ? .bold : .medium))
@@ -161,6 +190,10 @@ private struct AppTabBarItem: View {
                 dampingFraction: 0.6
             )
         )
+    }
+
+    private var badgeText: String {
+        badgeCount > 99 ? "99+" : "\(badgeCount)"
     }
 }
 
