@@ -272,9 +272,16 @@ struct PrivateChatView: View {
                     .foregroundStyle(Color.primaryText)
                     .lineLimit(1)
 
-                Text("chats.personal")
-                    .font(Font.App.caption())
-                    .foregroundStyle(Color.secondaryText)
+                if viewModel.isOtherParticipantTyping {
+                    Text("chats.typing")
+                        .font(Font.App.caption())
+                        .foregroundStyle(Color.secondaryText)
+                        .italic()
+                } else {
+                    Text("chats.personal")
+                        .font(Font.App.caption())
+                        .foregroundStyle(Color.secondaryText)
+                }
             }
         }
 

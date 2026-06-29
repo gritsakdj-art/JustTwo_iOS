@@ -74,6 +74,8 @@ final class MessengerRealtimeCoordinator {
     func deactivateChat(_ viewModel: ChatViewModel) {
         guard activeChatViewModel === viewModel else { return }
 
+        viewModel.stopTyping()
+
         let conversationID = activeConversationID
         activeChatViewModel = nil
         activeConversationID = nil
@@ -92,6 +94,7 @@ final class MessengerRealtimeCoordinator {
     func stop() {
         eventTask?.cancel()
         eventTask = nil
+        activeChatViewModel?.stopTyping()
         activeChatViewModel = nil
         conversationListViewModel = nil
         session = nil
@@ -148,6 +151,12 @@ final class MessengerRealtimeCoordinator {
 
         case .conversationUpdated(_, let payload):
             handleConversationUpdated(payload)
+
+        case .typingStarted(let conversationID, let profileID):
+            handleTypingStarted(profileID: profileID, conversationID: conversationID)
+
+        case .typingStopped(let conversationID, let profileID):
+            handleTypingStopped(profileID: profileID, conversationID: conversationID)
 
         case .pong, .error, .subscriptionReady, .subscriptionRemoved, .unknown:
             break
@@ -297,6 +306,27 @@ final class MessengerRealtimeCoordinator {
         }
     }
 
+    private func handleTypingStarted(profileID: UUID, conversationID: UUID) {
+        Task { [weak self] in
+            guard let self else { return }
+            let currentProfileID = await self.currentProfileID()
+            await MainActor.run {
+                guard self.activeConversationID == conversationID else { return }
+                if let currentProfileID, profileID == currentProfileID { return }
+                self.activeChatViewModel?.applyTypingStarted(profileID: profileID)
+            }
+        }
+    }
+
+    private func handleTypingStopped(profileID: UUID, conversationID: UUID) {
+        Task { [weak self] in
+            await MainActor.run {
+                guard self?.activeConversationID == conversationID else { return }
+                self?.activeChatViewModel?.applyTypingStopped(profileID: profileID)
+            }
+        }
+    }
+
     private func reconcileAfterReconnect() async {
         guard !isRefreshingAfterReconnect else { return }
         isRefreshingAfterReconnect = true
@@ -306,6 +336,7 @@ final class MessengerRealtimeCoordinator {
 
         await refreshConversations()
         await refreshActiveChat()
+        activeChatViewModel?.clearTypingState()
         await subscribeActiveConversationIfNeeded(force: true)
 
         isRefreshingAfterReconnect = false

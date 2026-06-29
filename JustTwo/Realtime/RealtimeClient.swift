@@ -143,6 +143,14 @@ final class RealtimeClient {
         try await send(.unsubscribe(conversationID: conversationID), using: task)
     }
 
+    func sendTypingStarted(conversationID: UUID) async throws {
+        try await send(.typingStarted(conversationID: conversationID))
+    }
+
+    func sendTypingStopped(conversationID: UUID) async throws {
+        try await send(.typingStopped(conversationID: conversationID))
+    }
+
     private func send(_ message: RealtimeClientMessageDTO) async throws {
         guard let task else {
             throw RealtimeClientError.notConnected

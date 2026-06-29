@@ -10,9 +10,15 @@ final class ChatViewModel {
     let conversation: ChatConversationPreview
 
     private(set) var messages: [ChatMessage] = []
-    var draftText = ""
+    var draftText = "" {
+        didSet {
+            guard draftText != oldValue else { return }
+            handleDraftTextChange(draftText)
+        }
+    }
     private(set) var isLoading = false
     private(set) var isSending = false
+    private(set) var typingProfileIDs: Set<UUID> = []
     var errorMessage: String?
 
     var actionMenuMessage: ChatMessage?
@@ -23,11 +29,22 @@ final class ChatViewModel {
     private var currentProfileID: UUID?
     private var didOpen = false
     private var isRealtimeActive = false
+    private var typingTimeoutTasks: [UUID: Task<Void, Never>] = [:]
+    private let typingEmitter: ChatTypingEmitter
+    private let typingTimeout: TimeInterval = 5
 
     private var messageCache: MessageCacheStore { MessageCacheStore.shared }
 
     init(conversation: ChatConversationPreview) {
         self.conversation = conversation
+        self.typingEmitter = ChatTypingEmitter(conversationID: conversation.id)
+    }
+
+    var isOtherParticipantTyping: Bool {
+        guard let currentProfileID else {
+            return !typingProfileIDs.isEmpty
+        }
+        return typingProfileIDs.contains { $0 != currentProfileID }
     }
 
     static func preview(
@@ -77,7 +94,49 @@ final class ChatViewModel {
     func deactivateRealtime() {
         guard isRealtimeActive else { return }
         isRealtimeActive = false
+        stopTyping()
         MessengerRealtimeCoordinator.shared.deactivateChat(self)
+    }
+
+    func stopTyping() {
+        typingEmitter.chatClosed()
+        clearTypingState()
+    }
+
+    func clearTypingState() {
+        typingProfileIDs.removeAll()
+        for task in typingTimeoutTasks.values {
+            task.cancel()
+        }
+        typingTimeoutTasks.removeAll()
+    }
+
+    func applyTypingStarted(profileID: UUID) {
+        typingProfileIDs.insert(profileID)
+        scheduleTypingTimeout(for: profileID)
+    }
+
+    func applyTypingStopped(profileID: UUID) {
+        typingProfileIDs.remove(profileID)
+        typingTimeoutTasks[profileID]?.cancel()
+        typingTimeoutTasks.removeValue(forKey: profileID)
+    }
+
+    private func handleDraftTextChange(_ text: String) {
+        typingEmitter.textDidChange(text)
+    }
+
+    private func scheduleTypingTimeout(for profileID: UUID) {
+        typingTimeoutTasks[profileID]?.cancel()
+        typingTimeoutTasks[profileID] = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .seconds(self?.typingTimeout ?? 5))
+            guard !Task.isCancelled else { return }
+            self?.applyTypingStopped(profileID: profileID)
+        }
+    }
+
+    private func clearTyping(for profileID: UUID) {
+        applyTypingStopped(profileID: profileID)
     }
 
     func reload(session: SessionStore, router: AppRouter) async {
@@ -161,6 +220,7 @@ final class ChatViewModel {
             }
 
             draftText = ""
+            typingEmitter.messageSent()
             let mapped = ChatUIMapping.message(from: dto, currentProfileID: profileID)
             appendOrReplace(mapped)
             messageCache.upsertMessage(mapped, conversationID: conversation.id)
@@ -319,6 +379,7 @@ final class ChatViewModel {
     @discardableResult
     func applyRealtimeMessage(_ dto: MessageDTO, currentProfileID: UUID) -> Bool {
         self.currentProfileID = currentProfileID
+        clearTyping(for: dto.senderProfileID)
         let message = ChatUIMapping.message(from: dto, currentProfileID: currentProfileID)
         messageCache.upsertMessage(message, conversationID: conversation.id)
         return appendOrReplace(message)

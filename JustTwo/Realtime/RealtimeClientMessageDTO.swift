@@ -27,6 +27,20 @@ struct RealtimeClientMessageDTO: Encodable, Equatable, Sendable {
         )
     }
 
+    static func typingStarted(conversationID: UUID) -> RealtimeClientMessageDTO {
+        RealtimeClientMessageDTO(
+            type: "typing.started",
+            conversationID: conversationID
+        )
+    }
+
+    static func typingStopped(conversationID: UUID) -> RealtimeClientMessageDTO {
+        RealtimeClientMessageDTO(
+            type: "typing.stopped",
+            conversationID: conversationID
+        )
+    }
+
     enum CodingKeys: String, CodingKey {
         case type
         case conversationID

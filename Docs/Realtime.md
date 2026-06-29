@@ -14,8 +14,8 @@ Implemented in PR5:
 
 * authenticated `URLSessionWebSocketTask` connection;
 * `RealtimeConnectionState`;
-* client messages: `ping`, `subscribe.conversation`, `unsubscribe.conversation`;
-* server event decoding for PR2/PR3/PR4 realtime events;
+* client messages: `ping`, `subscribe.conversation`, `unsubscribe.conversation`, `typing.started`, `typing.stopped` (PR7);
+* server event decoding for PR2/PR3/PR4/PR7 realtime events;
 * resilient unknown-event and payload decoding;
 * `AsyncStream` event routing through `RealtimeEventRouter`;
 * reconnect with capped exponential backoff;
@@ -26,12 +26,11 @@ Not implemented in PR5:
 
 * chat UI/store mutation from realtime events;
 * missed-message reconciliation after reconnect;
-* typing indicators;
 * presence;
 * APNs/background push;
 * background WebSocket persistence.
 
-Those belong to later realtime PRs.
+PR6 added messenger UI integration. PR7 added typing indicators in active chat.
 
 ## Lifecycle
 
@@ -68,6 +67,7 @@ Realtime failure does not block login and does not log the user out by itself. R
 * `reaction.removed`;
 * `conversation.read`;
 * `conversation.updated`;
+* `typing.started` / `typing.stopped` (PR7);
 * unknown future event types.
 
 `message.deleted` is intentionally decoded without requiring a message body.

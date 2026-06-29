@@ -151,6 +151,20 @@ struct RealtimeEventDTO: Decodable, Sendable {
                 )
             )
 
+        case "typing.started":
+            guard let id = conversationID ?? payload.conversationID,
+                  let profileID = payload.profileID else {
+                return .unknown(type: type)
+            }
+            return .typingStarted(conversationID: id, profileID: profileID)
+
+        case "typing.stopped":
+            guard let id = conversationID ?? payload.conversationID,
+                  let profileID = payload.profileID else {
+                return .unknown(type: type)
+            }
+            return .typingStopped(conversationID: id, profileID: profileID)
+
         default:
             return .unknown(type: type)
         }
@@ -170,6 +184,8 @@ enum RealtimeEvent: Sendable {
     case reactionRemoved(conversationID: UUID, payload: ReactionRemovedPayload)
     case conversationRead(conversationID: UUID, payload: ConversationReadPayload)
     case conversationUpdated(conversationID: UUID, payload: ConversationUpdatedPayload)
+    case typingStarted(conversationID: UUID, profileID: UUID)
+    case typingStopped(conversationID: UUID, profileID: UUID)
     case unknown(type: String)
 
     var type: String {
@@ -198,6 +214,10 @@ enum RealtimeEvent: Sendable {
             return "conversation.read"
         case .conversationUpdated:
             return "conversation.updated"
+        case .typingStarted:
+            return "typing.started"
+        case .typingStopped:
+            return "typing.stopped"
         case .unknown(let type):
             return type
         }

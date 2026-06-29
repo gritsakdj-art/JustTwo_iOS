@@ -1377,6 +1377,23 @@
         }
       }
     },
+    "chats.typing" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Typing…"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Печатает…"
+          }
+        }
+      }
+    },
     "chats.you" : {
       "extractionState" : "manual",
       "localizations" : {
