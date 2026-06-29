@@ -129,6 +129,7 @@ final class SplashViewModel {
             setPhase(.finishing)
             if profile != nil {
                 session.connectRealtimeIfEligible()
+                session.syncPushRegistrationIfEligible()
                 await AppStartupWarmupStore.shared.warmupAuthenticatedHome(
                     session: session,
                     router: router

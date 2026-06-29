@@ -9,13 +9,18 @@ struct PrivateChatView: View {
     @Environment(AppRouter.self) private var router
 
     private let usesPreviewData: Bool
+    private let targetMessageID: UUID?
 
     @State private var bottomChromeHeight: CGFloat = 72
+    @State private var didScrollToTargetMessage = false
+    @State private var initialScrollTask: Task<Void, Never>?
 
     init(
         conversation: ChatConversationPreview,
+        targetMessageID: UUID? = nil,
         previewViewModel: ChatViewModel? = nil
     ) {
+        self.targetMessageID = targetMessageID
         if let previewViewModel {
             _viewModel = State(initialValue: previewViewModel)
             usesPreviewData = true
@@ -233,14 +238,23 @@ struct PrivateChatView: View {
                 .padding(.bottom, 8)
             }
             .scrollIndicators(.hidden)
-            .onChange(of: viewModel.messages.count) { _, _ in
-                scrollToBottom(proxy, animated: true)
+            .onChange(of: viewModel.isLoading) { wasLoading, isLoading in
+                guard wasLoading, !isLoading else { return }
+                scheduleScrollToVisiblePosition(proxy, animated: false)
+            }
+            .onChange(of: viewModel.messages.last?.id) { oldValue, newValue in
+                guard oldValue != nil, newValue != nil else { return }
+                scheduleScrollToVisiblePosition(proxy, animated: true)
             }
             .onChange(of: bottomInset) { _, _ in
-                scrollToBottom(proxy, animated: false)
+                scheduleScrollToVisiblePosition(proxy, animated: false)
             }
             .onAppear {
-                scrollToBottom(proxy, animated: false)
+                scheduleScrollToVisiblePosition(proxy, animated: false)
+            }
+            .onDisappear {
+                initialScrollTask?.cancel()
+                initialScrollTask = nil
             }
         }
     }
@@ -275,14 +289,46 @@ struct PrivateChatView: View {
         }
     }
 
-    private func scrollToBottom(_ proxy: ScrollViewProxy, animated: Bool) {
-        guard !viewModel.messages.isEmpty else { return }
+    private func scheduleScrollToVisiblePosition(_ proxy: ScrollViewProxy, animated: Bool) {
+        initialScrollTask?.cancel()
+        initialScrollTask = Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(64))
+            guard !Task.isCancelled else { return }
+            scrollToTargetMessage(proxy, animated: animated)
+            scrollToBottom(proxy, animated: animated)
+        }
+    }
+
+    private func scrollToTargetMessage(_ proxy: ScrollViewProxy, animated: Bool) {
+        guard !didScrollToTargetMessage,
+              let targetMessageID,
+              viewModel.messages.contains(where: { $0.id == targetMessageID }) else {
+            return
+        }
+
+        didScrollToTargetMessage = true
         if animated {
             withAnimation(.easeOut(duration: 0.25)) {
-                proxy.scrollTo(Self.bottomAnchorID, anchor: .bottom)
+                proxy.scrollTo(targetMessageID, anchor: .center)
             }
         } else {
+            proxy.scrollTo(targetMessageID, anchor: .center)
+        }
+    }
+
+    private func scrollToBottom(_ proxy: ScrollViewProxy, animated: Bool) {
+        guard targetMessageID == nil || didScrollToTargetMessage else { return }
+        guard let lastMessageID = viewModel.messages.last?.id else { return }
+
+        let scroll = {
+            proxy.scrollTo(lastMessageID, anchor: .bottom)
             proxy.scrollTo(Self.bottomAnchorID, anchor: .bottom)
+        }
+
+        if animated {
+            withAnimation(.easeOut(duration: 0.25), scroll)
+        } else {
+            scroll()
         }
     }
 }

@@ -39,6 +39,8 @@ extension EncodableAPIRequest {
     }
 }
 
+struct EmptyResponse: Decodable, Sendable {}
+
 enum JSONCoding {
     static let encoder: JSONEncoder = {
         let encoder = JSONEncoder()

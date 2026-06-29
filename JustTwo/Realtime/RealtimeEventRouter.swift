@@ -13,13 +13,12 @@ final class RealtimeEventRouter {
 
     func stream() -> AsyncStream<RealtimeEvent> {
         let id = UUID()
-        let router = self
 
         return AsyncStream { continuation in
             continuations[id] = continuation
-            continuation.onTermination = { [weak router, id] _ in
+            continuation.onTermination = { [id] _ in
                 Task { @MainActor in
-                    router?.removeContinuation(id)
+                    RealtimeEventRouter.shared.removeContinuation(id)
                 }
             }
         }

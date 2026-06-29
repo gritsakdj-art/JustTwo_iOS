@@ -1,15 +1,21 @@
 import SwiftUI
+import UserNotifications
 
 struct GeneralSettingsView: View {
     @AppStorage("app.language") private var selectedLanguageRawValue = AppLanguage.system.rawValue
     @AppStorage("app.theme") private var selectedThemeRawValue = AppTheme.system.rawValue
+    @AppStorage(MessageNotificationPreferences.messagesEnabledKey) private var messagesEnabled = false
+    @AppStorage(MessageNotificationPreferences.messagePreviewEnabledKey) private var messagePreviewEnabled = true
     @State private var expandedPicker: SettingsPickerKind?
+    @State private var authorizationStatus: UNAuthorizationStatus = .notDetermined
+    @State private var isRequestingPermission = false
 
     var body: some View {
         ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: AppSpacing.lg) {
                 themePicker
                 languagePicker
+                notificationsSection
             }
             .id(selectedLanguageRawValue)
             .padding(.horizontal, AppSpacing.xl)
@@ -20,6 +26,9 @@ struct GeneralSettingsView: View {
         .discoverShellBackground()
         .localizedNavigationTitle("profile.menu.general_settings")
         .toolbarBackground(.hidden, for: .navigationBar)
+        .task {
+            authorizationStatus = await MessengerNotificationService.shared.authorizationStatus()
+        }
     }
 
     private var selectedLanguage: AppLanguage {
@@ -104,6 +113,106 @@ struct GeneralSettingsView: View {
                 togglePicker(.language)
             }
         )
+    }
+
+    private var notificationsSection: some View {
+        VStack(alignment: .leading, spacing: AppSpacing.sm) {
+            Text("settings.notifications.section")
+                .font(Font.App.manrope(size: 13, weight: .bold))
+                .foregroundStyle(Color.secondaryText)
+                .textCase(.uppercase)
+                .padding(.horizontal, 4)
+
+            VStack(spacing: 0) {
+                notificationToggleRow(
+                    title: "settings.notifications.messages.title",
+                    subtitle: "settings.notifications.messages.subtitle",
+                    isOn: $messagesEnabled,
+                    disabled: isRequestingPermission
+                )
+                .onChange(of: messagesEnabled) { _, isEnabled in
+                    guard isEnabled else { return }
+                    Task {
+                        await handleMessagesToggleEnabled()
+                    }
+                }
+
+                SettingsPickerDivider()
+
+                notificationToggleRow(
+                    title: "settings.notifications.preview.title",
+                    subtitle: "settings.notifications.preview.subtitle",
+                    isOn: $messagePreviewEnabled,
+                    disabled: !messagesEnabled || isRequestingPermission
+                )
+            }
+            .background(Color.cardSurface, in: RoundedRectangle(cornerRadius: AppCornerRadius.card, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: AppCornerRadius.card, style: .continuous)
+                    .stroke(Color.hairline, lineWidth: 1)
+            )
+            .shadow(color: Color.discoverCardShadow.opacity(0.08), radius: 24, x: 0, y: 10)
+
+            if authorizationStatus == .denied {
+                Text("settings.notifications.permission_denied")
+                    .font(Font.App.footnote())
+                    .foregroundStyle(Color.error)
+                    .padding(.horizontal, 4)
+            }
+        }
+    }
+
+    private func notificationToggleRow(
+        title: LocalizedStringResource,
+        subtitle: LocalizedStringResource,
+        isOn: Binding<Bool>,
+        disabled: Bool
+    ) -> some View {
+        HStack(alignment: .top, spacing: AppSpacing.sm) {
+            Image(systemName: "bell.badge.fill")
+                .font(.system(size: 17, weight: .semibold))
+                .foregroundStyle(Color.brandPrimary)
+                .frame(width: 38, height: 38)
+                .background(Color.elevatedSurface, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(Font.App.manrope(size: 16, weight: .semibold))
+                    .foregroundStyle(Color.primaryText)
+
+                Text(subtitle)
+                    .font(Font.App.caption(size: 12, weight: .medium))
+                    .foregroundStyle(Color.secondaryText)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            Spacer(minLength: AppSpacing.sm)
+
+            Toggle(title, isOn: isOn)
+                .labelsHidden()
+                .tint(Color.discoverViolet)
+                .disabled(disabled)
+        }
+        .frame(minHeight: 60)
+        .padding(.horizontal, AppSpacing.sm)
+        .padding(.vertical, 2)
+    }
+
+    private func handleMessagesToggleEnabled() async {
+        isRequestingPermission = true
+        defer { isRequestingPermission = false }
+
+        let granted = await MessengerNotificationService.shared.requestAuthorization()
+        authorizationStatus = await MessengerNotificationService.shared.authorizationStatus()
+
+        if granted {
+            let session = SessionStore.shared
+            let router = AppRouter.shared
+            session.connectRealtimeIfEligible()
+            ConversationListViewModel.shared.activateRealtime(session: session, router: router)
+        } else {
+            messagesEnabled = false
+        }
     }
 
     private var pickerDivider: some View {

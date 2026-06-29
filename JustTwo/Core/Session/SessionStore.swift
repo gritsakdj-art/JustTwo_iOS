@@ -36,6 +36,7 @@ final class SessionStore {
         pendingVerificationEmail = user.emailVerified ? nil : user.email
 
         connectRealtimeIfEligible()
+        syncPushRegistrationIfEligible()
     }
 
     func setCurrentUser(_ user: UserResponse) {
@@ -58,6 +59,11 @@ final class SessionStore {
     }
 
     func clearSession() {
+        let pushUnregisterToken = APIAuth.accessToken
+        Task { @MainActor in
+            await PushRegistrationService.shared.unregisterCurrentDevice(accessToken: pushUnregisterToken)
+        }
+
         MessengerRealtimeCoordinator.shared.stop()
         realtimeClient.disconnect()
         MessengerBadgeStore.shared.reset()
@@ -90,6 +96,15 @@ final class SessionStore {
         }
     }
 
+    func syncPushRegistrationIfEligible() {
+        guard isFullyAuthenticated else { return }
+
+        Task { @MainActor in
+            await PushRegistrationService.shared.requestAuthorizationIfNeeded()
+            await PushRegistrationService.shared.syncCurrentTokenIfPossible()
+        }
+    }
+
     func applicationDidBecomeActive() {
         guard isFullyAuthenticated else {
             MessengerBadgeStore.shared.reset()
@@ -98,6 +113,7 @@ final class SessionStore {
         }
 
         realtimeClient.applicationDidBecomeActive()
+        syncPushRegistrationIfEligible()
     }
 
     func applicationDidEnterBackground() {

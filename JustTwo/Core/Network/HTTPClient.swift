@@ -19,6 +19,10 @@ struct HTTPClient: Sendable {
 
         switch httpResponse.statusCode {
         case 200...299:
+            if data.isEmpty, R.Response.self == EmptyResponse.self {
+                return EmptyResponse() as! R.Response
+            }
+
             do {
                 return try JSONCoding.decoder.decode(R.Response.self, from: data)
             } catch {

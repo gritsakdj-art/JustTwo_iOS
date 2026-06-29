@@ -22,6 +22,12 @@ final class RealtimeClient {
     private var explicitDisconnect = true
     private var isDisconnectingExplicitly = false
     private var foregroundAllowed = true
+    private var pendingSubscribeConversationIDs: Set<UUID> = []
+    private var pendingUnsubscribeConversationIDs: Set<UUID> = []
+    private var keepaliveTask: Task<Void, Never>?
+    private var needsForegroundReconnect = false
+
+    private let backgroundKeepaliveInterval: TimeInterval = 20
 
     init(
         configuration: APIConfiguration = .current,
@@ -87,14 +93,24 @@ final class RealtimeClient {
 
     func applicationDidBecomeActive() {
         foregroundAllowed = true
+        stopBackgroundKeepalive()
+
         Task { [weak self] in
-            await self?.connectIfPossible()
+            await self?.refreshConnectionAfterForeground()
         }
     }
 
     func applicationDidEnterBackground() {
-        foregroundAllowed = false
-        disconnect(shouldReconnect: false)
+        guard shouldMaintainBackgroundConnection else {
+            stopBackgroundKeepalive()
+            foregroundAllowed = false
+            disconnect(shouldReconnect: false)
+            return
+        }
+
+        NetworkDebug.log("Realtime background disconnect skipped: message notifications enabled")
+        needsForegroundReconnect = true
+        startBackgroundKeepalive()
     }
 
     func sendPing() async throws {
@@ -102,11 +118,29 @@ final class RealtimeClient {
     }
 
     func subscribe(conversationID: UUID) async throws {
-        try await send(.subscribe(conversationID: conversationID))
+        pendingUnsubscribeConversationIDs.remove(conversationID)
+
+        guard let task else {
+            pendingSubscribeConversationIDs.insert(conversationID)
+            NetworkDebug.log("Realtime subscribe queued until connected: \(conversationID)")
+            throw RealtimeClientError.notConnected
+        }
+
+        pendingSubscribeConversationIDs.remove(conversationID)
+        try await send(.subscribe(conversationID: conversationID), using: task)
     }
 
     func unsubscribe(conversationID: UUID) async throws {
-        try await send(.unsubscribe(conversationID: conversationID))
+        pendingSubscribeConversationIDs.remove(conversationID)
+
+        guard let task else {
+            pendingUnsubscribeConversationIDs.insert(conversationID)
+            NetworkDebug.log("Realtime unsubscribe queued until connected: \(conversationID)")
+            throw RealtimeClientError.notConnected
+        }
+
+        pendingUnsubscribeConversationIDs.remove(conversationID)
+        try await send(.unsubscribe(conversationID: conversationID), using: task)
     }
 
     private func send(_ message: RealtimeClientMessageDTO) async throws {
@@ -114,6 +148,10 @@ final class RealtimeClient {
             throw RealtimeClientError.notConnected
         }
 
+        try await send(message, using: task)
+    }
+
+    private func send(_ message: RealtimeClientMessageDTO, using task: URLSessionWebSocketTask) async throws {
         let data = try JSONCoding.encoder.encode(message)
         guard let text = String(data: data, encoding: .utf8) else {
             throw RealtimeClientError.encodingFailed
@@ -185,6 +223,9 @@ final class RealtimeClient {
             reconnectAttempt = 0
             state = .connected(connectionID: payload.connectionID)
             NetworkDebug.log("Realtime connection ready")
+            Task { [weak self] in
+                await self?.flushPendingSubscriptions()
+            }
 
         case .error(let payload) where payload.code == "unauthorized":
             state = .failed(message: payload.message)
@@ -214,7 +255,11 @@ final class RealtimeClient {
         NetworkDebug.logError(error, prefix: "Realtime receive failed")
         task = nil
         receiveTask = nil
-        scheduleReconnectIfNeeded()
+
+        let isTimeout = ns.domain == NSURLErrorDomain && ns.code == NSURLErrorTimedOut
+        scheduleReconnectIfNeeded(
+            immediate: isTimeout && shouldMaintainBackgroundConnection
+        )
     }
 
     private func disconnect(shouldReconnect: Bool) {
@@ -222,12 +267,15 @@ final class RealtimeClient {
         isDisconnectingExplicitly = !shouldReconnect
         reconnectTask?.cancel()
         reconnectTask = nil
+        stopBackgroundKeepalive()
 
         receiveTask?.cancel()
         receiveTask = nil
 
         task?.cancel(with: .normalClosure, reason: nil)
         task = nil
+        pendingSubscribeConversationIDs.removeAll()
+        pendingUnsubscribeConversationIDs.removeAll()
 
         if shouldReconnect {
             isDisconnectingExplicitly = false
@@ -243,8 +291,8 @@ final class RealtimeClient {
         explicitDisconnect || isDisconnectingExplicitly
     }
 
-    private func scheduleReconnectIfNeeded() {
-        guard !explicitDisconnect, foregroundAllowed else {
+    private func scheduleReconnectIfNeeded(immediate: Bool = false) {
+        guard !explicitDisconnect, foregroundAllowed || shouldMaintainBackgroundConnection else {
             state = .disconnected
             return
         }
@@ -258,14 +306,16 @@ final class RealtimeClient {
 
         reconnectAttempt += 1
         let attempt = reconnectAttempt
-        let delay = reconnectPolicy.delay(forAttempt: attempt)
+        let delay = immediate ? 0 : reconnectPolicy.delay(forAttempt: attempt)
         state = .reconnecting(attempt: attempt)
 
         NetworkDebug.log("Realtime reconnect scheduled attempt=\(attempt) delay=\(delay)s")
 
         reconnectTask = Task { [weak self] in
-            let nanoseconds = UInt64(delay * 1_000_000_000)
-            try? await Task.sleep(nanoseconds: nanoseconds)
+            if delay > 0 {
+                let nanoseconds = UInt64(delay * 1_000_000_000)
+                try? await Task.sleep(nanoseconds: nanoseconds)
+            }
 
             await MainActor.run {
                 guard let self, !Task.isCancelled else { return }
@@ -273,6 +323,94 @@ final class RealtimeClient {
                 Task { [weak self] in
                     await self?.connectIfPossible()
                 }
+            }
+        }
+    }
+
+    private var shouldMaintainBackgroundConnection: Bool {
+        MessageNotificationPreferences.messagesEnabled
+    }
+
+    private func refreshConnectionAfterForeground() async {
+        defer { needsForegroundReconnect = false }
+
+        if needsForegroundReconnect {
+            NetworkDebug.log("Realtime foreground refresh reconnect started")
+            if task != nil {
+                disconnect(shouldReconnect: false)
+            }
+            await connectIfPossible()
+            return
+        }
+
+        if task == nil {
+            await connectIfPossible()
+            return
+        }
+
+        do {
+            try await sendPing()
+            NetworkDebug.log("Realtime foreground ping succeeded")
+        } catch {
+            NetworkDebug.logError(error, prefix: "Realtime foreground ping failed, reconnecting")
+            disconnect(shouldReconnect: false)
+            await connectIfPossible()
+        }
+    }
+
+    private func startBackgroundKeepalive() {
+        stopBackgroundKeepalive()
+
+        keepaliveTask = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(self?.backgroundKeepaliveInterval ?? 20))
+                guard !Task.isCancelled else { return }
+
+                await MainActor.run {
+                    guard let self, self.task != nil else { return }
+
+                    Task {
+                        do {
+                            try await self.sendPing()
+                            NetworkDebug.log("Realtime background ping succeeded")
+                        } catch {
+                            NetworkDebug.logError(error, prefix: "Realtime background ping failed")
+                            self.handleReceiveError(error)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private func stopBackgroundKeepalive() {
+        keepaliveTask?.cancel()
+        keepaliveTask = nil
+    }
+
+    private func flushPendingSubscriptions() async {
+        guard let task else { return }
+
+        let subscribeIDs = pendingSubscribeConversationIDs
+        let unsubscribeIDs = pendingUnsubscribeConversationIDs
+        pendingSubscribeConversationIDs.removeAll()
+        pendingUnsubscribeConversationIDs.removeAll()
+
+        for conversationID in unsubscribeIDs {
+            do {
+                try await send(.unsubscribe(conversationID: conversationID), using: task)
+                NetworkDebug.log("Realtime flushed queued unsubscribe: \(conversationID)")
+            } catch {
+                NetworkDebug.logError(error, prefix: "Realtime flushed unsubscribe failed")
+            }
+        }
+
+        for conversationID in subscribeIDs {
+            do {
+                try await send(.subscribe(conversationID: conversationID), using: task)
+                NetworkDebug.log("Realtime flushed queued subscribe: \(conversationID)")
+            } catch {
+                NetworkDebug.logError(error, prefix: "Realtime flushed subscribe failed")
             }
         }
     }
