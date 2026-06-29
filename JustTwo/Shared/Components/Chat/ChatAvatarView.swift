@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 struct ChatAvatarView: View {
     let title: String
@@ -6,27 +7,62 @@ struct ChatAvatarView: View {
     let photoID: UUID?
     var size: CGFloat = 52
 
+    @State private var displayedImage: UIImage?
+
     var body: some View {
         Group {
-            if let photoURL {
-                AsyncImage(url: photoURL) { phase in
-                    switch phase {
-                    case .success(let image):
-                        image
-                            .resizable()
-                            .scaledToFill()
-                    case .failure, .empty:
-                        initialsPlaceholder
-                    @unknown default:
-                        initialsPlaceholder
-                    }
-                }
+            if let resolvedImage {
+                Image(uiImage: resolvedImage)
+                    .resizable()
+                    .scaledToFill()
             } else {
                 initialsPlaceholder
             }
         }
         .frame(width: size, height: size)
         .clipShape(Circle())
+        .task(id: loadTaskID) {
+            await loadImageIfNeeded()
+        }
+    }
+
+    private var resolvedImage: UIImage? {
+        displayedImage ?? cachedImage
+    }
+
+    private var cachedImage: UIImage? {
+        guard let photoID else { return nil }
+        return ChatPartnerAvatarCache.image(for: photoID)
+    }
+
+    private var loadTaskID: String {
+        "\(photoID?.uuidString ?? "none")-\(photoURL?.absoluteString ?? "none")"
+    }
+
+    @MainActor
+    private func loadImageIfNeeded() async {
+        if let cachedImage {
+            displayedImage = cachedImage
+            return
+        }
+
+        guard let photoURL else { return }
+
+        do {
+            let (data, response) = try await URLSession.shared.data(from: photoURL)
+            guard let http = response as? HTTPURLResponse,
+                  (200..<300).contains(http.statusCode),
+                  let image = UIImage(data: data) else {
+                return
+            }
+
+            if let photoID {
+                ProfilePhotoImageCache.shared.save(image, for: photoID)
+            }
+            displayedImage = image
+        } catch {
+            return
+        }
     }
 
     private var initialsPlaceholder: some View {

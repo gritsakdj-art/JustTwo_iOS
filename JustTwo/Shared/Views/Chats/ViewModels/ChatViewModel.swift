@@ -24,13 +24,15 @@ final class ChatViewModel {
     private var didOpen = false
     private var isRealtimeActive = false
 
+    private var messageCache: MessageCacheStore { MessageCacheStore.shared }
+
     init(conversation: ChatConversationPreview) {
         self.conversation = conversation
     }
 
     static func preview(
         conversation: ChatConversationPreview,
-        messages: [ChatMessage] = ChatUIMockData.messages(for: ChatUIMockData.conversations[0].id)
+        messages: [ChatMessage]
     ) -> ChatViewModel {
         let viewModel = ChatViewModel(conversation: conversation)
         viewModel.messages = messages
@@ -38,8 +40,15 @@ final class ChatViewModel {
         return viewModel
     }
 
+    static func preview(conversation: ChatConversationPreview) -> ChatViewModel {
+        preview(
+            conversation: conversation,
+            messages: ChatUIMockData.messages(for: ChatUIMockData.conversations[0].id)
+        )
+    }
+
     var composeBannerMode: ChatComposeBanner.Mode? {
-        if let editingMessage {
+        if editingMessage != nil {
             return .edit
         }
         if let replyTarget {
@@ -138,8 +147,8 @@ final class ChatViewModel {
             currentProfileID = profileID
 
             let dto: MessageDTO
-            if let editingMessage {
-                dto = try await MessageService.editMessage(messageID: editingMessage.id, body: trimmed)
+            if let editing = editingMessage {
+                dto = try await MessageService.editMessage(messageID: editing.id, body: trimmed)
                 self.editingMessage = nil
             } else {
                 dto = try await MessageService.sendMessage(
@@ -152,7 +161,9 @@ final class ChatViewModel {
             }
 
             draftText = ""
-            appendOrReplace(ChatUIMapping.message(from: dto, currentProfileID: profileID))
+            let mapped = ChatUIMapping.message(from: dto, currentProfileID: profileID)
+            appendOrReplace(mapped)
+            messageCache.upsertMessage(mapped, conversationID: conversation.id)
             await markRead(session: session, router: router)
         } catch let error as NetworkError {
             if error.isUserBlocked {
@@ -206,7 +217,9 @@ final class ChatViewModel {
                 dto = try await MessageService.addReaction(messageID: message.id, emoji: rawEmoji)
             }
 
-            appendOrReplace(ChatUIMapping.message(from: dto, currentProfileID: profileID))
+            let mapped = ChatUIMapping.message(from: dto, currentProfileID: profileID)
+            appendOrReplace(mapped)
+            messageCache.upsertMessage(mapped, conversationID: conversation.id)
         } catch let error as NetworkError {
             if let message = MessengerSessionSupport.handleNetworkError(error, session: session, router: router) {
                 errorMessage = message
@@ -235,7 +248,9 @@ final class ChatViewModel {
             currentProfileID = profileID
 
             let dto = try await MessageService.deleteMessage(messageID: message.id)
-            appendOrReplace(ChatUIMapping.message(from: dto, currentProfileID: profileID))
+            let mapped = ChatUIMapping.message(from: dto, currentProfileID: profileID)
+            appendOrReplace(mapped)
+            messageCache.upsertMessage(mapped, conversationID: conversation.id)
 
             if editingMessage?.id == message.id {
                 cancelCompose()
@@ -254,16 +269,28 @@ final class ChatViewModel {
     }
 
     private func loadMessages(session: SessionStore, router: AppRouter) async {
-        isLoading = messages.isEmpty
+        if let cached = messageCache.messages(for: conversation.id), !cached.isEmpty {
+            messages = cached
+            isLoading = false
+        } else {
+            isLoading = true
+        }
         errorMessage = nil
 
         do {
             let profileID = try await MessengerSessionSupport.resolveCurrentProfileID(session: session)
             currentProfileID = profileID
 
-            let response = try await MessageService.fetchMessages(conversationID: conversation.id)
-            messages = response.messages.map {
-                ChatUIMapping.message(from: $0, currentProfileID: profileID)
+            let loaded = await messageCache.loadRecentMessagesIfNeeded(
+                conversationID: conversation.id,
+                limit: MessengerLimits.defaultMessagePageSize,
+                session: session,
+                router: router,
+                force: true
+            )
+            messages = loaded
+            if let cacheError = messageCache.entry(for: conversation.id)?.errorMessage {
+                errorMessage = cacheError
             }
         } catch let error as NetworkError {
             if let message = MessengerSessionSupport.handleNetworkError(error, session: session, router: router) {
@@ -292,7 +319,9 @@ final class ChatViewModel {
     @discardableResult
     func applyRealtimeMessage(_ dto: MessageDTO, currentProfileID: UUID) -> Bool {
         self.currentProfileID = currentProfileID
-        return appendOrReplace(ChatUIMapping.message(from: dto, currentProfileID: currentProfileID))
+        let message = ChatUIMapping.message(from: dto, currentProfileID: currentProfileID)
+        messageCache.upsertMessage(message, conversationID: conversation.id)
+        return appendOrReplace(message)
     }
 
     @discardableResult
@@ -301,7 +330,9 @@ final class ChatViewModel {
             return false
         }
 
-        messages[index] = messages[index].markingDeleted(deletedAt: payload.deletedAt)
+        let updated = messages[index].markingDeleted(deletedAt: payload.deletedAt)
+        messages[index] = updated
+        messageCache.upsertMessage(updated, conversationID: conversation.id)
 
         if editingMessage?.id == payload.messageID {
             cancelCompose()
@@ -341,6 +372,7 @@ final class ChatViewModel {
         }
 
         messages[index] = messages[index].replacingReactions(reactions.sorted { $0.displayEmoji < $1.displayEmoji })
+        messageCache.upsertMessage(messages[index], conversationID: conversation.id)
         return true
     }
 
@@ -373,6 +405,7 @@ final class ChatViewModel {
         }
 
         messages[index] = messages[index].replacingReactions(reactions)
+        messageCache.upsertMessage(messages[index], conversationID: conversation.id)
         return true
     }
 
@@ -384,9 +417,11 @@ final class ChatViewModel {
                 return false
             }
             messages[index] = message
+            messageCache.upsertMessage(message, conversationID: conversation.id)
             return false
         } else {
             messages.append(message)
+            messageCache.upsertMessage(message, conversationID: conversation.id)
             return true
         }
     }

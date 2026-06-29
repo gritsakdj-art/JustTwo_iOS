@@ -14,7 +14,7 @@ enum ChatUIMockData {
             avatarURL: nil,
             avatarPhotoID: nil,
             lastMessageText: "Saturday works for me too!",
-            lastSenderName: String(localized: "chats.you"),
+            lastSenderName: "You",
             lastMessageAt: Date().addingTimeInterval(-1_200),
             unreadCount: 0
         ),
@@ -43,8 +43,8 @@ enum ChatUIMockData {
             title: "Alex",
             avatarURL: nil,
             avatarPhotoID: nil,
-            lastMessageText: String(localized: "chats.messageDeleted"),
-            lastSenderName: String(localized: "chats.you"),
+            lastMessageText: "Message deleted",
+            lastSenderName: "You",
             lastMessageAt: Date().addingTimeInterval(-96_000),
             unreadCount: 0
         ),

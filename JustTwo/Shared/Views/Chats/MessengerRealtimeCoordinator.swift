@@ -19,11 +19,18 @@ final class MessengerRealtimeCoordinator {
     private var isRefreshingAfterReconnect = false
 
     init(
-        realtimeClient: RealtimeClient = .shared,
-        eventRouter: RealtimeEventRouter = .shared
+        realtimeClient: RealtimeClient,
+        eventRouter: RealtimeEventRouter
     ) {
         self.realtimeClient = realtimeClient
         self.eventRouter = eventRouter
+    }
+
+    private convenience init() {
+        self.init(
+            realtimeClient: RealtimeClient.shared,
+            eventRouter: RealtimeEventRouter.shared
+        )
     }
 
     func activateConversationList(
@@ -154,6 +161,12 @@ final class MessengerRealtimeCoordinator {
                         currentProfileID: profileID
                     ) ?? false
                     NetworkDebug.log(inserted ? "Messenger realtime message.created applied" : "Messenger realtime duplicate/updated message.created handled")
+                } else if let profileID {
+                    _ = MessageCacheStore.shared.applyRealtimeMessage(
+                        message,
+                        conversationID: conversationID,
+                        currentProfileID: profileID
+                    )
                 }
 
                 if let profileID {
@@ -181,6 +194,12 @@ final class MessengerRealtimeCoordinator {
                 if self.activeConversationID == conversationID, let profileID {
                     _ = self.activeChatViewModel?.applyRealtimeMessage(message, currentProfileID: profileID)
                     NetworkDebug.log("Messenger realtime message.edited applied")
+                } else if let profileID {
+                    _ = MessageCacheStore.shared.applyRealtimeMessage(
+                        message,
+                        conversationID: conversationID,
+                        currentProfileID: profileID
+                    )
                 }
 
                 self.refreshConversationsFromRealtime()
@@ -195,37 +214,57 @@ final class MessengerRealtimeCoordinator {
                 refreshActiveChatFromRealtime()
             }
             NetworkDebug.log("Messenger realtime message.deleted applied")
+        } else {
+            _ = MessageCacheStore.shared.markMessageDeleted(
+                conversationID: conversationID,
+                messageID: payload.messageID,
+                deletedAt: payload.deletedAt
+            )
         }
 
         refreshConversationsFromRealtime()
     }
 
     private func handleReactionAdded(_ payload: ReactionAddedPayload, conversationID: UUID) {
-        guard activeConversationID == conversationID else { return }
-
-        let applied = activeChatViewModel?.applyRealtimeReactionAdded(payload) ?? false
-        if !applied {
-            refreshActiveChatFromRealtime()
+        if activeConversationID == conversationID {
+            let applied = activeChatViewModel?.applyRealtimeReactionAdded(payload) ?? false
+            if !applied {
+                refreshActiveChatFromRealtime()
+            }
+            NetworkDebug.log("Messenger realtime reaction.added applied")
+        } else {
+            _ = MessageCacheStore.shared.applyRealtimeReactionAdded(payload, conversationID: conversationID)
         }
-        NetworkDebug.log("Messenger realtime reaction.added applied")
     }
 
     private func handleReactionRemoved(_ payload: ReactionRemovedPayload, conversationID: UUID) {
-        guard activeConversationID == conversationID else { return }
+        if activeConversationID == conversationID {
+            Task { [weak self] in
+                guard let self else { return }
+                let profileID = await self.currentProfileID()
 
-        Task { [weak self] in
-            guard let self else { return }
-            let profileID = await self.currentProfileID()
-
-            await MainActor.run {
-                let applied = self.activeChatViewModel?.applyRealtimeReactionRemoved(
-                    payload,
-                    currentProfileID: profileID
-                ) ?? false
-                if !applied {
-                    self.refreshActiveChatFromRealtime()
+                await MainActor.run {
+                    let applied = self.activeChatViewModel?.applyRealtimeReactionRemoved(
+                        payload,
+                        currentProfileID: profileID
+                    ) ?? false
+                    if !applied {
+                        self.refreshActiveChatFromRealtime()
+                    }
+                    NetworkDebug.log("Messenger realtime reaction.removed applied")
                 }
-                NetworkDebug.log("Messenger realtime reaction.removed applied")
+            }
+        } else {
+            Task { [weak self] in
+                guard let self else { return }
+                let profileID = await self.currentProfileID()
+                await MainActor.run {
+                    _ = MessageCacheStore.shared.applyRealtimeReactionRemoved(
+                        payload,
+                        conversationID: conversationID,
+                        currentProfileID: profileID
+                    )
+                }
             }
         }
     }

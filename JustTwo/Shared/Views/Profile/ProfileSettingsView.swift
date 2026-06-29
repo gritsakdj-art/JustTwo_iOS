@@ -673,6 +673,12 @@ struct ProfileSettingsView: View {
 
                 switch context {
                 case .onboarding:
+                    session.connectRealtimeIfEligible()
+                    await AppStartupCoordinator.shared.runCriticalWarmup(
+                        session: session,
+                        router: router,
+                        force: true
+                    )
                     router.resetTo(.main)
                     router.presentPendingInviteIfNeeded()
                 case .settings:

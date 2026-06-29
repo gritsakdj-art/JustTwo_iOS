@@ -82,6 +82,15 @@
 - Added `Docs/InviteLinks.md` with endpoint contracts, deep link rules, file map, and manual test notes.
 - Verified iOS build with `xcodebuild`.
 
+### Startup loading and message cache
+
+- Split splash warmup into `AppStartupCoordinator` and focused startup loaders.
+- Added `ProfileStartupLoader`, `ProfilePhotosStartupLoader`, `ConversationsStartupLoader`, and `MessagesStartupLoader`.
+- Added `MessageCacheStore` for background preload and instant chat open from cache.
+- Wired realtime handlers to update inactive conversation message cache.
+- Fixed onboarding profile completion to run the same critical warmup as cold start.
+- Added `Docs/StartupLoading.md` and startup/cache unit tests.
+
 ## 2026-06-19
 
 ### Auth account lifecycle (verified)

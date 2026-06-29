@@ -40,6 +40,10 @@ struct ProfileView: View {
             .localizedNavigationTitle("tab.profile")
             .toolbarBackground(.hidden, for: .navigationBar)
             .task {
+                guard photoStore.photos.isEmpty else {
+                    await loadEditorSourceImage()
+                    return
+                }
                 await photoStore.loadPhotos()
                 await loadEditorSourceImage()
             }

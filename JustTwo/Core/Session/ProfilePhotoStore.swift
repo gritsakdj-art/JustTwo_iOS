@@ -15,6 +15,7 @@ final class ProfilePhotoStore {
     private(set) var primaryPhotoRevision = 0
 
     private var hasLoaded = false
+    private var loadTask: Task<Void, Never>?
     private let imageCache = ProfilePhotoImageCache.shared
 
     var primaryPhoto: ProfilePhotoDTO? {
@@ -40,6 +41,8 @@ final class ProfilePhotoStore {
     private init() {}
 
     func reset() {
+        loadTask?.cancel()
+        loadTask = nil
         photos = []
         hasLoaded = false
         isLoading = false
@@ -63,22 +66,44 @@ final class ProfilePhotoStore {
     }
 
     func loadPhotos(force: Bool = false) async {
-        guard force || !hasLoaded else { return }
-
-        isLoading = true
-        lastErrorMessage = nil
-
-        do {
-            photos = try await fetchPhotosFromServer()
-            hasLoaded = true
-            await cachePrimaryPhotoIfNeeded()
-        } catch let error as NetworkError {
-            lastErrorMessage = error.userMessage
-        } catch {
-            lastErrorMessage = error.localizedDescription
+        if !force, hasLoaded {
+            return
         }
 
-        isLoading = false
+        if let loadTask, !force {
+            await loadTask.value
+            return
+        }
+
+        if force {
+            loadTask?.cancel()
+            loadTask = nil
+            hasLoaded = false
+        }
+
+        let task = Task { @MainActor in
+            isLoading = true
+            lastErrorMessage = nil
+
+            do {
+                photos = try await fetchPhotosFromServer()
+                hasLoaded = true
+                await cachePrimaryPhotoIfNeeded()
+            } catch let error as NetworkError {
+                lastErrorMessage = error.userMessage
+            } catch {
+                lastErrorMessage = error.localizedDescription
+            }
+
+            isLoading = false
+        }
+
+        loadTask = task
+        await task.value
+
+        if loadTask == task {
+            loadTask = nil
+        }
     }
 
     @discardableResult

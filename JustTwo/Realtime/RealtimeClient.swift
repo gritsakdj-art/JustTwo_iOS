@@ -1,10 +1,11 @@
 import Foundation
 
 @MainActor
-@Observable
 final class RealtimeClient {
 
-    static let shared = RealtimeClient(router: .shared)
+    static let shared = RealtimeClient(
+        router: RealtimeEventRouter.shared
+    )
 
     private(set) var state: RealtimeConnectionState = .disconnected
 
@@ -14,9 +15,9 @@ final class RealtimeClient {
     private let reconnectPolicy: RealtimeReconnectPolicy
     private let tokenProvider: @MainActor () -> String?
 
-    nonisolated(unsafe) private var task: URLSessionWebSocketTask?
-    nonisolated(unsafe) private var receiveTask: Task<Void, Never>?
-    nonisolated(unsafe) private var reconnectTask: Task<Void, Never>?
+    private var task: URLSessionWebSocketTask?
+    private var receiveTask: Task<Void, Never>?
+    private var reconnectTask: Task<Void, Never>?
     private var reconnectAttempt = 0
     private var explicitDisconnect = true
     private var isDisconnectingExplicitly = false
@@ -34,12 +35,6 @@ final class RealtimeClient {
         self.router = router
         self.reconnectPolicy = reconnectPolicy
         self.tokenProvider = tokenProvider
-    }
-
-    deinit {
-        receiveTask?.cancel()
-        reconnectTask?.cancel()
-        task?.cancel(with: .normalClosure, reason: nil)
     }
 
     func connect(jwt: String) async {
@@ -146,7 +141,10 @@ final class RealtimeClient {
                 } catch is CancellationError {
                     return
                 } catch {
-                    await self?.handleReceiveError(error)
+                    guard let self else { return }
+                    await MainActor.run {
+                        self.handleReceiveError(error)
+                    }
                     return
                 }
             }

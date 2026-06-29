@@ -198,3 +198,5 @@ Related chat polish shipped with this flow:
 * `PrivateChatView` shows the partner avatar in the navigation bar trailing slot.
 * `ChatBubbleView` enforces a minimum bubble width so timestamps stay inside the bubble.
 * `ChatPatternBackground` tiles `Assets.xcassets/ChatPattern` over `discoverBackgroundGradient` with `brandPrimaryGradient` at 25% opacity.
+
+For splash warmup, conversation preload, and message cache behavior see [Startup loading flow](StartupLoading.md).

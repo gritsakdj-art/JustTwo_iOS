@@ -50,6 +50,7 @@ struct ProfilePhotosView: View {
             }
         }
         .task {
+            guard photoStore.photos.isEmpty else { return }
             await photoStore.loadPhotos()
         }
         .photosPicker(isPresented: $isShowingPhotoPicker, selection: $selectedItem, matching: .images)

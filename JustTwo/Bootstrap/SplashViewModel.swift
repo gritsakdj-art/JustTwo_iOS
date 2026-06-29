@@ -123,8 +123,7 @@ final class SplashViewModel {
             }
 
             setPhase(.loadingProfile)
-            let profile = try await ProfileService.fetchMyProfile()
-            session.updateCurrentProfile(profile)
+            let profile = try await ProfileStartupLoader.shared.loadIfNeeded(session: session)
             guard flowToken == token else { return }
 
             setPhase(.finishing)

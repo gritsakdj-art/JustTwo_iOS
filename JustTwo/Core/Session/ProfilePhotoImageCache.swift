@@ -12,7 +12,7 @@ final class ProfilePhotoImageCache {
     private let avatarFallbackFileName = "avatar-fallback.jpg"
 
     private init() {
-        memoryCache.countLimit = 12
+        memoryCache.countLimit = 48
     }
 
     private var cacheDirectory: URL {

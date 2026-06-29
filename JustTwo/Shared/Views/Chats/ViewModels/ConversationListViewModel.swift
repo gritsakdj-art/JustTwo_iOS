@@ -11,9 +11,12 @@ final class ConversationListViewModel {
     var errorMessage: String?
 
     private var didLoad = false
+    private var refreshTask: Task<Void, Never>?
     private var appliedRealtimeMessageIDs: Set<UUID> = []
 
     func reset() {
+        refreshTask?.cancel()
+        refreshTask = nil
         conversations = []
         isLoading = false
         errorMessage = nil
@@ -23,7 +26,7 @@ final class ConversationListViewModel {
     }
 
     static func preview(
-        conversations: [ChatConversationPreview] = ChatUIMockData.conversations,
+        conversations: [ChatConversationPreview],
         isLoading: Bool = false,
         errorMessage: String? = nil
     ) -> ConversationListViewModel {
@@ -33,6 +36,17 @@ final class ConversationListViewModel {
         viewModel.errorMessage = errorMessage
         viewModel.didLoad = true
         return viewModel
+    }
+
+    static func preview(
+        isLoading: Bool = false,
+        errorMessage: String? = nil
+    ) -> ConversationListViewModel {
+        preview(
+            conversations: ChatUIMockData.conversations,
+            isLoading: isLoading,
+            errorMessage: errorMessage
+        )
     }
 
     func loadIfNeeded(session: SessionStore, router: AppRouter) async {
@@ -49,6 +63,22 @@ final class ConversationListViewModel {
     }
 
     func refresh(session: SessionStore, router: AppRouter) async {
+        if let refreshTask {
+            await refreshTask.value
+            return
+        }
+
+        let task = Task { @MainActor in
+            await performRefresh(session: session, router: router)
+        }
+        refreshTask = task
+        await task.value
+        if refreshTask == task {
+            refreshTask = nil
+        }
+    }
+
+    private func performRefresh(session: SessionStore, router: AppRouter) async {
         let showLoading = conversations.isEmpty
         if showLoading {
             isLoading = true
@@ -63,6 +93,7 @@ final class ConversationListViewModel {
             }
             syncMessengerBadge()
             didLoad = true
+            ConversationAvatarsStartupLoader.shared.preloadRemainingIfNeeded(for: conversations)
         } catch let error as NetworkError {
             if let message = MessengerSessionSupport.handleNetworkError(error, session: session, router: router) {
                 errorMessage = message

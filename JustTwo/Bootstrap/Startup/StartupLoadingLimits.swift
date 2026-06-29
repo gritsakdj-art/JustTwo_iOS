@@ -1,0 +1,7 @@
+import Foundation
+
+enum StartupLoadingLimits {
+    nonisolated static let preloadConversationCount = 15
+    nonisolated static let preloadMessagesPerConversation = 10
+    nonisolated static let preloadCriticalAvatarCount = 10
+}
