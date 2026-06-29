@@ -3,6 +3,8 @@ import SwiftData
 
 @main
 struct JustTwoApp: App {
+    @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
+
     var sharedModelContainer: ModelContainer = {
         let schema = Schema([
             Item.self,
@@ -25,6 +27,7 @@ struct JustTwoApp: App {
 
     init() {
         AppFontRegistrar.registerFonts()
+        PushRegistrationService.shared.configure()
     }
 
     var body: some Scene {

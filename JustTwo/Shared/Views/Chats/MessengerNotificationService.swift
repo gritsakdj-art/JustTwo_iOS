@@ -14,7 +14,6 @@ final class MessengerNotificationService {
     }
 
     private let center = UNUserNotificationCenter.current()
-    private let delegate = NotificationDelegate()
     private weak var router: AppRouter?
     private var lastFireAtByConversation: [UUID: Date] = [:]
     private let minInterval: TimeInterval = 1.0
@@ -23,12 +22,11 @@ final class MessengerNotificationService {
 
     func configure(router: AppRouter) {
         self.router = router
-        delegate.onOpenMessage = { [weak self] conversationID, messageID in
+        PushRegistrationService.shared.onOpenMessage = { [weak self] conversationID, messageID in
             Task { @MainActor in
                 self?.handleNotificationTap(conversationID: conversationID, messageID: messageID)
             }
         }
-        center.delegate = delegate
 
         Task {
             await requestAuthIfNeeded()
@@ -183,32 +181,5 @@ final class MessengerNotificationService {
         } catch {
             return nil
         }
-    }
-}
-
-private final class NotificationDelegate: NSObject, UNUserNotificationCenterDelegate {
-
-    var onOpenMessage: ((UUID, UUID) -> Void)?
-
-    func userNotificationCenter(
-        _ center: UNUserNotificationCenter,
-        willPresent notification: UNNotification
-    ) async -> UNNotificationPresentationOptions {
-        [.banner, .sound, .badge]
-    }
-
-    func userNotificationCenter(
-        _ center: UNUserNotificationCenter,
-        didReceive response: UNNotificationResponse
-    ) async {
-        let userInfo = response.notification.request.content.userInfo
-        guard let conversationRaw = userInfo[MessengerNotificationService.PayloadKey.conversationID] as? String,
-              let messageRaw = userInfo[MessengerNotificationService.PayloadKey.messageID] as? String,
-              let conversationID = UUID(uuidString: conversationRaw),
-              let messageID = UUID(uuidString: messageRaw) else {
-            return
-        }
-
-        onOpenMessage?(conversationID, messageID)
     }
 }
