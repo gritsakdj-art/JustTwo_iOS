@@ -37,8 +37,15 @@ enum AuthService {
         )
     }
 
-    static func currentUser() async throws -> UserResponse {
-        try await NetworkExecutor.shared.send(CurrentUserRequest())
+    static func currentUser(
+        strategies: [NetworkStrategy] = NetworkStrategy.defaultFlow,
+        configuration: APIConfiguration = .current
+    ) async throws -> UserResponse {
+        try await NetworkExecutor.shared.send(
+            CurrentUserRequest(),
+            strategies: strategies,
+            configuration: configuration
+        )
     }
 
     static func refreshCurrentUser() async throws -> UserResponse {

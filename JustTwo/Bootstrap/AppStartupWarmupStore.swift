@@ -22,6 +22,10 @@ final class AppStartupWarmupStore {
         await coordinator.runCriticalWarmup(session: session, router: router, force: force)
     }
 
+    func scheduleAuthenticatedHomeWarmup(session: SessionStore, router: AppRouter, force: Bool = false) {
+        coordinator.scheduleAuthenticatedHomeWarmup(session: session, router: router, force: force)
+    }
+
     func reset() {
         coordinator.reset()
     }

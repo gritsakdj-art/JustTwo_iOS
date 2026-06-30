@@ -2,9 +2,16 @@ import Foundation
 
 enum ProfileService {
 
-    static func fetchMyProfile() async throws -> UserProfileDTO? {
+    static func fetchMyProfile(
+        strategies: [NetworkStrategy] = NetworkStrategy.defaultFlow,
+        configuration: APIConfiguration = .current
+    ) async throws -> UserProfileDTO? {
         do {
-            let response = try await NetworkExecutor.shared.send(GetProfileRequest())
+            let response = try await NetworkExecutor.shared.send(
+                GetProfileRequest(),
+                strategies: strategies,
+                configuration: configuration
+            )
             return response.profile
         } catch let error as NetworkError where error.isProfileNotFound {
             return nil

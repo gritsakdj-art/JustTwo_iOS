@@ -5864,7 +5864,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Server is temporarily unavailable"
+            "value" : "Can't reach server"
           }
         },
         "es" : {
@@ -5888,7 +5888,7 @@
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Сервер временно недоступен"
+            "value" : "Не удаётся подключиться к серверу"
           }
         }
       }
@@ -5911,7 +5911,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Request timed out"
+            "value" : "Server not responding"
           }
         },
         "es" : {
@@ -5935,7 +5935,7 @@
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Превышено время ожидания"
+            "value" : "Сервер не отвечает"
           }
         }
       }
@@ -12021,7 +12021,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "The server is temporarily unavailable."
+            "value" : "Can't reach the server. Try another network or VPN."
           }
         },
         "es" : {
@@ -12045,7 +12045,7 @@
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Сервер временно недоступен."
+            "value" : "Не удаётся подключиться к серверу. Попробуй другую сеть или VPN."
           }
         }
       }
@@ -12068,7 +12068,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "The server is taking too long to respond."
+            "value" : "The server isn't responding. Check your connection or try another network."
           }
         },
         "es" : {
@@ -12092,7 +12092,7 @@
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Сервер слишком долго не отвечает."
+            "value" : "Сервер не отвечает. Проверь соединение или попробуй другую сеть."
           }
         }
       }
@@ -12328,6 +12328,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Загружаем профиль…"
+          }
+        }
+      }
+    },
+    "splash.phase.loading_chats" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Loading chats…"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Загружаем чаты…"
           }
         }
       }

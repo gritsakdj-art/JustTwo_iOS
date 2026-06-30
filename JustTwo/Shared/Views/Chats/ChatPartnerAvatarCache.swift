@@ -14,7 +14,7 @@ enum ChatPartnerAvatarCache {
         guard let url = conversation.avatarURL else { return }
 
         do {
-            let (data, response) = try await URLSession.shared.data(from: url)
+            let (data, response) = try await ImageDownloadClient.data(from: url)
             guard let http = response as? HTTPURLResponse,
                   (200..<300).contains(http.statusCode),
                   let uiImage = UIImage(data: data) else {

@@ -38,6 +38,8 @@ final class AppStartupCoordinator {
         isRunningCritical = true
         defer { isRunningCritical = false }
 
+        NetworkDebug.log("Startup critical warmup started user=\(userID)")
+
         let task = Task { @MainActor in
             await withTaskGroup(of: Void.self) { group in
                 group.addTask {
@@ -57,6 +59,8 @@ final class AppStartupCoordinator {
 
             let conversations = ConversationListViewModel.shared.conversations
             await ConversationAvatarsStartupLoader.shared.preloadCritical(for: conversations)
+
+            NetworkDebug.log("Startup critical warmup finished user=\(userID)")
         }
 
         criticalTask = task
@@ -66,6 +70,16 @@ final class AppStartupCoordinator {
             criticalTask = nil
             warmedUserID = userID
             scheduleBackgroundWarmup(session: session, router: router, force: force)
+        }
+    }
+
+    func scheduleAuthenticatedHomeWarmup(
+        session: SessionStore,
+        router: AppRouter,
+        force: Bool = false
+    ) {
+        Task { @MainActor in
+            await runCriticalWarmup(session: session, router: router, force: force)
         }
     }
 

@@ -49,7 +49,7 @@ struct ChatAvatarView: View {
         guard let photoURL else { return }
 
         do {
-            let (data, response) = try await URLSession.shared.data(from: photoURL)
+            let (data, response) = try await ImageDownloadClient.data(from: photoURL)
             guard let http = response as? HTTPURLResponse,
                   (200..<300).contains(http.statusCode),
                   let image = UIImage(data: data) else {

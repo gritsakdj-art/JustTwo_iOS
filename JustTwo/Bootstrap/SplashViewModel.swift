@@ -12,6 +12,7 @@ final class SplashViewModel {
     private var didStart = false
     private var flowToken = UUID()
     private var flowTask: Task<Void, Never>?
+    private var networkWatchID: UUID?
 
     private enum Timing {
         static let minimumDisplayDuration: Duration = .milliseconds(900)
@@ -29,11 +30,13 @@ final class SplashViewModel {
     }
 
     func retry() {
+        stopNetworkWatch()
         didStart = false
         start(force: true)
     }
 
     func cancel() {
+        stopNetworkWatch()
         flowTask?.cancel()
         flowTask = nil
     }
@@ -91,9 +94,11 @@ final class SplashViewModel {
         func setPhase(_ newPhase: Phase) {
             guard flowToken == token else { return }
             phase = newPhase
+            NetworkDebug.log("Splash phase → \(newPhase.logLabel)")
         }
 
         let startedAt = ContinuousClock.now
+        NetworkDebug.log("Splash flow started")
 
         do {
             setState(.loading)
@@ -106,28 +111,37 @@ final class SplashViewModel {
                 session.clearSession()
                 await ensureMinimumDisplayDuration(since: startedAt, token: token)
                 guard flowToken == token else { return }
+                logFlowFinished(since: startedAt, result: "needAuth")
                 setState(.result(.needAuth))
                 return
             }
 
             setPhase(.loadingUser)
-            let user = try await AuthService.currentUser()
+            let user = try await AuthService.currentUser(
+                strategies: SplashStartupPolicy.authStrategies,
+                configuration: .splash
+            )
             session.setCurrentUser(user)
             guard flowToken == token else { return }
 
             guard user.emailVerified else {
                 await ensureMinimumDisplayDuration(since: startedAt, token: token)
                 guard flowToken == token else { return }
+                logFlowFinished(since: startedAt, result: "needEmailVerification")
                 setState(.result(.needEmailVerification(email: user.email)))
                 return
             }
 
             setPhase(.loadingProfile)
-            let profile = try await ProfileStartupLoader.shared.loadIfNeeded(session: session)
+            let profile = try await ProfileStartupLoader.shared.loadIfNeeded(
+                session: session,
+                strategies: SplashStartupPolicy.authStrategies,
+                configuration: .splash
+            )
             guard flowToken == token else { return }
 
-            setPhase(.finishing)
             if profile != nil {
+                setPhase(.loadingChats)
                 session.connectRealtimeIfEligible()
                 session.syncPushRegistrationIfEligible()
                 await AppStartupWarmupStore.shared.warmupAuthenticatedHome(
@@ -137,21 +151,49 @@ final class SplashViewModel {
             }
             guard flowToken == token else { return }
 
+            stopNetworkWatch()
             await ensureMinimumDisplayDuration(since: startedAt, token: token)
             guard flowToken == token else { return }
-            setState(.result(profile == nil ? .needProfileSetup : .ready))
+            let result: SplashResult = profile == nil ? .needProfileSetup : .ready
+            logFlowFinished(since: startedAt, result: String(describing: result))
+            setState(.result(result))
         } catch is CancellationError {
             return
         } catch let error as NetworkError where error.shouldClearSession {
             NetworkDebug.logError(error)
             session.clearSession()
+            stopNetworkWatch()
             await ensureMinimumDisplayDuration(since: startedAt, token: token)
             guard flowToken == token else { return }
             setState(.result(.needAuth))
         } catch let error as NetworkError {
+            NetworkDebug.log("Splash flow failed phase=\(phase.logLabel) error=\(error)")
+            NetworkDebug.logError(error, prefix: "Splash")
             setState(.networkError(error))
+            beginNetworkWatchForAutoRetry(token: token)
         } catch {
-            setState(.networkError(NetworkError.map(error)))
+            let mapped = NetworkError.map(error)
+            NetworkDebug.log("Splash flow failed phase=\(phase.logLabel) error=\(mapped)")
+            NetworkDebug.logError(error, prefix: "Splash")
+            setState(.networkError(mapped))
+            beginNetworkWatchForAutoRetry(token: token)
+        }
+    }
+
+    private func beginNetworkWatchForAutoRetry(token: UUID) {
+        stopNetworkWatch()
+        networkWatchID = NetworkPathMonitor.shared.registerPathChangeHandler { [weak self] in
+            guard let self, self.flowToken == token else { return }
+            guard case .networkError = self.state else { return }
+            NetworkDebug.log("Splash auto-retry: network path changed")
+            self.retry()
+        }
+    }
+
+    private func stopNetworkWatch() {
+        if let networkWatchID {
+            NetworkPathMonitor.shared.unregisterHandler(networkWatchID)
+            self.networkWatchID = nil
         }
     }
 
@@ -167,6 +209,15 @@ final class SplashViewModel {
         try? await Task.sleep(for: remaining)
         guard flowToken == token else { return }
     }
+
+    private func logFlowFinished(since startedAt: ContinuousClock.Instant, result: String) {
+        let elapsed = startedAt.duration(to: .now)
+        let milliseconds = Double(elapsed.components.seconds) * 1_000
+            + Double(elapsed.components.attoseconds) / 1_000_000_000_000_000
+        NetworkDebug.log(
+            "Splash flow finished result=\(result) in \(String(format: "%.0f", milliseconds))ms"
+        )
+    }
 }
 
 extension SplashViewModel {
@@ -175,6 +226,7 @@ extension SplashViewModel {
         case restoringSession
         case loadingUser
         case loadingProfile
+        case loadingChats
         case finishing
 
         var title: LocalizedStringResource {
@@ -185,8 +237,25 @@ extension SplashViewModel {
                 return "splash.phase.loading_user"
             case .loadingProfile:
                 return "splash.phase.loading_profile"
+            case .loadingChats:
+                return "splash.phase.loading_chats"
             case .finishing:
                 return "splash.phase.finishing"
+            }
+        }
+
+        var logLabel: String {
+            switch self {
+            case .restoringSession:
+                return "restoringSession"
+            case .loadingUser:
+                return "loadingUser"
+            case .loadingProfile:
+                return "loadingProfile"
+            case .loadingChats:
+                return "loadingChats"
+            case .finishing:
+                return "finishing"
             }
         }
     }

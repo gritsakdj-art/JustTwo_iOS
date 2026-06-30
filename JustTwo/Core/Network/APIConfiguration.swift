@@ -20,12 +20,22 @@ enum APIEnvironment: Sendable {
 }
 
 struct APIConfiguration: Sendable {
-    nonisolated static let current = APIConfiguration(environment: .staging)
+    nonisolated static let current = APIConfiguration(
+        environment: .staging,
+        requestTimeout: 20,
+        resourceTimeout: 60
+    )
+
+    nonisolated static let splash = APIConfiguration(
+        environment: .staging,
+        requestTimeout: 10,
+        resourceTimeout: 15
+    )
 
     let environment: APIEnvironment
+    let requestTimeout: TimeInterval
+    let resourceTimeout: TimeInterval
 
     nonisolated var baseURL: URL { environment.baseURL }
     nonisolated var realtimeWebSocketURL: URL { environment.realtimeWebSocketURL }
-    nonisolated var requestTimeout: TimeInterval { 20 }
-    nonisolated var resourceTimeout: TimeInterval { 60 }
 }

@@ -11,6 +11,7 @@ enum NetworkDebug {
     nonisolated static func logError(_ error: Error, prefix: String = "❌") {
         #if DEBUG
         log("\(prefix) \(type(of: error)): \(error.localizedDescription)")
+        log(URLErrorDiagnostics.summary(for: error))
 
         let ns = error as NSError
         if !ns.userInfo.isEmpty {

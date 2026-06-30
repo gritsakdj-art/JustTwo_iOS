@@ -93,6 +93,8 @@ extension NetworkError {
                 return .timeout
             case NSURLErrorNetworkConnectionLost:
                 return .connectionLost
+            case NSURLErrorCannotLoadFromNetwork:
+                return .serverUnavailable
             case NSURLErrorCannotFindHost,
                  NSURLErrorCannotConnectToHost,
                  NSURLErrorDNSLookupFailed:

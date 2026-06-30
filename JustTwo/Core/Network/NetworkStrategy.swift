@@ -6,6 +6,8 @@ enum NetworkStrategy: Sendable {
     case ephemeral
     case forcedFresh
     case lastResort
+    case splashPrimary
+    case splashEphemeral
 
     nonisolated var name: String {
         switch self {
@@ -17,6 +19,10 @@ enum NetworkStrategy: Sendable {
             return "forcedFresh"
         case .lastResort:
             return "lastResort"
+        case .splashPrimary:
+            return "splashPrimary"
+        case .splashEphemeral:
+            return "splashEphemeral"
         }
     }
 
@@ -30,6 +36,10 @@ enum NetworkStrategy: Sendable {
             return URLSessionProvider.forcedFreshSession
         case .lastResort:
             return URLSessionProvider.lastResortSession
+        case .splashPrimary:
+            return URLSessionProvider.splashSession
+        case .splashEphemeral:
+            return URLSessionProvider.splashEphemeralSession
         }
     }
 
@@ -43,5 +53,11 @@ enum NetworkStrategy: Sendable {
     nonisolated static let lightFlow: [NetworkStrategy] = [
         .primary,
         .ephemeral
+    ]
+
+    /// Short timeouts for splash auth probes (~10s per attempt).
+    nonisolated static let splashFlow: [NetworkStrategy] = [
+        .splashPrimary,
+        .splashEphemeral
     ]
 }

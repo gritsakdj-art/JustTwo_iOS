@@ -18,6 +18,7 @@ final class MessengerRealtimeCoordinator {
     private var subscribedConversationID: UUID?
     private var conversationListSubscriptionIDs: Set<UUID> = []
     private var isRefreshingAfterReconnect = false
+    private var connectAndSyncGeneration = 0
 
     init(
         realtimeClient: RealtimeClient,
@@ -45,12 +46,7 @@ final class MessengerRealtimeCoordinator {
         conversationListViewModel = viewModel
         updateContext(session: session, router: router)
         startListeningIfNeeded()
-        session.connectRealtimeIfEligible()
-
-        Task { [weak self] in
-            await self?.session?.realtimeClient.connectIfPossible()
-            self?.syncConversationListSubscriptions()
-        }
+        scheduleConnectAndSyncSubscriptions()
     }
 
     func deactivateConversationList(_ viewModel: ConversationListViewModel) {
@@ -107,12 +103,25 @@ final class MessengerRealtimeCoordinator {
         subscribedConversationID = nil
         conversationListSubscriptionIDs = []
         isRefreshingAfterReconnect = false
+        connectAndSyncGeneration += 1
         presenceStore.clearAll()
     }
 
     private func updateContext(session: SessionStore, router: AppRouter) {
         self.session = session
         self.router = router
+    }
+
+    private func scheduleConnectAndSyncSubscriptions() {
+        connectAndSyncGeneration += 1
+        let generation = connectAndSyncGeneration
+
+        Task { [weak self] in
+            guard let self else { return }
+            await self.session?.realtimeClient.connectIfPossible()
+            guard generation == self.connectAndSyncGeneration else { return }
+            self.syncConversationListSubscriptions()
+        }
     }
 
     private func startListeningIfNeeded() {

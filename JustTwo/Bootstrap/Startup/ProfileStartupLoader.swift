@@ -10,7 +10,12 @@ final class ProfileStartupLoader {
 
     private init() {}
 
-    func loadIfNeeded(session: SessionStore, force: Bool = false) async throws -> UserProfileDTO? {
+    func loadIfNeeded(
+        session: SessionStore,
+        force: Bool = false,
+        strategies: [NetworkStrategy] = NetworkStrategy.defaultFlow,
+        configuration: APIConfiguration = .current
+    ) async throws -> UserProfileDTO? {
         guard let userID = session.currentUser?.id else { return nil }
 
         if !force, loadedForUserID == userID {
@@ -28,7 +33,10 @@ final class ProfileStartupLoader {
         }
 
         let task = Task { @MainActor () throws -> UserProfileDTO? in
-            let profile = try await ProfileService.fetchMyProfile()
+            let profile = try await ProfileService.fetchMyProfile(
+                strategies: strategies,
+                configuration: configuration
+            )
             session.updateCurrentProfile(profile)
             return profile
         }

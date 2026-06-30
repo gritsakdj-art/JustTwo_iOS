@@ -57,8 +57,20 @@ actor NetworkExecutor {
 
                     let ns = error as NSError
                     if ns.domain == NSURLErrorDomain, ns.code == NSURLErrorCancelled {
-                        NetworkDebug.log("⛔️ [\(opID)] URLSession cancelled")
-                        throw CancellationError()
+                        if Task.isCancelled {
+                            NetworkDebug.log("⛔️ [\(opID)] task cancelled")
+                            throw CancellationError()
+                        }
+                        NetworkDebug.log("⚠️ [\(opID)] URLSession cancelled without task cancel, will retry if possible")
+                        lastError = error
+                        guard attempt < strategies.count else {
+                            throw NetworkError.connectionLost
+                        }
+                        NetworkDebug.log(
+                            "🔁 [\(opID)] switching strategy → \(strategies[attempt].name) after \(delay / 1_000_000)ms"
+                        )
+                        try await Task.sleep(nanoseconds: delay)
+                        continue
                     }
 
                     lastError = error
