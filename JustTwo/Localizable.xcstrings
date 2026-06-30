@@ -4465,6 +4465,114 @@
         }
       }
     },
+    "invite.link.mode.invite" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : { "stringUnit" : { "state" : "translated", "value" : "دعوة" } },
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Einladen" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Invite" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Invitar" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Inviter" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Invita" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Пригласить" } }
+      }
+    },
+    "invite.link.mode.join" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : { "stringUnit" : { "state" : "translated", "value" : "انضم" } },
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Beitreten" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Join" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Unirse" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Rejoindre" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Unisciti" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Присоединиться" } }
+      }
+    },
+    "invite.join.headline" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : { "stringUnit" : { "state" : "translated", "value" : "الانضمام إلى محادثة" } },
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Einem Chat beitreten" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Join a chat" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Unirse a un chat" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Rejoindre un chat" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Unisciti a una chat" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Присоединиться к чату" } }
+      }
+    },
+    "invite.join.subtitle" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : { "stringUnit" : { "state" : "translated", "value" : "الصق رابط الدعوة الذي أرسله لك شخص آخر" } },
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Füge einen Einladungslink ein, den du von jemandem erhalten hast" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Paste an invite link that someone sent you" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Pega un enlace de invitación que alguien te envió" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Collez un lien d'invitation que quelqu'un vous a envoyé" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Incolla un link di invito che qualcuno ti ha inviato" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Вставьте ссылку-приглашение, которую вам отправили" } }
+      }
+    },
+    "invite.join.paste_clipboard" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : { "stringUnit" : { "state" : "translated", "value" : "لصق من الحافظة" } },
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Aus Zwischenablage einfügen" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Paste from clipboard" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Pegar del portapapeles" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Coller depuis le presse-papiers" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Incolla dagli appunti" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Вставить из буфера" } }
+      }
+    },
+    "invite.join.open_button" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : { "stringUnit" : { "state" : "translated", "value" : "فتح الدعوة" } },
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Einladung öffnen" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Open invite" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Abrir invitación" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Ouvrir l'invitation" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Apri invito" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Открыть приглашение" } }
+      }
+    },
+    "invite.join.scan_button" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : { "stringUnit" : { "state" : "translated", "value" : "مسح QR" } },
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "QR scannen" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Scan QR code" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Escanear QR" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Scanner le QR" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Scansiona QR" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Сканировать QR" } }
+      }
+    },
+    "invite.join.scan.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : { "stringUnit" : { "state" : "translated", "value" : "مسح رمز QR" } },
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "QR-Code scannen" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Scan QR code" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Escanear código QR" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Scanner le code QR" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Scansiona codice QR" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Сканирование QR" } }
+      }
+    },
+    "invite.join.scan.unsupported" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : { "stringUnit" : { "state" : "translated", "value" : "المسح غير متاح على هذا الجهاز." } },
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Scannen ist auf diesem Gerät nicht verfügbar." } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Scanning isn't available on this device." } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "El escaneo no está disponible en este dispositivo." } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Le scan n'est pas disponible sur cet appareil." } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "La scansione non è disponibile su questo dispositivo." } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Сканирование недоступно на этом устройстве." } }
+      }
+    },
     "invite.link.paste.section" : {
       "extractionState" : "manual",
       "localizations" : {
