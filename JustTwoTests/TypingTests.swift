@@ -193,6 +193,7 @@ struct TypingTests {
         ChatConversationPreview(
             id: id,
             title: "Taylor",
+            otherParticipantProfileID: fixedOtherProfileID(),
             avatarURL: nil,
             avatarPhotoID: nil,
             lastMessageText: nil,

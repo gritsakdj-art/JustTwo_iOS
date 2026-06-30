@@ -12,6 +12,7 @@ final class MessengerRealtimeCoordinator {
 
     private let realtimeClient: RealtimeClient
     private let eventRouter: RealtimeEventRouter
+    private let presenceStore: PresenceStore
     private var eventTask: Task<Void, Never>?
     private var activeConversationID: UUID?
     private var subscribedConversationID: UUID?
@@ -20,16 +21,19 @@ final class MessengerRealtimeCoordinator {
 
     init(
         realtimeClient: RealtimeClient,
-        eventRouter: RealtimeEventRouter
+        eventRouter: RealtimeEventRouter,
+        presenceStore: PresenceStore
     ) {
         self.realtimeClient = realtimeClient
         self.eventRouter = eventRouter
+        self.presenceStore = presenceStore
     }
 
     private convenience init() {
         self.init(
             realtimeClient: RealtimeClient.shared,
-            eventRouter: RealtimeEventRouter.shared
+            eventRouter: RealtimeEventRouter.shared,
+            presenceStore: .shared
         )
     }
 
@@ -103,6 +107,7 @@ final class MessengerRealtimeCoordinator {
         subscribedConversationID = nil
         conversationListSubscriptionIDs = []
         isRefreshingAfterReconnect = false
+        presenceStore.clearAll()
     }
 
     private func updateContext(session: SessionStore, router: AppRouter) {
@@ -157,6 +162,9 @@ final class MessengerRealtimeCoordinator {
 
         case .typingStopped(let conversationID, let profileID):
             handleTypingStopped(profileID: profileID, conversationID: conversationID)
+
+        case .presenceChanged(let payload):
+            handlePresenceChanged(payload)
 
         case .pong, .error, .subscriptionReady, .subscriptionRemoved, .unknown:
             break
@@ -327,12 +335,26 @@ final class MessengerRealtimeCoordinator {
         }
     }
 
+    private func handlePresenceChanged(_ payload: PresenceChangedPayload) {
+        Task { [weak self] in
+            guard let self else { return }
+            let currentProfileID = await self.currentProfileID()
+            await MainActor.run {
+                if let currentProfileID, payload.profileID == currentProfileID {
+                    return
+                }
+                self.presenceStore.apply(payload)
+            }
+        }
+    }
+
     private func reconcileAfterReconnect() async {
         guard !isRefreshingAfterReconnect else { return }
         isRefreshingAfterReconnect = true
         NetworkDebug.log("Messenger realtime reconnect reconcile started")
 
         resetTrackedSubscriptions()
+        presenceStore.clearAll()
 
         await refreshConversations()
         await refreshActiveChat()

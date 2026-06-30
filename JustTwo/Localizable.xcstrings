@@ -1377,6 +1377,23 @@
         }
       }
     },
+    "chats.online" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Online"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "В сети"
+          }
+        }
+      }
+    },
     "chats.typing" : {
       "extractionState" : "manual",
       "localizations" : {

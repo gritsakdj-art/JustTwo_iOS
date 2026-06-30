@@ -30,7 +30,7 @@ Not implemented in PR5:
 * APNs/background push;
 * background WebSocket persistence.
 
-PR6 added messenger UI integration. PR7 added typing indicators in active chat.
+PR6 added messenger UI integration. PR7 added typing indicators in active chat. PR8B added ephemeral presence indicators in the conversation list and active private chat header.
 
 ## Lifecycle
 
@@ -68,11 +68,23 @@ Realtime failure does not block login and does not log the user out by itself. R
 * `conversation.read`;
 * `conversation.updated`;
 * `typing.started` / `typing.stopped` (PR7);
+* `presence.changed` (PR8B);
 * unknown future event types.
 
 `message.deleted` is intentionally decoded without requiring a message body.
 
 `reaction.added` accepts the current backend `count` shape as either `Bool` or future `Int` through `RealtimeReactionCount`.
+
+## Presence (PR8B)
+
+`presence.changed` updates `PresenceStore` through `MessengerRealtimeCoordinator`.
+
+* online/offline is ephemeral and not persisted locally;
+* unknown participant presence is treated as offline;
+* own presence events are ignored;
+* presence clears on logout, background disconnect, and reconnect reconcile;
+* conversation list rows and private chat header show a small online indicator when the other participant is online;
+* REST remains the source of truth for messenger data.
 
 ## Manual smoke
 

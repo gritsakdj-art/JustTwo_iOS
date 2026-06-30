@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ChatConversationRow: View {
     let conversation: ChatConversationPreview
+    let isOnline: Bool
     let onTap: () -> Void
 
     private enum UI {
@@ -22,6 +23,7 @@ struct ChatConversationRow: View {
                     photoID: conversation.avatarPhotoID,
                     size: UI.avatarSize
                 )
+                .onlinePresenceIndicator(isVisible: isOnline, size: 13, borderWidth: 2)
 
                 VStack(alignment: .leading, spacing: UI.textStackSpacing) {
                     Text(conversation.title)
@@ -103,7 +105,7 @@ struct ChatPressableRowStyle: ButtonStyle {
     ScrollView {
         VStack(spacing: 0) {
             ForEach(ChatUIMockData.conversations) { conversation in
-                ChatConversationRow(conversation: conversation, onTap: {})
+                ChatConversationRow(conversation: conversation, isOnline: false, onTap: {})
                 Divider().overlay(Color.hairline)
             }
         }

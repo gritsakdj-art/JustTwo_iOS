@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ChatsView: View {
     @State private var listViewModel: ConversationListViewModel
+    @State private var presenceStore = PresenceStore.shared
     @State private var route: ChatRoute?
     @State private var isInviteSheetPresented = false
 
@@ -54,6 +55,8 @@ struct ChatsView: View {
                 listViewModel.activateRealtime(session: session, router: router)
             }
             .onChange(of: route?.id) { _, newValue in
+                router.isPrivateChatPresented = newValue != nil
+
                 guard newValue == nil, !usesPreviewData else { return }
                 Task {
                     await listViewModel.refresh(session: session, router: router)
@@ -78,12 +81,21 @@ struct ChatsView: View {
                 guard !usesPreviewData else { return }
                 listViewModel.activateRealtime(session: session, router: router)
 
-                guard let conversation = router.pendingChatConversation else { return }
-                route = ChatRoute(
-                    conversation: conversation,
-                    targetMessageID: router.pendingChatMessageID
-                )
-                router.clearPendingChatNavigation()
+                if let conversation = router.pendingChatConversation {
+                    route = ChatRoute(
+                        conversation: conversation,
+                        targetMessageID: router.pendingChatMessageID
+                    )
+                    router.clearPendingChatNavigation()
+                }
+
+                router.isPrivateChatPresented = route != nil
+            }
+            .onDisappear {
+                guard !usesPreviewData else { return }
+                if route == nil {
+                    router.isPrivateChatPresented = false
+                }
             }
             .toolbarBackground(.hidden, for: .navigationBar)
         }
@@ -136,7 +148,10 @@ struct ChatsView: View {
         ScrollView {
             LazyVStack(spacing: 0) {
                 ForEach(listViewModel.conversations) { conversation in
-                    ChatConversationRow(conversation: conversation) {
+                    ChatConversationRow(
+                        conversation: conversation,
+                        isOnline: presenceStore.isOnline(profileID: conversation.otherParticipantProfileID)
+                    ) {
                         route = ChatRoute(conversation: conversation)
                     }
 

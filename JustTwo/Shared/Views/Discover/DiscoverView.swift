@@ -145,8 +145,12 @@ struct DiscoverView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .environment(\.isDiscoverShell, true)
 
-            AppTabBar(selection: $selectedTab, chatsBadgeCount: chatsViewModel.totalUnreadCount)
+            if selectedTab != .chats || !router.isPrivateChatPresented {
+                AppTabBar(selection: $selectedTab, chatsBadgeCount: chatsViewModel.totalUnreadCount)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
         }
+        .animation(.easeInOut(duration: 0.22), value: router.isPrivateChatPresented)
         .background {
             Color.discoverBackgroundGradient
                 .ignoresSafeArea()
