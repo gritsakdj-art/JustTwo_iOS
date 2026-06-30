@@ -476,6 +476,7 @@ struct RealtimeTests {
         ChatConversationPreview(
             id: id,
             title: title,
+            otherParticipantProfileID: nil,
             avatarURL: nil,
             avatarPhotoID: nil,
             lastMessageText: nil,

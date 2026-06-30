@@ -291,6 +291,7 @@ final class RealtimeClient {
         } else {
             reconnectAttempt = 0
             state = .disconnected
+            PresenceStore.shared.clearAll()
             NetworkDebug.log("Realtime disconnected")
         }
     }

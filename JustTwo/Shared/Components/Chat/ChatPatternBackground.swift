@@ -5,18 +5,27 @@ struct ChatPatternBackground: View {
     private enum UI {
         /// SVG viewBox width/height in `ChatPattern.svg`.
         static let sourceTileSize: CGFloat = 2250
-        static let tileSize: CGFloat = 96
-        static let patternOpacity: Double = 0.25
+        static let tileSize: CGFloat = 192
+        static let patternOpacity: Double = 0.3
 
         static var tileScale: CGFloat { tileSize / sourceTileSize }
+    }
+
+    private var patternGradient: LinearGradient {
+        LinearGradient(
+            colors: [.brandPrimary, .brandGradientEnd],
+            startPoint: .bottomTrailing,
+            endPoint: .topLeading
+        )
     }
 
     var body: some View {
         ZStack {
             Color.discoverBackgroundGradient
+                .scaleEffect(x: -1, y: -1)
 
             GeometryReader { geometry in
-                Color.brandPrimaryGradient
+                patternGradient
                     .opacity(UI.patternOpacity)
                     .mask {
                         tiledPattern(in: geometry.size)

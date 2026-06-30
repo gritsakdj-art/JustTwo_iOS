@@ -15,6 +15,7 @@ final class AppRouter {
     var selectedMainTab: AppTab = .discover
     var pendingChatConversation: ChatConversationPreview?
     var pendingChatMessageID: UUID?
+    var isPrivateChatPresented = false
 
     private init() {}
 
@@ -25,6 +26,9 @@ final class AppRouter {
     func resetTo(_ screen: AppScreen) {
         self.screen = screen
         splashError = nil
+        if screen == .main {
+            PushNotificationRoutingCoordinator.shared.applyPendingRouteIfPossible()
+        }
     }
 
     func handleSplash(_ state: SplashState) {

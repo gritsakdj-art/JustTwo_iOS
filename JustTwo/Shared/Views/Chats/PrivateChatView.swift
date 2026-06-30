@@ -4,6 +4,7 @@ struct PrivateChatView: View {
     private static let bottomAnchorID = "private-chat-bottom-anchor"
 
     @State private var viewModel: ChatViewModel
+    @State private var presenceStore = PresenceStore.shared
 
     @Environment(SessionStore.self) private var session
     @Environment(AppRouter.self) private var router
@@ -277,6 +278,10 @@ struct PrivateChatView: View {
                         .font(Font.App.caption())
                         .foregroundStyle(Color.secondaryText)
                         .italic()
+                } else if presenceStore.isOnline(profileID: viewModel.conversation.otherParticipantProfileID) {
+                    Text("chats.online")
+                        .font(Font.App.caption())
+                        .foregroundStyle(Color.secondaryText)
                 } else {
                     Text("chats.personal")
                         .font(Font.App.caption())
@@ -290,7 +295,10 @@ struct PrivateChatView: View {
                 title: viewModel.conversation.title,
                 photoURL: viewModel.conversation.avatarURL,
                 photoID: viewModel.conversation.avatarPhotoID,
-                size: 34
+                size: 38
+            )
+            .onlinePresenceRing(
+                isOnline: presenceStore.isOnline(profileID: viewModel.conversation.otherParticipantProfileID)
             )
             .accessibilityLabel(Text(viewModel.conversation.title))
         }

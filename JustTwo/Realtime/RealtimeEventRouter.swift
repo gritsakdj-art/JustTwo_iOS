@@ -11,6 +11,10 @@ final class RealtimeEventRouter {
 
     private init() {}
 
+    static func makeForTesting() -> RealtimeEventRouter {
+        RealtimeEventRouter()
+    }
+
     func stream() -> AsyncStream<RealtimeEvent> {
         let id = UUID()
 

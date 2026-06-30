@@ -165,6 +165,19 @@ struct RealtimeEventDTO: Decodable, Sendable {
             }
             return .typingStopped(conversationID: id, profileID: profileID)
 
+        case "presence.changed":
+            guard let profileID = payload.profileID,
+                  let statusRaw = payload.status else {
+                return .unknown(type: type)
+            }
+            return .presenceChanged(
+                payload: PresenceChangedPayload(
+                    profileID: profileID,
+                    status: PresenceStatus(serverValue: statusRaw),
+                    lastSeenAt: payload.lastSeenAt
+                )
+            )
+
         default:
             return .unknown(type: type)
         }
@@ -186,6 +199,7 @@ enum RealtimeEvent: Sendable {
     case conversationUpdated(conversationID: UUID, payload: ConversationUpdatedPayload)
     case typingStarted(conversationID: UUID, profileID: UUID)
     case typingStopped(conversationID: UUID, profileID: UUID)
+    case presenceChanged(payload: PresenceChangedPayload)
     case unknown(type: String)
 
     var type: String {
@@ -218,6 +232,8 @@ enum RealtimeEvent: Sendable {
             return "typing.started"
         case .typingStopped:
             return "typing.stopped"
+        case .presenceChanged:
+            return "presence.changed"
         case .unknown(let type):
             return type
         }
@@ -325,8 +341,10 @@ struct RealtimePayload: Decodable, Sendable {
     let profileID: UUID?
     let emoji: String?
     let lastReadAt: Date?
+    let lastSeenAt: Date?
     let updatedAt: Date?
     let lastMessageAt: Date?
+    let status: String?
     let code: String?
     let messageText: String?
 
@@ -345,8 +363,10 @@ struct RealtimePayload: Decodable, Sendable {
         profileID = nil
         emoji = nil
         lastReadAt = nil
+        lastSeenAt = nil
         updatedAt = nil
         lastMessageAt = nil
+        status = nil
         code = nil
         messageText = nil
     }
@@ -363,8 +383,10 @@ struct RealtimePayload: Decodable, Sendable {
         case profileID
         case emoji
         case lastReadAt
+        case lastSeenAt
         case updatedAt
         case lastMessageAt
+        case status
         case code
     }
 
@@ -382,8 +404,10 @@ struct RealtimePayload: Decodable, Sendable {
         profileID = try container.decodeIfPresent(UUID.self, forKey: .profileID)
         emoji = try container.decodeIfPresent(String.self, forKey: .emoji)
         lastReadAt = try container.decodeIfPresent(Date.self, forKey: .lastReadAt)
+        lastSeenAt = try container.decodeIfPresent(Date.self, forKey: .lastSeenAt)
         updatedAt = try container.decodeIfPresent(Date.self, forKey: .updatedAt)
         lastMessageAt = try container.decodeIfPresent(Date.self, forKey: .lastMessageAt)
+        status = try container.decodeIfPresent(String.self, forKey: .status)
         code = try container.decodeIfPresent(String.self, forKey: .code)
         messageText = try? container.decode(String.self, forKey: .message)
     }

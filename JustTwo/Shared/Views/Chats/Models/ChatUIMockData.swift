@@ -11,6 +11,7 @@ enum ChatUIMockData {
         ChatConversationPreview(
             id: emmaID,
             title: "Emma",
+            otherParticipantProfileID: UUID(uuidString: "F1000001-0000-4000-8000-000000000001"),
             avatarURL: nil,
             avatarPhotoID: nil,
             lastMessageText: "Saturday works for me too!",
@@ -21,6 +22,7 @@ enum ChatUIMockData {
         ChatConversationPreview(
             id: markID,
             title: "Mark",
+            otherParticipantProfileID: UUID(uuidString: "F1000002-0000-4000-8000-000000000002"),
             avatarURL: nil,
             avatarPhotoID: nil,
             lastMessageText: "Are you free for a walk by the canal?",
@@ -31,6 +33,7 @@ enum ChatUIMockData {
         ChatConversationPreview(
             id: elizabethID,
             title: "Elizabeth",
+            otherParticipantProfileID: UUID(uuidString: "F1000003-0000-4000-8000-000000000003"),
             avatarURL: nil,
             avatarPhotoID: nil,
             lastMessageText: "That rooftop bar sounds perfect.",
@@ -41,6 +44,7 @@ enum ChatUIMockData {
         ChatConversationPreview(
             id: alexID,
             title: "Alex",
+            otherParticipantProfileID: UUID(uuidString: "F1000004-0000-4000-8000-000000000004"),
             avatarURL: nil,
             avatarPhotoID: nil,
             lastMessageText: "Message deleted",
@@ -51,6 +55,7 @@ enum ChatUIMockData {
         ChatConversationPreview(
             id: mayaID,
             title: "Maya",
+            otherParticipantProfileID: UUID(uuidString: "F1000005-0000-4000-8000-000000000005"),
             avatarURL: nil,
             avatarPhotoID: nil,
             lastMessageText: nil,

@@ -79,6 +79,7 @@ extension ChatMessage {
 struct ChatConversationPreview: Identifiable, Equatable, Hashable {
     let id: UUID
     let title: String
+    let otherParticipantProfileID: UUID?
     let avatarURL: URL?
     let avatarPhotoID: UUID?
     let lastMessageText: String?
@@ -92,11 +93,13 @@ extension ChatConversationPreview {
         lastMessageText: String? = nil,
         lastSenderName: String? = nil,
         lastMessageAt: Date? = nil,
-        unreadCount: Int? = nil
+        unreadCount: Int? = nil,
+        otherParticipantProfileID: UUID? = nil
     ) -> ChatConversationPreview {
         ChatConversationPreview(
             id: id,
             title: title,
+            otherParticipantProfileID: otherParticipantProfileID ?? self.otherParticipantProfileID,
             avatarURL: avatarURL,
             avatarPhotoID: avatarPhotoID,
             lastMessageText: lastMessageText ?? self.lastMessageText,
@@ -119,6 +122,7 @@ enum ChatUIMapping {
         return ChatConversationPreview(
             id: conversation.id,
             title: otherName,
+            otherParticipantProfileID: conversation.otherParticipant?.profile.id,
             avatarURL: avatarURL(from: conversation.otherParticipant?.profile.primaryPhoto),
             avatarPhotoID: conversation.otherParticipant?.profile.primaryPhoto?.id,
             lastMessageText: lastMessagePreview(
