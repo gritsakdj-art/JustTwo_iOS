@@ -28,6 +28,7 @@ struct ConversationParticipantDTO: Decodable, Sendable {
     let role: String
     let joinedAt: Date
     let lastReadAt: Date?
+    let lastDeliveredAt: Date?
 }
 
 struct MessengerProfileSummaryDTO: Decodable, Identifiable, Sendable {
@@ -61,9 +62,60 @@ struct MessageDTO: Decodable, Identifiable, Sendable {
     let body: String?
     let replyTo: MessageReplyDTO?
     let reactions: [MessageReactionDTO]
+    let deliveryStatus: MessageDeliveryStatus?
     let createdAt: Date?
     let editedAt: Date?
     let deletedAt: Date?
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case conversationID
+        case senderProfileID
+        case kind
+        case body
+        case replyTo
+        case reactions
+        case deliveryStatus
+        case createdAt
+        case editedAt
+        case deletedAt
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+
+        id = try container.decode(UUID.self, forKey: .id)
+        conversationID = try container.decode(UUID.self, forKey: .conversationID)
+        senderProfileID = try container.decode(UUID.self, forKey: .senderProfileID)
+        kind = try container.decode(String.self, forKey: .kind)
+        body = try container.decodeIfPresent(String.self, forKey: .body)
+        replyTo = try container.decodeIfPresent(MessageReplyDTO.self, forKey: .replyTo)
+        reactions = try container.decodeIfPresent([MessageReactionDTO].self, forKey: .reactions) ?? []
+        deliveryStatus = try container.decodeIfPresent(MessageDeliveryStatus.self, forKey: .deliveryStatus)
+        createdAt = try container.decodeIfPresent(Date.self, forKey: .createdAt)
+        editedAt = try container.decodeIfPresent(Date.self, forKey: .editedAt)
+        deletedAt = try container.decodeIfPresent(Date.self, forKey: .deletedAt)
+    }
+}
+
+enum MessageDeliveryStatus: String, Codable, Equatable, Sendable, Hashable {
+    case sent
+    case delivered
+    case read
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        let rawValue = try container.decode(String.self)
+        self = MessageDeliveryStatus(rawValue: rawValue) ?? .sent
+    }
+
+    var rank: Int {
+        switch self {
+        case .sent: return 0
+        case .delivered: return 1
+        case .read: return 2
+        }
+    }
 }
 
 struct MessageReplyDTO: Decodable, Sendable {
@@ -115,6 +167,10 @@ struct EditMessageRequestBody: Encodable, Sendable {
 
 struct MarkConversationReadRequestBody: Encodable, Sendable {
     let lastReadMessageID: UUID?
+}
+
+struct MarkConversationDeliveredRequestBody: Encodable, Sendable {
+    let messageID: UUID
 }
 
 struct MessageSearchResponseDTO: Decodable, Sendable {

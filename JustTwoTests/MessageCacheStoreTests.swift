@@ -20,7 +20,8 @@ struct MessageCacheStoreTests {
             isDeleted: false,
             isEdited: false,
             replyPreview: nil,
-            reactions: []
+            reactions: [],
+            deliveryStatus: .sent
         )
 
         store.setMessages([message], for: conversationID)
@@ -43,7 +44,8 @@ struct MessageCacheStoreTests {
             isDeleted: false,
             isEdited: false,
             replyPreview: nil,
-            reactions: []
+            reactions: [],
+            deliveryStatus: .sent
         )
         let edited = ChatMessage(
             id: messageID,
@@ -54,7 +56,8 @@ struct MessageCacheStoreTests {
             isDeleted: false,
             isEdited: true,
             replyPreview: nil,
-            reactions: []
+            reactions: [],
+            deliveryStatus: .sent
         )
 
         store.setMessages([original], for: conversationID)
@@ -78,7 +81,8 @@ struct MessageCacheStoreTests {
             isDeleted: false,
             isEdited: false,
             replyPreview: nil,
-            reactions: []
+            reactions: [],
+            deliveryStatus: nil
         )
 
         store.setMessages([message], for: conversationID)
@@ -93,11 +97,74 @@ struct MessageCacheStoreTests {
     }
 
     @Test
+    func receiptStatusUpdatesOutgoingMessagesWithoutDowngrade() {
+        let store = MessageCacheStore.shared
+        store.reset()
+        let firstID = UUID()
+        let secondID = UUID()
+        let firstDate = Date(timeIntervalSince1970: 1_000)
+        let secondDate = Date(timeIntervalSince1970: 2_000)
+
+        store.setMessages([
+            makeMessage(id: firstID, createdAt: firstDate, isMine: true, status: .sent),
+            makeMessage(id: secondID, createdAt: secondDate, isMine: true, status: .sent),
+            makeMessage(id: UUID(), createdAt: secondDate.addingTimeInterval(1), isMine: false, status: nil)
+        ], for: conversationID)
+
+        #expect(store.applyDeliveryStatus(
+            conversationID: conversationID,
+            status: .delivered,
+            messageID: secondID,
+            cutoffDate: nil
+        ))
+        #expect(store.messages(for: conversationID)?[0].deliveryStatus == .delivered)
+        #expect(store.messages(for: conversationID)?[1].deliveryStatus == .delivered)
+        #expect(store.messages(for: conversationID)?[2].deliveryStatus == nil)
+
+        #expect(store.applyDeliveryStatus(
+            conversationID: conversationID,
+            status: .read,
+            messageID: nil,
+            cutoffDate: firstDate
+        ))
+        #expect(store.messages(for: conversationID)?[0].deliveryStatus == .read)
+        #expect(store.messages(for: conversationID)?[1].deliveryStatus == .delivered)
+
+        #expect(!store.applyDeliveryStatus(
+            conversationID: conversationID,
+            status: .delivered,
+            messageID: firstID,
+            cutoffDate: nil
+        ))
+        #expect(store.messages(for: conversationID)?[0].deliveryStatus == .read)
+    }
+
+    @Test
     func resetClearsCache() {
         let store = MessageCacheStore.shared
         store.setMessages([], for: conversationID)
         store.reset()
 
         #expect(store.messages(for: conversationID) == nil)
+    }
+
+    private func makeMessage(
+        id: UUID,
+        createdAt: Date,
+        isMine: Bool,
+        status: MessageDeliveryStatus?
+    ) -> ChatMessage {
+        ChatMessage(
+            id: id,
+            displayText: "Message",
+            rawBody: "Message",
+            createdAt: createdAt,
+            isMine: isMine,
+            isDeleted: false,
+            isEdited: false,
+            replyPreview: nil,
+            reactions: [],
+            deliveryStatus: status
+        )
     }
 }

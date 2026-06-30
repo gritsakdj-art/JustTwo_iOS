@@ -66,6 +66,7 @@ final class SessionStore {
         }
 
         MessengerRealtimeCoordinator.shared.stop()
+        ConversationDeliveryAckCoordinator.shared.reset()
         realtimeClient.disconnect()
         MessengerBadgeStore.shared.reset()
 

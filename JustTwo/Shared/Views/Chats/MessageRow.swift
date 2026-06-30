@@ -19,6 +19,7 @@ struct MessageRow: View {
                 isEdited: message.isEdited,
                 isDeleted: message.isDeleted,
                 reactions: message.reactions,
+                deliveryStatus: message.deliveryStatus,
                 onReactionTap: onReactionTap
             )
             .contentShape(Rectangle())
@@ -50,7 +51,8 @@ struct MessageRow: View {
                     replyPreview: nil,
                     reactions: [
                         ChatMessageReaction(emoji: "👍", count: 1, reactedByMe: false)
-                    ]
+                    ],
+                    deliveryStatus: nil
                 ),
                 senderName: "Emma",
                 onLongPress: {}
@@ -70,7 +72,8 @@ struct MessageRow: View {
                         body: "Want to grab coffee?",
                         isDeleted: false
                     ),
-                    reactions: []
+                    reactions: [],
+                    deliveryStatus: .delivered
                 ),
                 senderName: nil,
                 onLongPress: {}

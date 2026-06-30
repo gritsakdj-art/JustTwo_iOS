@@ -8,6 +8,7 @@ import UIKit
 final class ChatViewModel {
 
     let conversation: ChatConversationPreview
+    let initialUnreadCount: Int
 
     private(set) var messages: [ChatMessage] = []
     var draftText = "" {
@@ -32,12 +33,22 @@ final class ChatViewModel {
     private var typingTimeoutTasks: [UUID: Task<Void, Never>] = [:]
     private let typingEmitter: ChatTypingEmitter
     private let typingTimeout: TimeInterval = 5
+    private let deliveryAckCoordinator: ConversationDeliveryAckCoordinator
 
     private var messageCache: MessageCacheStore { MessageCacheStore.shared }
 
-    init(conversation: ChatConversationPreview) {
+    init(
+        conversation: ChatConversationPreview,
+        deliveryAckCoordinator: ConversationDeliveryAckCoordinator
+    ) {
         self.conversation = conversation
+        self.initialUnreadCount = conversation.unreadCount
         self.typingEmitter = ChatTypingEmitter(conversationID: conversation.id)
+        self.deliveryAckCoordinator = deliveryAckCoordinator
+    }
+
+    convenience init(conversation: ChatConversationPreview) {
+        self.init(conversation: conversation, deliveryAckCoordinator: .shared)
     }
 
     var isOtherParticipantTyping: Bool {
@@ -78,10 +89,62 @@ final class ChatViewModel {
         return nil
     }
 
+    var firstUnreadMessageID: UUID? {
+        guard initialUnreadCount > 0, !messages.isEmpty else { return nil }
+        let index = max(0, messages.count - initialUnreadCount)
+        guard messages.indices.contains(index) else { return nil }
+        return messages[index].id
+    }
+
+    var lastReadMessageIDForInitialScroll: UUID? {
+        guard initialUnreadCount > 0, !messages.isEmpty else { return nil }
+        let firstUnreadIndex = max(0, messages.count - initialUnreadCount)
+        let lastReadIndex = firstUnreadIndex - 1
+        guard messages.indices.contains(lastReadIndex) else { return nil }
+        return messages[lastReadIndex].id
+    }
+
+    var lastReadVisibilityMessageID: UUID? {
+        if let lastReadMessageID = lastReadMessageIDForInitialScroll {
+            return lastReadMessageID
+        }
+        return messages.last?.id
+    }
+
+    enum InitialScrollTarget: Equatable {
+        case targetMessage(UUID)
+        case lastReadMessage(UUID)
+        case bottom
+    }
+
+    func initialScrollTarget(pushTargetMessageID: UUID?) -> InitialScrollTarget {
+        if let pushTargetMessageID,
+           messages.contains(where: { $0.id == pushTargetMessageID }) {
+            return .targetMessage(pushTargetMessageID)
+        }
+        if let lastReadMessageID = lastReadMessageIDForInitialScroll {
+            return .lastReadMessage(lastReadMessageID)
+        }
+        if let lastMessageID = messages.last?.id {
+            return .lastReadMessage(lastMessageID)
+        }
+        return .bottom
+    }
+
+    static func isMessageVisibleInViewport(
+        frame: CGRect,
+        viewportHeight: CGFloat,
+        tolerance: CGFloat = 2
+    ) -> Bool {
+        guard viewportHeight > 0 else { return true }
+        return frame.maxY > tolerance && frame.minY < viewportHeight - tolerance
+    }
+
     func open(session: SessionStore, router: AppRouter) async {
         guard !didOpen else { return }
         didOpen = true
         await loadMessages(session: session, router: router)
+        await markDelivered(session: session, router: router)
         await markRead(session: session, router: router)
     }
 
@@ -145,6 +208,7 @@ final class ChatViewModel {
 
     func refreshFromRealtime(session: SessionStore, router: AppRouter) async {
         await loadMessages(session: session, router: router)
+        await markDelivered(session: session, router: router)
         await markRead(session: session, router: router)
     }
 
@@ -224,7 +288,6 @@ final class ChatViewModel {
             let mapped = ChatUIMapping.message(from: dto, currentProfileID: profileID)
             appendOrReplace(mapped)
             messageCache.upsertMessage(mapped, conversationID: conversation.id)
-            await markRead(session: session, router: router)
         } catch let error as NetworkError {
             if error.isUserBlocked {
                 errorMessage = String(localized: "chats.error.user_blocked")
@@ -364,15 +427,64 @@ final class ChatViewModel {
     }
 
     private func markRead(session: SessionStore, router: AppRouter) async {
+        guard didOpen, MessengerSessionSupport.isAppForegroundActive else {
+            NetworkDebug.log("Messenger read ack skipped: inactive chat or background")
+            return
+        }
+        guard let messageID = latestInboundMessageID() else {
+            NetworkDebug.log("Messenger read ack skipped: no inbound message")
+            return
+        }
+        guard deliveryAckCoordinator.shouldSendRead(
+            conversationID: conversation.id,
+            messageID: messageID
+        ) else {
+            NetworkDebug.log("Messenger read ack skipped: duplicate \(conversation.id)")
+            return
+        }
+
         do {
             _ = try await ConversationService.markRead(
                 conversationID: conversation.id,
-                lastReadMessageID: messages.last?.id
+                lastReadMessageID: messageID
             )
+            deliveryAckCoordinator.markReadAcked(conversationID: conversation.id, messageID: messageID)
+            NetworkDebug.log("Messenger read ack sent: \(conversation.id)")
         } catch let error as NetworkError {
             _ = MessengerSessionSupport.handleNetworkError(error, session: session, router: router)
         } catch {
             // Non-blocking: read receipt failure should not block chat UI.
+        }
+    }
+
+    private func markDelivered(session: SessionStore, router: AppRouter) async {
+        guard MessengerSessionSupport.isAppForegroundActive else {
+            NetworkDebug.log("Messenger delivered ack skipped: background")
+            return
+        }
+        guard let messageID = latestInboundMessageID() else {
+            NetworkDebug.log("Messenger delivered ack skipped: no inbound message")
+            return
+        }
+        guard deliveryAckCoordinator.shouldSendDelivered(
+            conversationID: conversation.id,
+            messageID: messageID
+        ) else {
+            NetworkDebug.log("Messenger delivered ack skipped: duplicate \(conversation.id)")
+            return
+        }
+
+        do {
+            _ = try await ConversationService.markDelivered(
+                conversationID: conversation.id,
+                messageID: messageID
+            )
+            deliveryAckCoordinator.markDeliveredAcked(conversationID: conversation.id, messageID: messageID)
+            NetworkDebug.log("Messenger delivered ack sent from active chat: \(conversation.id)")
+        } catch let error as NetworkError {
+            _ = MessengerSessionSupport.handleNetworkError(error, session: session, router: router)
+        } catch {
+            // Non-blocking: delivery receipt failure should not block chat UI.
         }
     }
 
@@ -383,6 +495,46 @@ final class ChatViewModel {
         let message = ChatUIMapping.message(from: dto, currentProfileID: currentProfileID)
         messageCache.upsertMessage(message, conversationID: conversation.id)
         return appendOrReplace(message)
+    }
+
+    func acknowledgeVisibleMessages(session: SessionStore?, router: AppRouter?) {
+        guard let session, let router else { return }
+        Task { [weak self] in
+            guard let self else { return }
+            await self.markDelivered(session: session, router: router)
+            await self.markRead(session: session, router: router)
+        }
+    }
+
+    @discardableResult
+    func applyDeliveryStatus(
+        _ status: MessageDeliveryStatus,
+        messageID: UUID?,
+        cutoffDate: Date?
+    ) -> Bool {
+        let targetDate = cutoffDate ?? messageID.flatMap { id in
+            messages.first(where: { $0.id == id })?.createdAt
+        }
+        var didUpdate = false
+
+        for index in messages.indices {
+            let message = messages[index]
+            guard shouldApplyReceipt(to: message, messageID: messageID, cutoffDate: targetDate) else {
+                continue
+            }
+
+            let updated = message.replacingDeliveryStatus(status)
+            if updated == message {
+                NetworkDebug.log("Messenger receipt status ignored because it would downgrade")
+                continue
+            }
+
+            messages[index] = updated
+            messageCache.upsertMessage(updated, conversationID: conversation.id)
+            didUpdate = true
+        }
+
+        return didUpdate
     }
 
     @discardableResult
@@ -485,5 +637,24 @@ final class ChatViewModel {
             messageCache.upsertMessage(message, conversationID: conversation.id)
             return true
         }
+    }
+
+    private func latestInboundMessageID() -> UUID? {
+        messages.last(where: { !$0.isMine && !$0.isDeleted })?.id
+    }
+
+    private func shouldApplyReceipt(
+        to message: ChatMessage,
+        messageID: UUID?,
+        cutoffDate: Date?
+    ) -> Bool {
+        guard message.isMine, !message.isDeleted else { return false }
+        if let cutoffDate {
+            return message.createdAt <= cutoffDate
+        }
+        if let messageID {
+            return message.id == messageID
+        }
+        return false
     }
 }

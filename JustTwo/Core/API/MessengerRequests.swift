@@ -41,6 +41,23 @@ struct MarkConversationReadRequest: EncodableAPIRequest {
     }
 }
 
+struct MarkConversationDeliveredRequest: EncodableAPIRequest {
+    typealias Response = ConversationResponseDTO
+    typealias Body = MarkConversationDeliveredRequestBody
+
+    let conversationID: UUID
+    let bodyValue: MarkConversationDeliveredRequestBody?
+
+    var path: String { "conversations/\(conversationID.uuidString)/delivered" }
+    var method: HTTPMethod { .patch }
+    var requiresAuth: Bool { true }
+
+    init(conversationID: UUID, messageID: UUID) {
+        self.conversationID = conversationID
+        bodyValue = MarkConversationDeliveredRequestBody(messageID: messageID)
+    }
+}
+
 struct GetMessagesRequest: APIRequest {
     typealias Response = MessagesResponseDTO
 

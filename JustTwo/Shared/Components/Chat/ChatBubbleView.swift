@@ -9,6 +9,7 @@ struct ChatBubbleView: View {
     var isEdited: Bool = false
     var isDeleted: Bool = false
     var reactions: [ChatMessageReaction] = []
+    var deliveryStatus: MessageDeliveryStatus?
     var onReactionTap: ((ChatMessageReaction) -> Void)?
 
     private enum UI {
@@ -25,11 +26,14 @@ struct ChatBubbleView: View {
         static let minWidthEdited: CGFloat = 156
         static let timeClusterWidth: CGFloat = 54
         static let editedLabelWidth: CGFloat = 52
+        static let receiptWidth: CGFloat = 22
     }
 
     private var bubbleMinWidth: CGFloat {
         let horizontalInsets = bottomLeadingInset + bottomTrailingInset
-        let metadataWidth = UI.timeClusterWidth + (isEdited ? UI.editedLabelWidth + 4 : 0)
+        let metadataWidth = UI.timeClusterWidth
+            + (isEdited ? UI.editedLabelWidth + 4 : 0)
+            + (deliveryStatus == nil ? 0 : UI.receiptWidth)
         return max(isEdited ? UI.minWidthEdited : UI.minWidth, horizontalInsets + metadataWidth + 12)
     }
 
@@ -132,6 +136,10 @@ struct ChatBubbleView: View {
                         .foregroundStyle(Color.secondaryText.opacity(0.75))
                         .monospacedDigit()
                         .lineLimit(1)
+
+                    if let deliveryStatus {
+                        MessageDeliveryReceiptView(status: deliveryStatus)
+                    }
                 }
                 .fixedSize(horizontal: true, vertical: false)
                 .allowsHitTesting(false)
@@ -140,6 +148,24 @@ struct ChatBubbleView: View {
             .padding(.trailing, bottomTrailingInset)
             .padding(.bottom, UI.bottomInset)
         }
+    }
+}
+
+private struct MessageDeliveryReceiptView: View {
+    let status: MessageDeliveryStatus
+
+    var body: some View {
+        HStack(spacing: -5) {
+            Image(systemName: "checkmark")
+                .font(.system(size: 10, weight: .semibold))
+            if status != .sent {
+                Image(systemName: "checkmark")
+                    .font(.system(size: 10, weight: .semibold))
+            }
+        }
+        .foregroundStyle(status == .read ? Color.brandPrimary : Color.secondaryText.opacity(0.75))
+        .frame(width: status == .sent ? 10 : 16, height: 12, alignment: .trailing)
+        .accessibilityHidden(true)
     }
 }
 
@@ -165,14 +191,16 @@ struct ChatBubbleView: View {
             isEdited: true,
             reactions: [
                 ChatMessageReaction(emoji: "😂", count: 1, reactedByMe: true)
-            ]
+            ],
+            deliveryStatus: .read
         )
 
         ChatBubbleView(
             text: "Hi",
             senderName: nil,
             createdAt: Date(),
-            isMine: true
+            isMine: true,
+            deliveryStatus: .sent
         )
 
         ChatBubbleView(

@@ -79,8 +79,17 @@ struct RealtimeTests {
         if case .conversationRead(_, let payload) = try decodeEvent(conversationReadJSON()) {
             #expect(payload.profileID.uuidString == profileID.uppercased())
             #expect(payload.lastReadAt != nil)
+            #expect(payload.messageID?.uuidString == messageID.uppercased())
         } else {
             Issue.record("Expected conversation.read")
+        }
+
+        if case .conversationDelivered(_, let payload) = try decodeEvent(conversationDeliveredJSON()) {
+            #expect(payload.profileID.uuidString == profileID.uppercased())
+            #expect(payload.lastDeliveredAt != nil)
+            #expect(payload.messageID?.uuidString == messageID.uppercased())
+        } else {
+            Issue.record("Expected conversation.delivered")
         }
 
         if case .conversationUpdated(let id, let payload) = try decodeEvent(conversationUpdatedJSON()) {
@@ -429,6 +438,81 @@ struct RealtimeTests {
         ))
     }
 
+    @MainActor
+    @Test("message delivery status decodes and maps for outgoing only")
+    func messageDeliveryStatusDecodesAndMapsForOutgoingOnly() throws {
+        let conversationID = fixedConversationID()
+        let currentProfileID = fixedCurrentProfileID()
+
+        for status in ["sent", "delivered", "read"] {
+            let dto = try makeMessageDTO(
+                id: UUID(),
+                conversationID: conversationID,
+                senderProfileID: currentProfileID,
+                body: "Status",
+                deliveryStatus: status
+            )
+            #expect(dto.deliveryStatus?.rawValue == status)
+            #expect(ChatUIMapping.message(from: dto, currentProfileID: currentProfileID).deliveryStatus?.rawValue == status)
+        }
+
+        let omitted = try makeMessageDTO(
+            id: UUID(),
+            conversationID: conversationID,
+            senderProfileID: currentProfileID,
+            body: "Default"
+        )
+        #expect(ChatUIMapping.message(from: omitted, currentProfileID: currentProfileID).deliveryStatus == .sent)
+
+        let incoming = try makeMessageDTO(
+            id: UUID(),
+            conversationID: conversationID,
+            senderProfileID: fixedOtherProfileID(),
+            body: "Incoming",
+            deliveryStatus: "read"
+        )
+        #expect(ChatUIMapping.message(from: incoming, currentProfileID: currentProfileID).deliveryStatus == nil)
+
+        let unknown = try makeMessageDTO(
+            id: UUID(),
+            conversationID: conversationID,
+            senderProfileID: currentProfileID,
+            body: "Future",
+            deliveryStatus: "future-status"
+        )
+        #expect(unknown.deliveryStatus == .sent)
+    }
+
+    @MainActor
+    @Test("receipt events update outgoing messages without downgrade")
+    func receiptEventsUpdateOutgoingMessagesWithoutDowngrade() {
+        let conversationID = fixedConversationID()
+        let firstID = UUID(uuidString: "AAAAAAA1-1111-4111-8111-111111111111")!
+        let secondID = UUID(uuidString: "AAAAAAA2-2222-4222-8222-222222222222")!
+        let firstDate = Date(timeIntervalSince1970: 1_000)
+        let secondDate = Date(timeIntervalSince1970: 2_000)
+        let viewModel = ChatViewModel.preview(
+            conversation: makeConversation(id: conversationID),
+            messages: [
+                makeChatMessage(id: firstID, createdAt: firstDate, isMine: true, status: .sent),
+                makeChatMessage(id: secondID, createdAt: secondDate, isMine: true, status: .sent),
+                makeChatMessage(id: UUID(), createdAt: secondDate.addingTimeInterval(1), isMine: false, status: nil)
+            ]
+        )
+
+        #expect(viewModel.applyDeliveryStatus(.delivered, messageID: secondID, cutoffDate: nil))
+        #expect(viewModel.messages[0].deliveryStatus == .delivered)
+        #expect(viewModel.messages[1].deliveryStatus == .delivered)
+        #expect(viewModel.messages[2].deliveryStatus == nil)
+
+        #expect(viewModel.applyDeliveryStatus(.read, messageID: nil, cutoffDate: firstDate))
+        #expect(viewModel.messages[0].deliveryStatus == .read)
+        #expect(viewModel.messages[1].deliveryStatus == .delivered)
+
+        #expect(!viewModel.applyDeliveryStatus(.delivered, messageID: firstID, cutoffDate: nil))
+        #expect(viewModel.messages[0].deliveryStatus == .read)
+    }
+
     private func jsonObject(for message: RealtimeClientMessageDTO) throws -> [String: Any] {
         let data = try JSONCoding.encoder.encode(message)
         let object = try JSONSerialization.jsonObject(with: data)
@@ -444,10 +528,12 @@ struct RealtimeTests {
         conversationID: UUID,
         senderProfileID: UUID,
         body: String?,
+        deliveryStatus: String? = nil,
         editedAt: String? = nil,
         deletedAt: String? = nil
     ) throws -> MessageDTO {
         let bodyJSON = body.map { #""\#($0)""# } ?? "null"
+        let deliveryStatusJSON = deliveryStatus.map { #""\#($0)""# } ?? "null"
         let editedAtJSON = editedAt.map { #""\#($0)""# } ?? "null"
         let deletedAtJSON = deletedAt.map { #""\#($0)""# } ?? "null"
 
@@ -460,6 +546,7 @@ struct RealtimeTests {
           "body": \(bodyJSON),
           "replyTo": null,
           "reactions": [],
+          "deliveryStatus": \(deliveryStatusJSON),
           "createdAt": "2026-06-26T13:18:31Z",
           "editedAt": \(editedAtJSON),
           "deletedAt": \(deletedAtJSON)
@@ -483,6 +570,26 @@ struct RealtimeTests {
             lastSenderName: nil,
             lastMessageAt: lastMessageAt,
             unreadCount: unreadCount
+        )
+    }
+
+    private func makeChatMessage(
+        id: UUID,
+        createdAt: Date,
+        isMine: Bool,
+        status: MessageDeliveryStatus?
+    ) -> ChatMessage {
+        ChatMessage(
+            id: id,
+            displayText: "Message",
+            rawBody: "Message",
+            createdAt: createdAt,
+            isMine: isMine,
+            isDeleted: false,
+            isEdited: false,
+            replyPreview: nil,
+            reactions: [],
+            deliveryStatus: status
         )
     }
 
@@ -681,9 +788,26 @@ struct RealtimeTests {
           "eventID": "00000000-0000-0000-0000-000000000001",
           "occurredAt": "2026-06-26T13:18:31Z",
           "conversationID": "22222222-2222-2222-2222-222222222222",
+            "payload": {
+              "profileID": "44444444-4444-4444-4444-444444444444",
+            "lastReadAt": "2026-06-26T13:18:31Z",
+            "messageID": "33333333-3333-3333-3333-333333333333"
+          }
+        }
+        """
+    }
+
+    private func conversationDeliveredJSON() -> String {
+        """
+        {
+          "type": "conversation.delivered",
+          "eventID": "00000000-0000-0000-0000-000000000001",
+          "occurredAt": "2026-06-26T13:18:31Z",
+          "conversationID": "22222222-2222-2222-2222-222222222222",
           "payload": {
             "profileID": "44444444-4444-4444-4444-444444444444",
-            "lastReadAt": "2026-06-26T13:18:31Z"
+            "lastDeliveredAt": "2026-06-26T13:18:31Z",
+            "messageID": "33333333-3333-3333-3333-333333333333"
           }
         }
         """

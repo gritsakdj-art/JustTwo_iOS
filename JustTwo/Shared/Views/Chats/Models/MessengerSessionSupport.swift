@@ -1,6 +1,17 @@
 import Foundation
+#if canImport(UIKit)
+import UIKit
+#endif
 
 enum MessengerSessionSupport {
+
+    static var isAppForegroundActive: Bool {
+        #if canImport(UIKit)
+        UIApplication.shared.applicationState == .active
+        #else
+        true
+        #endif
+    }
 
     @MainActor
     static func resolveCurrentProfileID(session: SessionStore) async throws -> UUID {

@@ -43,6 +43,8 @@ struct ChatsView: View {
                     conversation: route.conversation,
                     targetMessageID: route.targetMessageID
                 )
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .navigationStackHostingBackgroundClear()
             }
             .task {
                 guard !usesPreviewData else { return }
@@ -68,7 +70,7 @@ struct ChatsView: View {
                     isInviteSheetPresented = false
                 }
                 guard !usesPreviewData, let conversation = router.pendingChatConversation else { return }
-                route = ChatRoute(
+                presentPrivateChat(
                     conversation: conversation,
                     targetMessageID: router.pendingChatMessageID
                 )
@@ -82,7 +84,7 @@ struct ChatsView: View {
                 listViewModel.activateRealtime(session: session, router: router)
 
                 if let conversation = router.pendingChatConversation {
-                    route = ChatRoute(
+                    presentPrivateChat(
                         conversation: conversation,
                         targetMessageID: router.pendingChatMessageID
                     )
@@ -103,6 +105,21 @@ struct ChatsView: View {
             Color.discoverBackgroundGradient
                 .ignoresSafeArea()
         }
+    }
+
+    private func presentPrivateChat(
+        conversation: ChatConversationPreview,
+        targetMessageID: UUID? = nil
+    ) {
+        var transaction = Transaction()
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            router.isPrivateChatPresented = true
+        }
+        route = ChatRoute(
+            conversation: conversation,
+            targetMessageID: targetMessageID
+        )
     }
 
     private var header: some View {
@@ -152,7 +169,7 @@ struct ChatsView: View {
                         conversation: conversation,
                         isOnline: presenceStore.isOnline(profileID: conversation.otherParticipantProfileID)
                     ) {
-                        route = ChatRoute(conversation: conversation)
+                        presentPrivateChat(conversation: conversation)
                     }
 
                     Divider()

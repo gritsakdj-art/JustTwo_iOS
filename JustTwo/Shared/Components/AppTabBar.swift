@@ -82,6 +82,14 @@ struct AppTabBar: View {
         .padding(.horizontal, AppSpacing.lg)
         .padding(.top, 4)
         .padding(.bottom, 6)
+        .background {
+            GeometryReader { geometry in
+                Color.clear.preference(
+                    key: TabBarHeightPreferenceKey.self,
+                    value: geometry.size.height
+                )
+            }
+        }
     }
 
     private func badgeCount(for tab: AppTab) -> Int {

@@ -36,6 +36,31 @@ struct ChatMessage: Identifiable, Equatable, Hashable {
     let isEdited: Bool
     let replyPreview: ChatReplyPreview?
     let reactions: [ChatMessageReaction]
+    let deliveryStatus: MessageDeliveryStatus?
+
+    init(
+        id: UUID,
+        displayText: String,
+        rawBody: String?,
+        createdAt: Date,
+        isMine: Bool,
+        isDeleted: Bool,
+        isEdited: Bool,
+        replyPreview: ChatReplyPreview?,
+        reactions: [ChatMessageReaction],
+        deliveryStatus: MessageDeliveryStatus? = nil
+    ) {
+        self.id = id
+        self.displayText = displayText
+        self.rawBody = rawBody
+        self.createdAt = createdAt
+        self.isMine = isMine
+        self.isDeleted = isDeleted
+        self.isEdited = isEdited
+        self.replyPreview = replyPreview
+        self.reactions = reactions
+        self.deliveryStatus = deliveryStatus
+    }
 
     var text: String { displayText }
 
@@ -57,7 +82,8 @@ extension ChatMessage {
             isDeleted: true,
             isEdited: false,
             replyPreview: replyPreview,
-            reactions: reactions
+            reactions: reactions,
+            deliveryStatus: nil
         )
     }
 
@@ -71,7 +97,34 @@ extension ChatMessage {
             isDeleted: isDeleted,
             isEdited: isEdited,
             replyPreview: replyPreview,
-            reactions: reactions
+            reactions: reactions,
+            deliveryStatus: deliveryStatus
+        )
+    }
+
+    func replacingDeliveryStatus(_ status: MessageDeliveryStatus?) -> ChatMessage {
+        let nextStatus: MessageDeliveryStatus?
+        if !isMine || isDeleted {
+            nextStatus = nil
+        } else if let current = deliveryStatus, let status {
+            nextStatus = status.rank > current.rank ? status : current
+        } else {
+            nextStatus = status ?? deliveryStatus
+        }
+
+        guard nextStatus != deliveryStatus else { return self }
+
+        return ChatMessage(
+            id: id,
+            displayText: displayText,
+            rawBody: rawBody,
+            createdAt: createdAt,
+            isMine: isMine,
+            isDeleted: isDeleted,
+            isEdited: isEdited,
+            replyPreview: replyPreview,
+            reactions: reactions,
+            deliveryStatus: nextStatus
         )
     }
 }
@@ -168,12 +221,14 @@ enum ChatUIMapping {
             replyPreview = nil
         }
 
+        let isMine = dto.senderProfileID == currentProfileID
+
         return ChatMessage(
             id: dto.id,
             displayText: displayText,
             rawBody: isDeleted ? nil : dto.body,
             createdAt: dto.createdAt ?? .distantPast,
-            isMine: dto.senderProfileID == currentProfileID,
+            isMine: isMine,
             isDeleted: isDeleted,
             isEdited: dto.editedAt != nil && !isDeleted,
             replyPreview: replyPreview,
@@ -183,7 +238,8 @@ enum ChatUIMapping {
                     count: $0.count,
                     reactedByMe: $0.reactedByMe
                 )
-            }
+            },
+            deliveryStatus: isMine && !isDeleted ? (dto.deliveryStatus ?? .sent) : nil
         )
     }
 

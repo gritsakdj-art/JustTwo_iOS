@@ -134,7 +134,22 @@ struct RealtimeEventDTO: Decodable, Sendable {
                 conversationID: id,
                 payload: ConversationReadPayload(
                     profileID: profileID,
-                    lastReadAt: payload.lastReadAt
+                    lastReadAt: payload.lastReadAt,
+                    messageID: payload.messageID
+                )
+            )
+
+        case "conversation.delivered":
+            guard let id = conversationID ?? payload.conversationID,
+                  let profileID = payload.profileID else {
+                return .unknown(type: type)
+            }
+            return .conversationDelivered(
+                conversationID: id,
+                payload: ConversationDeliveredPayload(
+                    profileID: profileID,
+                    lastDeliveredAt: payload.lastDeliveredAt,
+                    messageID: payload.messageID
                 )
             )
 
@@ -196,6 +211,7 @@ enum RealtimeEvent: Sendable {
     case reactionAdded(conversationID: UUID, payload: ReactionAddedPayload)
     case reactionRemoved(conversationID: UUID, payload: ReactionRemovedPayload)
     case conversationRead(conversationID: UUID, payload: ConversationReadPayload)
+    case conversationDelivered(conversationID: UUID, payload: ConversationDeliveredPayload)
     case conversationUpdated(conversationID: UUID, payload: ConversationUpdatedPayload)
     case typingStarted(conversationID: UUID, profileID: UUID)
     case typingStopped(conversationID: UUID, profileID: UUID)
@@ -226,6 +242,8 @@ enum RealtimeEvent: Sendable {
             return "reaction.removed"
         case .conversationRead:
             return "conversation.read"
+        case .conversationDelivered:
+            return "conversation.delivered"
         case .conversationUpdated:
             return "conversation.updated"
         case .typingStarted:
@@ -270,6 +288,13 @@ struct ReactionRemovedPayload: Equatable, Sendable {
 struct ConversationReadPayload: Equatable, Sendable {
     let profileID: UUID
     let lastReadAt: Date?
+    let messageID: UUID?
+}
+
+struct ConversationDeliveredPayload: Equatable, Sendable {
+    let profileID: UUID
+    let lastDeliveredAt: Date?
+    let messageID: UUID?
 }
 
 struct ConversationUpdatedPayload: Equatable, Sendable {
@@ -341,6 +366,7 @@ struct RealtimePayload: Decodable, Sendable {
     let profileID: UUID?
     let emoji: String?
     let lastReadAt: Date?
+    let lastDeliveredAt: Date?
     let lastSeenAt: Date?
     let updatedAt: Date?
     let lastMessageAt: Date?
@@ -363,6 +389,7 @@ struct RealtimePayload: Decodable, Sendable {
         profileID = nil
         emoji = nil
         lastReadAt = nil
+        lastDeliveredAt = nil
         lastSeenAt = nil
         updatedAt = nil
         lastMessageAt = nil
@@ -383,6 +410,7 @@ struct RealtimePayload: Decodable, Sendable {
         case profileID
         case emoji
         case lastReadAt
+        case lastDeliveredAt
         case lastSeenAt
         case updatedAt
         case lastMessageAt
@@ -404,6 +432,7 @@ struct RealtimePayload: Decodable, Sendable {
         profileID = try container.decodeIfPresent(UUID.self, forKey: .profileID)
         emoji = try container.decodeIfPresent(String.self, forKey: .emoji)
         lastReadAt = try container.decodeIfPresent(Date.self, forKey: .lastReadAt)
+        lastDeliveredAt = try container.decodeIfPresent(Date.self, forKey: .lastDeliveredAt)
         lastSeenAt = try container.decodeIfPresent(Date.self, forKey: .lastSeenAt)
         updatedAt = try container.decodeIfPresent(Date.self, forKey: .updatedAt)
         lastMessageAt = try container.decodeIfPresent(Date.self, forKey: .lastMessageAt)

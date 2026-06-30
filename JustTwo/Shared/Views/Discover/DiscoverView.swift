@@ -116,6 +116,7 @@ struct DiscoverView: View {
     @State private var isLiked: Bool = false
     @State private var isPassed: Bool = false
     @State private var chatsViewModel = ConversationListViewModel.shared
+    @State private var tabBarHeight = MainTabBarLayout.fallbackHeight
     @Environment(\.colorScheme) private var colorScheme
 
     let profiles: [Profile]
@@ -137,6 +138,10 @@ struct DiscoverView: View {
         profiles[profileIndex % profiles.count]
     }
 
+    private var showsTabBar: Bool {
+        selectedTab != .chats || !router.isPrivateChatPresented
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             headerView
@@ -144,13 +149,23 @@ struct DiscoverView: View {
             tabContent
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .environment(\.isDiscoverShell, true)
-
-            if selectedTab != .chats || !router.isPrivateChatPresented {
-                AppTabBar(selection: $selectedTab, chatsBadgeCount: chatsViewModel.totalUnreadCount)
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
-            }
+                .padding(.bottom, showsTabBar ? tabBarHeight : 0)
         }
-        .animation(.easeInOut(duration: 0.22), value: router.isPrivateChatPresented)
+        .overlay(alignment: .bottom) {
+            AppTabBar(selection: $selectedTab, chatsBadgeCount: chatsViewModel.totalUnreadCount)
+                .opacity(showsTabBar ? 1 : 0)
+                .allowsHitTesting(showsTabBar)
+                .accessibilityHidden(!showsTabBar)
+                .animation(
+                    router.isPrivateChatPresented ? nil : .easeInOut(duration: 0.22),
+                    value: showsTabBar
+                )
+        }
+        .animation(nil, value: router.isPrivateChatPresented)
+        .onPreferenceChange(TabBarHeightPreferenceKey.self) { height in
+            guard height > 0 else { return }
+            tabBarHeight = height
+        }
         .background {
             Color.discoverBackgroundGradient
                 .ignoresSafeArea()

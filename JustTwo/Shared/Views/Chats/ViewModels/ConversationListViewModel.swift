@@ -94,6 +94,12 @@ final class ConversationListViewModel {
             conversations = response.conversations.map {
                 ChatUIMapping.conversationPreview(from: $0, currentProfileID: profileID)
             }
+            await ConversationDeliveryAckCoordinator.shared.acknowledgeDeliveredForConversations(
+                response.conversations,
+                currentProfileID: profileID,
+                session: session,
+                router: router
+            )
             syncMessengerBadge()
             didLoad = true
             ConversationAvatarsStartupLoader.shared.preloadRemainingIfNeeded(for: conversations)

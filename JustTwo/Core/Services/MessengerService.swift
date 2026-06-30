@@ -23,6 +23,19 @@ enum ConversationService {
         )
         return response.conversation
     }
+
+    nonisolated static func markDelivered(
+        conversationID: UUID,
+        messageID: UUID
+    ) async throws -> ConversationDTO {
+        let response = try await NetworkExecutor.shared.send(
+            MarkConversationDeliveredRequest(
+                conversationID: conversationID,
+                messageID: messageID
+            )
+        )
+        return response.conversation
+    }
 }
 
 enum MessageService {

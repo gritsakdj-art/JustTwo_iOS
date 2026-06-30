@@ -3,10 +3,69 @@ import SwiftUI
 import UIKit
 #endif
 
+enum MainTabBarLayout {
+    static let fallbackHeight: CGFloat = 64
+}
+
+struct TabBarHeightPreferenceKey: PreferenceKey {
+    static var defaultValue: CGFloat = MainTabBarLayout.fallbackHeight
+
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        let next = nextValue()
+        if next > 0 {
+            value = next
+        }
+    }
+}
+
+#if canImport(UIKit)
 /// Clears opaque system backgrounds that `NavigationStack` inserts above the parent shell gradient.
-private struct NavigationStackHostingBackgroundClearer: UIViewRepresentable {
+private final class HostingBackgroundClearView: UIView {
+    override func didMoveToWindow() {
+        super.didMoveToWindow()
+        clearHostingBackgrounds()
+    }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        clearHostingBackgrounds()
+    }
+
+    private func clearHostingBackgrounds() {
+        NavigationStackHostingBackgroundClearer.clearHostingBackgrounds(startingAt: self)
+    }
+}
+
+enum NavigationStackHostingBackgroundClearer {
+    static func clearHostingBackgrounds(startingAt view: UIView) {
+        var current: UIView? = view
+        while let ancestor = current {
+            if shouldClearBackground(for: ancestor) {
+                ancestor.backgroundColor = .clear
+                ancestor.isOpaque = false
+            }
+            current = ancestor.superview
+        }
+    }
+
+    private static func shouldClearBackground(for view: UIView) -> Bool {
+        let typeName = String(describing: type(of: view))
+        if typeName.contains("UIHostingView") || typeName.contains("_UIHostingView") {
+            return true
+        }
+        if typeName.contains("UILayoutContainerView") {
+            return true
+        }
+        if typeName.contains("UINavigationController") || typeName.contains("NavigationController") {
+            return true
+        }
+        return false
+    }
+}
+
+private struct NavigationStackHostingBackgroundClearerRepresentable: UIViewRepresentable {
     func makeUIView(context: Context) -> UIView {
-        let view = UIView(frame: .zero)
+        let view = HostingBackgroundClearView(frame: .zero)
         view.isUserInteractionEnabled = false
         view.backgroundColor = .clear
         view.isOpaque = false
@@ -14,26 +73,17 @@ private struct NavigationStackHostingBackgroundClearer: UIViewRepresentable {
     }
 
     func updateUIView(_ uiView: UIView, context: Context) {
-        DispatchQueue.main.async {
-            Self.clearHostingBackgrounds(startingAt: uiView)
-        }
-    }
-
-    private static func clearHostingBackgrounds(startingAt view: UIView) {
-        var current: UIView? = view
-        while let ancestor = current {
-            let typeName = String(describing: type(of: ancestor))
-            if typeName.contains("UIHostingView") || typeName.contains("_UIHostingView") {
-                ancestor.backgroundColor = .clear
-                ancestor.isOpaque = false
-            }
-            current = ancestor.superview
-        }
+        NavigationStackHostingBackgroundClearer.clearHostingBackgrounds(startingAt: uiView)
     }
 }
+#endif
 
 extension View {
     func navigationStackHostingBackgroundClear() -> some View {
-        background(NavigationStackHostingBackgroundClearer())
+        #if canImport(UIKit)
+        background(NavigationStackHostingBackgroundClearerRepresentable())
+        #else
+        self
+        #endif
     }
 }

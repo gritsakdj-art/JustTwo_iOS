@@ -154,6 +154,9 @@ final class MessengerRealtimeCoordinator {
         case .conversationRead(let conversationID, let payload):
             handleConversationRead(payload, conversationID: conversationID)
 
+        case .conversationDelivered(let conversationID, let payload):
+            handleConversationDelivered(payload, conversationID: conversationID)
+
         case .conversationUpdated(_, let payload):
             handleConversationUpdated(payload)
 
@@ -182,6 +185,10 @@ final class MessengerRealtimeCoordinator {
                         message,
                         currentProfileID: profileID
                     ) ?? false
+                    self.activeChatViewModel?.acknowledgeVisibleMessages(
+                        session: self.session,
+                        router: self.router
+                    )
                     NetworkDebug.log(inserted ? "Messenger realtime message.created applied" : "Messenger realtime duplicate/updated message.created handled")
                 } else if let profileID {
                     _ = MessageCacheStore.shared.applyRealtimeMessage(
@@ -204,6 +211,18 @@ final class MessengerRealtimeCoordinator {
                 } else {
                     self.refreshConversationsFromRealtime()
                 }
+            }
+
+            if let profileID,
+               self.activeConversationID != conversationID,
+               message.senderProfileID != profileID {
+                await ConversationDeliveryAckCoordinator.shared.acknowledgeDeliveredIfNeeded(
+                    conversationID: conversationID,
+                    message: message,
+                    currentProfileID: profileID,
+                    session: self.session,
+                    router: self.router
+                )
             }
         }
     }
@@ -303,6 +322,51 @@ final class MessengerRealtimeCoordinator {
                     profileID: payload.profileID,
                     currentProfileID: profileID
                 )
+
+                guard payload.profileID != profileID else { return }
+                let applied: Bool
+                if self.activeConversationID == conversationID {
+                    applied = self.activeChatViewModel?.applyDeliveryStatus(
+                        .read,
+                        messageID: payload.messageID,
+                        cutoffDate: payload.lastReadAt
+                    ) ?? false
+                } else {
+                    applied = MessageCacheStore.shared.applyDeliveryStatus(
+                        conversationID: conversationID,
+                        status: .read,
+                        messageID: payload.messageID,
+                        cutoffDate: payload.lastReadAt
+                    )
+                }
+                NetworkDebug.log(applied ? "Messenger realtime conversation.read applied" : "Messenger realtime conversation.read ignored")
+            }
+        }
+    }
+
+    private func handleConversationDelivered(_ payload: ConversationDeliveredPayload, conversationID: UUID) {
+        Task { [weak self] in
+            guard let self else { return }
+            let profileID = await self.currentProfileID()
+
+            await MainActor.run {
+                guard payload.profileID != profileID else { return }
+                let applied: Bool
+                if self.activeConversationID == conversationID {
+                    applied = self.activeChatViewModel?.applyDeliveryStatus(
+                        .delivered,
+                        messageID: payload.messageID,
+                        cutoffDate: payload.lastDeliveredAt
+                    ) ?? false
+                } else {
+                    applied = MessageCacheStore.shared.applyDeliveryStatus(
+                        conversationID: conversationID,
+                        status: .delivered,
+                        messageID: payload.messageID,
+                        cutoffDate: payload.lastDeliveredAt
+                    )
+                }
+                NetworkDebug.log(applied ? "Messenger realtime conversation.delivered applied" : "Messenger realtime conversation.delivered ignored")
             }
         }
     }

@@ -234,6 +234,52 @@ final class MessageCacheStore {
         return true
     }
 
+    @discardableResult
+    func applyDeliveryStatus(
+        conversationID: UUID,
+        status: MessageDeliveryStatus,
+        messageID: UUID?,
+        cutoffDate: Date?
+    ) -> Bool {
+        guard var entry = entries[conversationID] else { return false }
+        var didUpdate = false
+        let targetDate = cutoffDate ?? messageID.flatMap { id in
+            entry.messages.first(where: { $0.id == id })?.createdAt
+        }
+
+        for index in entry.messages.indices {
+            let message = entry.messages[index]
+            guard shouldApplyReceipt(to: message, messageID: messageID, cutoffDate: targetDate) else {
+                continue
+            }
+
+            let updated = message.replacingDeliveryStatus(status)
+            guard updated != message else { continue }
+            entry.messages[index] = updated
+            didUpdate = true
+        }
+
+        guard didUpdate else { return false }
+        entry.loadedAt = .now
+        entries[conversationID] = entry
+        return true
+    }
+
+    private func shouldApplyReceipt(
+        to message: ChatMessage,
+        messageID: UUID?,
+        cutoffDate: Date?
+    ) -> Bool {
+        guard message.isMine, !message.isDeleted else { return false }
+        if let cutoffDate {
+            return message.createdAt <= cutoffDate
+        }
+        if let messageID {
+            return message.id == messageID
+        }
+        return false
+    }
+
     func reset() {
         for task in loadTasks.values {
             task.cancel()

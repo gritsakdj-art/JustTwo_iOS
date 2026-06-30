@@ -133,6 +133,7 @@ final class AppRouter {
         pendingChatConversation = conversation
         pendingChatMessageID = messageID
         selectedMainTab = .chats
+        isPrivateChatPresented = true
     }
 
     func clearPendingChatNavigation() {
