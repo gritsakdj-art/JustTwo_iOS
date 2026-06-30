@@ -3,21 +3,6 @@ import SwiftUI
 import UIKit
 #endif
 
-enum MainTabBarLayout {
-    static let fallbackHeight: CGFloat = 64
-}
-
-struct TabBarHeightPreferenceKey: PreferenceKey {
-    static var defaultValue: CGFloat = MainTabBarLayout.fallbackHeight
-
-    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
-        let next = nextValue()
-        if next > 0 {
-            value = next
-        }
-    }
-}
-
 #if canImport(UIKit)
 /// Clears opaque system backgrounds that `NavigationStack` inserts above the parent shell gradient.
 private final class HostingBackgroundClearView: UIView {

@@ -27,6 +27,7 @@ struct JustTwoApp: App {
 
     init() {
         AppFontRegistrar.registerFonts()
+        AppTabBarAppearance.configure()
         PushRegistrationService.shared.configure()
     }
 

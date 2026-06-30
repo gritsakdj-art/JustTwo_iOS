@@ -15,7 +15,6 @@ final class AppRouter {
     var selectedMainTab: AppTab = .discover
     var pendingChatConversation: ChatConversationPreview?
     var pendingChatMessageID: UUID?
-    var isPrivateChatPresented = false
 
     private init() {}
 
@@ -133,7 +132,6 @@ final class AppRouter {
         pendingChatConversation = conversation
         pendingChatMessageID = messageID
         selectedMainTab = .chats
-        isPrivateChatPresented = true
     }
 
     func clearPendingChatNavigation() {

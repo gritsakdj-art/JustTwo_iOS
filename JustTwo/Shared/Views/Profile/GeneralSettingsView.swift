@@ -124,11 +124,12 @@ struct GeneralSettingsView: View {
                 .padding(.horizontal, 4)
 
             VStack(spacing: 0) {
-                notificationToggleRow(
+                NotificationSettingsToggleRow(
+                    iconName: "bell.badge.fill",
                     title: "settings.notifications.messages.title",
                     subtitle: "settings.notifications.messages.subtitle",
                     isOn: $messagesEnabled,
-                    disabled: isRequestingPermission
+                    isToggleDisabled: isRequestingPermission
                 )
                 .onChange(of: messagesEnabled) { _, isEnabled in
                     guard isEnabled else { return }
@@ -139,11 +140,12 @@ struct GeneralSettingsView: View {
 
                 SettingsPickerDivider()
 
-                notificationToggleRow(
+                NotificationSettingsToggleRow(
+                    iconName: "text.bubble.fill",
                     title: "settings.notifications.preview.title",
                     subtitle: "settings.notifications.preview.subtitle",
                     isOn: $messagePreviewEnabled,
-                    disabled: !messagesEnabled || isRequestingPermission
+                    isToggleDisabled: !messagesEnabled || isRequestingPermission
                 )
             }
             .background(Color.cardSurface, in: RoundedRectangle(cornerRadius: AppCornerRadius.card, style: .continuous))
@@ -160,42 +162,6 @@ struct GeneralSettingsView: View {
                     .padding(.horizontal, 4)
             }
         }
-    }
-
-    private func notificationToggleRow(
-        title: LocalizedStringResource,
-        subtitle: LocalizedStringResource,
-        isOn: Binding<Bool>,
-        disabled: Bool
-    ) -> some View {
-        HStack(alignment: .top, spacing: AppSpacing.sm) {
-            Image(systemName: "bell.badge.fill")
-                .font(.system(size: 17, weight: .semibold))
-                .foregroundStyle(Color.brandPrimary)
-                .frame(width: 38, height: 38)
-                .background(Color.elevatedSurface, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title)
-                    .font(Font.App.manrope(size: 16, weight: .semibold))
-                    .foregroundStyle(Color.primaryText)
-
-                Text(subtitle)
-                    .font(Font.App.caption(size: 12, weight: .medium))
-                    .foregroundStyle(Color.secondaryText)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-
-            Spacer(minLength: AppSpacing.sm)
-
-            Toggle(title, isOn: isOn)
-                .labelsHidden()
-                .tint(Color.discoverViolet)
-                .disabled(disabled)
-        }
-        .frame(minHeight: 60)
-        .padding(.horizontal, AppSpacing.sm)
-        .padding(.vertical, 2)
     }
 
     private func handleMessagesToggleEnabled() async {
@@ -243,6 +209,58 @@ struct GeneralSettingsView: View {
 private enum SettingsPickerKind {
     case theme
     case language
+}
+
+private struct NotificationSettingsToggleRow: View {
+    let iconName: String
+    let title: LocalizedStringResource
+    let subtitle: LocalizedStringResource
+    @Binding var isOn: Bool
+    var isToggleDisabled = false
+
+    var body: some View {
+        HStack(alignment: .center, spacing: AppSpacing.sm) {
+            iconBadge
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(Font.App.manrope(size: 16, weight: .semibold))
+                    .foregroundStyle(Color.primaryText)
+
+                Text(subtitle)
+                    .font(Font.App.caption(size: 12, weight: .medium))
+                    .foregroundStyle(Color.secondaryText)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            Spacer(minLength: AppSpacing.sm)
+
+            Toggle("", isOn: $isOn)
+                .labelsHidden()
+                .tint(Color.discoverViolet)
+                .disabled(isToggleDisabled)
+        }
+        .frame(minHeight: 60)
+        .padding(.horizontal, AppSpacing.sm)
+        .padding(.vertical, 2)
+        .contentShape(Rectangle())
+    }
+
+    private var iconBadge: some View {
+        Image(systemName: iconName)
+            .font(.system(size: 17, weight: .semibold))
+            .foregroundStyle(Color.onAccentText)
+            .frame(width: 38, height: 38)
+            .background {
+                Color.brandPrimaryGradient
+                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            }
+            .overlay {
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .strokeBorder(Color.glassBorderHighlight.opacity(0.34), lineWidth: 0.6)
+            }
+            .shadow(color: Color.discoverViolet.opacity(0.18), radius: 8, x: 0, y: 3)
+    }
 }
 
 private struct SettingsPickerDivider: View {

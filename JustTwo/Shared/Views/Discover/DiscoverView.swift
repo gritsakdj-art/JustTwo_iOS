@@ -105,18 +105,13 @@ enum DiscoverMood: CaseIterable {
 
 struct DiscoverView: View {
 
-    @Environment(AppRouter.self) private var router
-    @Environment(SessionStore.self) private var session
     @State private var selectedMode: DiscoverMode = .vibe
     @State private var selectedMood: DiscoverMood = .coffee
-    @State private var selectedTab: AppTab = .discover
     @State private var profileIndex = 0
     @State private var cardOffset: CGSize = .zero
     @State private var cardRotation: Double = 0
     @State private var isLiked: Bool = false
     @State private var isPassed: Bool = false
-    @State private var chatsViewModel = ConversationListViewModel.shared
-    @State private var tabBarHeight = MainTabBarLayout.fallbackHeight
     @Environment(\.colorScheme) private var colorScheme
 
     let profiles: [Profile]
@@ -138,87 +133,13 @@ struct DiscoverView: View {
         profiles[profileIndex % profiles.count]
     }
 
-    private var showsTabBar: Bool {
-        selectedTab != .chats || !router.isPrivateChatPresented
-    }
-
     var body: some View {
         VStack(spacing: 0) {
             headerView
-
-            tabContent
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .environment(\.isDiscoverShell, true)
-                .padding(.bottom, showsTabBar ? tabBarHeight : 0)
-        }
-        .overlay(alignment: .bottom) {
-            AppTabBar(selection: $selectedTab, chatsBadgeCount: chatsViewModel.totalUnreadCount)
-                .opacity(showsTabBar ? 1 : 0)
-                .allowsHitTesting(showsTabBar)
-                .accessibilityHidden(!showsTabBar)
-                .animation(
-                    router.isPrivateChatPresented ? nil : .easeInOut(duration: 0.22),
-                    value: showsTabBar
-                )
-        }
-        .animation(nil, value: router.isPrivateChatPresented)
-        .onPreferenceChange(TabBarHeightPreferenceKey.self) { height in
-            guard height > 0 else { return }
-            tabBarHeight = height
-        }
-        .background {
-            Color.discoverBackgroundGradient
-                .ignoresSafeArea()
-        }
-        .statusBarHidden(false)
-        .onAppear {
-            selectedTab = router.selectedMainTab
-        }
-        .task {
-            guard session.isFullyAuthenticated else { return }
-            await chatsViewModel.loadIfNeeded(session: session, router: router)
-            chatsViewModel.activateRealtime(session: session, router: router)
-        }
-        .onChange(of: router.selectedMainTab) { _, newTab in
-            selectedTab = newTab
-        }
-        .onChange(of: selectedTab) { _, newTab in
-            router.selectedMainTab = newTab
-        }
-        .fullScreenCover(item: invitePreviewPresentation) { presentation in
-            InvitePreviewView(token: presentation.token)
-                .environment(session)
-                .environment(router)
-        }
-    }
-
-    private var invitePreviewPresentation: Binding<InvitePreviewPresentation?> {
-        Binding(
-            get: {
-                router.presentedInvitePreviewToken.map(InvitePreviewPresentation.init(token:))
-            },
-            set: { newValue in
-                if newValue == nil {
-                    router.dismissInvitePreview()
-                }
-            }
-        )
-    }
-
-    @ViewBuilder
-    private var tabContent: some View {
-        switch selectedTab {
-        case .discover:
             discoverContent
-        case .matches:
-            MatchesView()
-        case .chats:
-            ChatsView(viewModel: chatsViewModel)
-        case .plans:
-            PlansView()
-        case .profile:
-            ProfileView()
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .discoverShellBackground()
     }
 
     private var discoverContent: some View {
@@ -708,14 +629,11 @@ private extension DiscoverView {
     }
 }
 
-private struct InvitePreviewPresentation: Identifiable {
-    let token: String
-
-    var id: String { token }
-}
-
 #Preview("Discover - Vibe") {
     DiscoverView(usesRemotePhoto: false)
+        .background {
+            Color.discoverBackgroundGradient.ignoresSafeArea()
+        }
 }
 
 #Preview("Discover - Activity") {

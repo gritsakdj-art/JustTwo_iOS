@@ -39,6 +39,7 @@ struct PlaceholderTabScreen: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .padding(.horizontal, AppSpacing.lg)
+        .discoverShellBackground()
     }
 }
 

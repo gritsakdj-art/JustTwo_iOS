@@ -73,6 +73,12 @@ extension Color {
     private static let lightDiscoverCardScrim = Color(hex: "#110812")
     private static let darkDiscoverCardScrim = Color(hex: "#04020A")
 
+    private static let lightTabBarInactiveIcon = Color(hex: "#8A76C9")
+    private static let darkTabBarInactiveIcon = Color(hex: "#A696DE")
+
+    private static let lightTabBarInactiveTitle = Color(hex: "#8E7A93")
+    private static let darkTabBarInactiveTitle = Color(hex: "#B8A9C1")
+
     private static let lightGlassBorderHighlight = Color(hex: "#FFFFFF")
     private static let darkGlassBorderHighlight = Color(hex: "#F1EAFB")
 
@@ -183,6 +189,14 @@ extension Color {
 
     static var discoverVioletLight: Color {
         dynamic(light: lightDiscoverVioletLight, dark: darkDiscoverVioletLight)
+    }
+
+    static var tabBarInactiveIcon: Color {
+        dynamic(light: lightTabBarInactiveIcon, dark: darkTabBarInactiveIcon)
+    }
+
+    static var tabBarInactiveTitle: Color {
+        dynamic(light: lightTabBarInactiveTitle, dark: darkTabBarInactiveTitle)
     }
 
     static var discoverPink: Color {

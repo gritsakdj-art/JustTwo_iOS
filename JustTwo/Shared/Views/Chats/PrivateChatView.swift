@@ -3,7 +3,6 @@ import SwiftUI
 struct PrivateChatView: View {
     private static let bottomPaddingID = "private-chat-bottom-padding"
     private static let unreadSeparatorID = "private-chat-unread-separator"
-    private static let scrollCoordinateSpace = "private-chat-scroll-space"
     private static let inputClearance: CGFloat = 16
 
     @State private var viewModel: ChatViewModel
@@ -18,8 +17,7 @@ struct PrivateChatView: View {
     @State private var didScrollToTargetMessage = false
     @State private var didPerformInitialScroll = false
     @State private var isLastReadMessageVisible = true
-    @State private var isLatestMessageVisible = true
-    @State private var scrollViewportHeight: CGFloat = 0
+    @State private var isNearBottom = false
     @State private var initialScrollTask: Task<Void, Never>?
 
     init(
@@ -54,6 +52,8 @@ struct PrivateChatView: View {
             }
             .navigationBarTitleDisplayMode(.inline)
             .navigationStackHostingBackgroundClear()
+            .toolbar(.hidden, for: .tabBar)
+            .tabBarInstantRevealOnPop()
             .toolbarBackground(.hidden, for: .navigationBar)
             .toolbar { toolbarContent }
             .task {
@@ -214,55 +214,20 @@ struct PrivateChatView: View {
                                     .id(Self.unreadSeparatorID)
                             }
 
-                            MessageRow(
-                                message: message,
-                                senderName: message.isMine ? nil : viewModel.conversation.title,
-                                onLongPress: {
-                                    viewModel.openActionMenu(for: message)
-                                },
-                                onReactionTap: { reaction in
-                                    Task {
-                                        await viewModel.toggleReaction(
-                                            reaction,
-                                            on: message,
-                                            session: session,
-                                            router: router
-                                        )
-                                    }
-                                }
-                            )
-                            .id(message.id)
-                            .background {
-                                messageVisibilityTracker(for: message)
-                            }
+                            messageRow(for: message)
                         }
 
                         Color.clear
                             .frame(height: Self.inputClearance)
                             .id(Self.bottomPaddingID)
+                            .onScrollVisibilityChange(threshold: 0.05) { isVisible in
+                                isNearBottom = isVisible
+                            }
                     }
                     .padding(.horizontal, 12)
                     .padding(.top, 8)
                 }
-                .coordinateSpace(name: Self.scrollCoordinateSpace)
-                .background {
-                    GeometryReader { geometry in
-                        Color.clear.preference(
-                            key: ScrollViewportHeightKey.self,
-                            value: geometry.size.height
-                        )
-                    }
-                }
                 .scrollIndicators(.hidden)
-                .onPreferenceChange(ScrollViewportHeightKey.self) { height in
-                    scrollViewportHeight = max(0, height)
-                }
-                .onPreferenceChange(LastReadMessageFrameKey.self) { frame in
-                    updateLastReadVisibility(frame: frame)
-                }
-                .onPreferenceChange(LatestMessageFrameKey.self) { frame in
-                    updateLatestMessageVisibility(frame: frame)
-                }
 
                 if shouldShowScrollDownButton {
                     scrollToBottomButton {
@@ -275,24 +240,22 @@ struct PrivateChatView: View {
             }
             .onChange(of: viewModel.isLoading) { wasLoading, isLoading in
                 guard wasLoading, !isLoading else { return }
-                scheduleInitialScroll(proxy, animated: false)
+                requestInitialScrollIfNeeded(proxy, animated: false)
             }
             .onChange(of: viewModel.messages.count) { oldCount, newCount in
-                guard newCount > 0, oldCount != newCount, !didPerformInitialScroll else { return }
-                scheduleInitialScroll(proxy, animated: false)
+                guard oldCount == 0, newCount > 0, !viewModel.isLoading else { return }
+                requestInitialScrollIfNeeded(proxy, animated: false)
             }
             .onChange(of: viewModel.messages.last?.id) { oldValue, newValue in
                 guard oldValue != nil, newValue != nil else { return }
-                if isLatestMessageVisible {
+                if isNearBottom {
                     scheduleScrollToLatest(proxy, animated: true)
                 }
             }
             .onAppear {
-                didPerformInitialScroll = false
-                didScrollToTargetMessage = false
                 isLastReadMessageVisible = true
-                isLatestMessageVisible = true
-                scheduleInitialScroll(proxy, animated: false)
+                isNearBottom = false
+                requestInitialScrollIfNeeded(proxy, animated: false)
             }
             .onDisappear {
                 initialScrollTask?.cancel()
@@ -306,23 +269,35 @@ struct PrivateChatView: View {
     }
 
     @ViewBuilder
-    private func messageVisibilityTracker(for message: ChatMessage) -> some View {
-        let isLastRead = message.id == viewModel.lastReadVisibilityMessageID
-        let isLatest = message.id == viewModel.messages.last?.id
-
-        if isLastRead || isLatest {
-            GeometryReader { geometry in
-                let frame = geometry.frame(in: .named(Self.scrollCoordinateSpace))
-                Color.clear
-                    .preference(
-                        key: LastReadMessageFrameKey.self,
-                        value: isLastRead ? frame : .zero
+    private func messageRow(for message: ChatMessage) -> some View {
+        let row = MessageRow(
+            message: message,
+            senderName: message.isMine ? nil : viewModel.conversation.title,
+            onLongPress: {
+                viewModel.openActionMenu(for: message)
+            },
+            onReactionTap: { reaction in
+                Task {
+                    await viewModel.toggleReaction(
+                        reaction,
+                        on: message,
+                        session: session,
+                        router: router
                     )
-                    .preference(
-                        key: LatestMessageFrameKey.self,
-                        value: isLatest ? frame : .zero
-                    )
+                }
             }
+        )
+        .id(message.id)
+
+        if message.id == viewModel.lastReadVisibilityMessageID {
+            row.onScrollVisibilityChange(threshold: 0.08) { isVisible in
+                guard didPerformInitialScroll else { return }
+                guard isLastReadMessageVisible != isVisible else { return }
+                isLastReadMessageVisible = isVisible
+                NetworkDebug.log(isVisible ? "Chat down button hidden" : "Chat down button visible")
+            }
+        } else {
+            row
         }
     }
 
@@ -419,20 +394,36 @@ struct PrivateChatView: View {
         }
     }
 
+    private func requestInitialScrollIfNeeded(_ proxy: ScrollViewProxy, animated: Bool) {
+        guard !didPerformInitialScroll, !viewModel.isLoading, !viewModel.messages.isEmpty else { return }
+        scheduleInitialScroll(proxy, animated: animated)
+    }
+
     private func scheduleInitialScroll(_ proxy: ScrollViewProxy, animated: Bool) {
         guard !didPerformInitialScroll, !viewModel.messages.isEmpty else { return }
-        initialScrollTask?.cancel()
+        guard initialScrollTask == nil else { return }
+
+        let target = viewModel.initialScrollTarget(pushTargetMessageID: targetMessageID)
+        logInitialScrollTarget(target)
+
         initialScrollTask = Task { @MainActor in
-            let delays: [UInt64] = [0, 50, 100, 200, 350, 500, 700]
+            defer {
+                didPerformInitialScroll = true
+                initialScrollTask = nil
+            }
+
+            let delays: [UInt64] = [0, 100, 250]
             for delay in delays {
                 if delay > 0 {
                     try? await Task.sleep(for: .milliseconds(delay))
                 }
-                guard !Task.isCancelled, !didPerformInitialScroll else { return }
-                guard !viewModel.messages.isEmpty else { continue }
-                performInitialScroll(proxy, animated: animated)
+                guard !Task.isCancelled, !viewModel.messages.isEmpty else { return }
+                applyInitialScroll(
+                    proxy,
+                    target: target,
+                    animated: animated && delay == 0
+                )
             }
-            didPerformInitialScroll = true
         }
     }
 
@@ -445,18 +436,29 @@ struct PrivateChatView: View {
         }
     }
 
-    private func performInitialScroll(_ proxy: ScrollViewProxy, animated: Bool) {
-        let target = viewModel.initialScrollTarget(pushTargetMessageID: targetMessageID)
+    private func logInitialScrollTarget(_ target: ChatViewModel.InitialScrollTarget) {
+        switch target {
+        case .targetMessage:
+            NetworkDebug.log("Chat initial scroll target: push message")
+        case .lastReadMessage:
+            NetworkDebug.log("Chat initial scroll target: last read message")
+        case .bottom:
+            NetworkDebug.log("Chat initial scroll target: bottom")
+        }
+    }
+
+    private func applyInitialScroll(
+        _ proxy: ScrollViewProxy,
+        target: ChatViewModel.InitialScrollTarget,
+        animated: Bool
+    ) {
         switch target {
         case .targetMessage(let messageID):
             didScrollToTargetMessage = true
-            NetworkDebug.log("Chat initial scroll target: push message")
             scrollTo(messageID, proxy: proxy, anchor: .center, animated: animated)
         case .lastReadMessage(let messageID):
-            NetworkDebug.log("Chat initial scroll target: last read message")
             scrollTo(messageID, proxy: proxy, anchor: .bottom, animated: animated)
         case .bottom:
-            NetworkDebug.log("Chat initial scroll target: bottom")
             scrollToLatestMessage(proxy, animated: animated)
         }
     }
@@ -489,49 +491,6 @@ struct PrivateChatView: View {
         } else {
             proxy.scrollTo(id, anchor: anchor)
         }
-    }
-
-    private func updateLastReadVisibility(frame: CGRect) {
-        guard frame != .zero else { return }
-        let nextValue = ChatViewModel.isMessageVisibleInViewport(
-            frame: frame,
-            viewportHeight: scrollViewportHeight
-        )
-        guard nextValue != isLastReadMessageVisible else { return }
-        isLastReadMessageVisible = nextValue
-        NetworkDebug.log(nextValue ? "Chat down button hidden" : "Chat down button visible")
-    }
-
-    private func updateLatestMessageVisibility(frame: CGRect) {
-        guard frame != .zero else { return }
-        isLatestMessageVisible = ChatViewModel.isMessageVisibleInViewport(
-            frame: frame,
-            viewportHeight: scrollViewportHeight
-        )
-    }
-}
-
-private struct ScrollViewportHeightKey: PreferenceKey {
-    static var defaultValue: CGFloat = 0
-
-    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
-        value = max(value, nextValue())
-    }
-}
-
-private struct LastReadMessageFrameKey: PreferenceKey {
-    static var defaultValue: CGRect = .zero
-
-    static func reduce(value: inout CGRect, nextValue: () -> CGRect) {
-        value = nextValue()
-    }
-}
-
-private struct LatestMessageFrameKey: PreferenceKey {
-    static var defaultValue: CGRect = .zero
-
-    static func reduce(value: inout CGRect, nextValue: () -> CGRect) {
-        value = nextValue()
     }
 }
 

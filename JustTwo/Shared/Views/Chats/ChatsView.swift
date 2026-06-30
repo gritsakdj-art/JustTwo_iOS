@@ -57,8 +57,6 @@ struct ChatsView: View {
                 listViewModel.activateRealtime(session: session, router: router)
             }
             .onChange(of: route?.id) { _, newValue in
-                router.isPrivateChatPresented = newValue != nil
-
                 guard newValue == nil, !usesPreviewData else { return }
                 Task {
                     await listViewModel.refresh(session: session, router: router)
@@ -90,14 +88,6 @@ struct ChatsView: View {
                     )
                     router.clearPendingChatNavigation()
                 }
-
-                router.isPrivateChatPresented = route != nil
-            }
-            .onDisappear {
-                guard !usesPreviewData else { return }
-                if route == nil {
-                    router.isPrivateChatPresented = false
-                }
             }
             .toolbarBackground(.hidden, for: .navigationBar)
         }
@@ -111,11 +101,6 @@ struct ChatsView: View {
         conversation: ChatConversationPreview,
         targetMessageID: UUID? = nil
     ) {
-        var transaction = Transaction()
-        transaction.disablesAnimations = true
-        withTransaction(transaction) {
-            router.isPrivateChatPresented = true
-        }
         route = ChatRoute(
             conversation: conversation,
             targetMessageID: targetMessageID
@@ -258,20 +243,10 @@ struct ChatsView: View {
     .environment(AppRouter.shared)
 }
 
-#Preview("Chats - In Discover Shell") {
-    ZStack {
-        Color.discoverBackgroundGradient
-            .ignoresSafeArea()
-
-        VStack(spacing: 0) {
-            ChatsView(previewViewModel: .preview(conversations: ChatUIMockData.conversations))
-                .environment(\.isDiscoverShell, true)
-
-            AppTabBar(selection: .constant(.chats))
-        }
-    }
-    .environment(SessionStore.shared)
-    .environment(AppRouter.shared)
+#Preview("Chats - In Tab Shell") {
+    MainTabView()
+        .environment(SessionStore.shared)
+        .environment(AppRouter.shared)
 }
 
 #Preview("Chats - Dark") {

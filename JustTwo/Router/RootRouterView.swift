@@ -7,7 +7,7 @@ struct RootRouterView: View {
     var body: some View {
         Group {
             if router.screen == .main, session.isFullyAuthenticated {
-                DiscoverView()
+                MainTabView()
             } else {
                 NavigationStack {
                     screenContent
