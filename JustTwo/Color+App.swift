@@ -26,6 +26,9 @@ extension Color {
     private static let lightBrandGradientEnd = Color(hex: "#6E56CF")
     private static let darkBrandGradientEnd = Color(hex: "#7E5FD4")
 
+    private static let lightIndigo = Color(hex: "#4F46E5")
+    private static let darkIndigo = Color(hex: "#818CF8")
+
     private static let lightBrandPrimaryGlow = Color(hex: "#FF6B8A")
     private static let darkBrandPrimaryGlow = Color(hex: "#FF5F87")
 
@@ -111,6 +114,9 @@ extension Color {
     private static let lightChatBubbleMine = Color(hex: "#E8DEFF")
     private static let darkChatBubbleMine = Color(hex: "#3A2F56")
 
+    private static let lightChatReactionSelected = Color(hex: "#005493")
+    private static let darkChatReactionSelected = Color(hex: "#005493")
+
     // MARK: Semantic — Core UI
 
     static var surface: Color {
@@ -127,6 +133,10 @@ extension Color {
 
     static var brandPrimaryGlow: Color {
         dynamic(light: lightBrandPrimaryGlow, dark: darkBrandPrimaryGlow)
+    }
+
+    static var indigo: Color {
+        dynamic(light: lightIndigo, dark: darkIndigo)
     }
 
     static var glassBorderHighlight: Color {
@@ -171,6 +181,10 @@ extension Color {
 
     static var chatBubbleOther: Color {
         cardSurface
+    }
+
+    static var chatReactionSelected: Color {
+        dynamic(light: lightChatReactionSelected, dark: darkChatReactionSelected)
     }
 
     // MARK: Semantic — Discover
@@ -309,6 +323,14 @@ extension Color {
     static var discoverMoodGradient: LinearGradient {
         LinearGradient(
             colors: [.discoverPink, .discoverPinkLight],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+    }
+
+    static var chatSendButtonGradient: LinearGradient {
+        LinearGradient(
+            colors: [.brandPrimary, .indigo],
             startPoint: .topLeading,
             endPoint: .bottomTrailing
         )

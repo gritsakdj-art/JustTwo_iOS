@@ -1,9 +1,12 @@
 import SwiftUI
+#if canImport(UIKit)
+import UIKit
+#endif
 
 struct PrivateChatView: View {
-    private static let bottomPaddingID = "private-chat-bottom-padding"
     private static let unreadSeparatorID = "private-chat-unread-separator"
-    private static let inputClearance: CGFloat = 16
+    private static let bottomClearance: CGFloat = 28
+    private static let bottomVisibilityThreshold: CGFloat = 0.92
 
     @State private var viewModel: ChatViewModel
     @State private var presenceStore = PresenceStore.shared
@@ -17,15 +20,23 @@ struct PrivateChatView: View {
     @State private var didScrollToTargetMessage = false
     @State private var didPerformInitialScroll = false
     @State private var isLastReadMessageVisible = true
+    @State private var isLatestMessageVisible = true
     @State private var isNearBottom = false
+    @State private var shouldStickToBottom = true
+    @State private var isScrollingToBottom = false
+    @State private var keyboardHeight: CGFloat = 0
+    @State private var isUserDraggingMessageList = false
     @State private var initialScrollTask: Task<Void, Never>?
+    @State private var scrollTask: Task<Void, Never>?
 
     init(
         conversation: ChatConversationPreview,
         targetMessageID: UUID? = nil,
-        previewViewModel: ChatViewModel? = nil
+        previewViewModel: ChatViewModel? = nil,
+        previewPresenceStore: PresenceStore? = nil
     ) {
         self.targetMessageID = targetMessageID
+        _presenceStore = State(initialValue: previewPresenceStore ?? .shared)
         if let previewViewModel {
             _viewModel = State(initialValue: previewViewModel)
             usesPreviewData = true
@@ -39,7 +50,7 @@ struct PrivateChatView: View {
         chatScreen
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background {
-                chatBackground.ignoresSafeArea()
+                chatBackground.ignoresSafeArea(.container, edges: .all)
             }
     }
 
@@ -50,6 +61,7 @@ struct PrivateChatView: View {
             .safeAreaInset(edge: .bottom, spacing: 0) {
                 bottomChrome
             }
+            .ignoresSafeArea(.keyboard, edges: .bottom)
             .navigationBarTitleDisplayMode(.inline)
             .navigationStackHostingBackgroundClear()
             .toolbar(.hidden, for: .tabBar)
@@ -69,10 +81,11 @@ struct PrivateChatView: View {
                 guard !usesPreviewData else { return }
                 viewModel.deactivateRealtime()
             }
-            .sheet(isPresented: actionMenuPresented) {
-                if let message = viewModel.actionMenuMessage {
-                    ChatMessageActionSheet(
+            .overlay {
+                if let message = viewModel.actionMenuMessage, viewModel.actionMenuAnchor != .zero {
+                    ChatMessageContextMenuOverlay(
                         message: message,
+                        anchor: viewModel.actionMenuAnchor,
                         onReply: { viewModel.startReply(to: message) },
                         onCopy: { viewModel.copyMessage(message) },
                         onEdit: { viewModel.startEdit(message: message) },
@@ -91,6 +104,7 @@ struct PrivateChatView: View {
                     )
                 }
             }
+            .animation(.spring(response: 0.34, dampingFraction: 0.88), value: viewModel.actionMenuMessage?.id)
             .alert(
                 "chats.action.delete_confirm_title",
                 isPresented: deleteAlertPresented
@@ -124,17 +138,6 @@ struct PrivateChatView: View {
             }
     }
 
-    private var actionMenuPresented: Binding<Bool> {
-        Binding(
-            get: { viewModel.actionMenuMessage != nil },
-            set: { isPresented in
-                if !isPresented {
-                    viewModel.dismissActionMenu()
-                }
-            }
-        )
-    }
-
     private var deleteAlertPresented: Binding<Bool> {
         Binding(
             get: { viewModel.pendingDeleteMessage != nil },
@@ -149,26 +152,21 @@ struct PrivateChatView: View {
     private var bottomChrome: some View {
         @Bindable var viewModel = viewModel
 
-        return VStack(spacing: 0) {
-            if let mode = viewModel.composeBannerMode {
-                ChatComposeBanner(mode: mode) {
-                    viewModel.cancelCompose()
-                    if viewModel.editingMessage != nil {
-                        viewModel.draftText = ""
-                    }
+        return MessageInputView(
+            text: $viewModel.draftText,
+            onSend: {
+                Task {
+                    await viewModel.send(session: session, router: router)
                 }
-            }
-
-            MessageInputView(
-                text: $viewModel.draftText,
-                onSend: {
-                    Task {
-                        await viewModel.send(session: session, router: router)
-                    }
-                },
-                isSending: viewModel.isSending
-            )
-        }
+            },
+            composeMode: viewModel.composeMode,
+            onCancelCompose: {
+                viewModel.cancelCompose()
+            },
+            isSending: viewModel.isSending
+        )
+        .padding(.bottom, keyboardHeight)
+        .animation(.easeOut(duration: 0.25), value: keyboardHeight)
         .background(Color.clear)
     }
 
@@ -216,22 +214,28 @@ struct PrivateChatView: View {
 
                             messageRow(for: message)
                         }
-
-                        Color.clear
-                            .frame(height: Self.inputClearance)
-                            .id(Self.bottomPaddingID)
-                            .onScrollVisibilityChange(threshold: 0.05) { isVisible in
-                                isNearBottom = isVisible
-                            }
                     }
                     .padding(.horizontal, 12)
                     .padding(.top, 8)
                 }
                 .scrollIndicators(.hidden)
+                .scrollDismissesKeyboard(.interactively)
+                .simultaneousGesture(
+                    DragGesture(minimumDistance: 8)
+                        .onChanged { _ in
+                            if viewModel.actionMenuMessage != nil {
+                                viewModel.dismissActionMenu()
+                            }
+                            isUserDraggingMessageList = true
+                        }
+                        .onEnded { _ in
+                            finishMessageListDrag()
+                        }
+                )
 
                 if shouldShowScrollDownButton {
                     scrollToBottomButton {
-                        scrollToLatestMessage(proxy, animated: true)
+                        requestScrollToLatestFromButton(proxy)
                     }
                     .padding(.trailing, 16)
                     .padding(.bottom, 16)
@@ -248,33 +252,87 @@ struct PrivateChatView: View {
             }
             .onChange(of: viewModel.messages.last?.id) { oldValue, newValue in
                 guard oldValue != nil, newValue != nil else { return }
-                if isNearBottom {
+                if shouldAutoScrollToNewLatestMessage {
                     scheduleScrollToLatest(proxy, animated: true)
                 }
             }
+            .onChange(of: keyboardHeight) { oldValue, newValue in
+                guard abs(newValue - oldValue) > 1, shouldStickToBottom else { return }
+                scheduleScrollToLatest(proxy, animated: true, delays: [0, 120, 280])
+            }
+            #if canImport(UIKit)
+            .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillChangeFrameNotification)) { notification in
+                updateKeyboardHeight(from: notification)
+            }
+            .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { _ in
+                keyboardHeight = 0
+            }
+            #endif
             .onAppear {
                 isLastReadMessageVisible = true
+                isLatestMessageVisible = true
                 isNearBottom = false
+                shouldStickToBottom = true
                 requestInitialScrollIfNeeded(proxy, animated: false)
             }
             .onDisappear {
                 initialScrollTask?.cancel()
                 initialScrollTask = nil
+                scrollTask?.cancel()
+                scrollTask = nil
             }
         }
     }
 
     private var shouldShowScrollDownButton: Bool {
-        didPerformInitialScroll && !viewModel.messages.isEmpty && !isLastReadMessageVisible
+        didPerformInitialScroll && !viewModel.messages.isEmpty && !isNearBottom
+    }
+
+    private var shouldAutoScrollToNewLatestMessage: Bool {
+        guard didPerformInitialScroll, let latestMessage = viewModel.messages.last else { return false }
+        return latestMessage.isMine || isNearBottom
+    }
+
+    private func updateBottomProximity(_ isVisible: Bool) {
+        guard didPerformInitialScroll else { return }
+
+        let isAtBottom = isVisible
+        guard isNearBottom != isAtBottom else { return }
+        isNearBottom = isAtBottom
+
+        if isAtBottom {
+            isScrollingToBottom = false
+            markStuckToBottom()
+        } else if !isScrollingToBottom {
+            shouldStickToBottom = false
+        }
+    }
+
+    private func markStuckToBottom() {
+        isNearBottom = true
+        isLatestMessageVisible = true
+        shouldStickToBottom = true
+    }
+
+    private func finishMessageListDrag() {
+        defer { isUserDraggingMessageList = false }
+
+        if isNearBottom {
+            markStuckToBottom()
+        } else {
+            shouldStickToBottom = false
+        }
     }
 
     @ViewBuilder
     private func messageRow(for message: ChatMessage) -> some View {
+        let isLastMessage = message.id == viewModel.messages.last?.id
+
         let row = MessageRow(
             message: message,
             senderName: message.isMine ? nil : viewModel.conversation.title,
-            onLongPress: {
-                viewModel.openActionMenu(for: message)
+            onLongPress: { frame in
+                viewModel.openActionMenu(for: message, anchor: frame)
             },
             onReactionTap: { reaction in
                 Task {
@@ -287,18 +345,28 @@ struct PrivateChatView: View {
                 }
             }
         )
-        .id(message.id)
 
-        if message.id == viewModel.lastReadVisibilityMessageID {
-            row.onScrollVisibilityChange(threshold: 0.08) { isVisible in
-                guard didPerformInitialScroll else { return }
-                guard isLastReadMessageVisible != isVisible else { return }
-                isLastReadMessageVisible = isVisible
-                NetworkDebug.log(isVisible ? "Chat down button hidden" : "Chat down button visible")
+        Group {
+            if isLastMessage {
+                row
+                    .padding(.bottom, Self.bottomClearance)
+                    .onScrollVisibilityChange(threshold: Self.bottomVisibilityThreshold) { isVisible in
+                        updateBottomProximity(isVisible)
+                    }
+            } else if message.id == viewModel.lastReadVisibilityMessageID {
+                row.onScrollVisibilityChange(threshold: 0.08) { isVisible in
+                    guard didPerformInitialScroll else { return }
+                    guard isLastReadMessageVisible != isVisible else { return }
+                    isLastReadMessageVisible = isVisible
+                }
+            } else {
+                row
             }
-        } else {
-            row
         }
+        .id(message.id)
+        .scaleEffect(viewModel.actionMenuMessage?.id == message.id ? 1.02 : 1)
+        .zIndex(viewModel.actionMenuMessage?.id == message.id ? 2 : 0)
+        .animation(.spring(response: 0.28, dampingFraction: 0.86), value: viewModel.actionMenuMessage?.id)
     }
 
     private var unreadSeparator: some View {
@@ -313,7 +381,7 @@ struct PrivateChatView: View {
                 .lineLimit(1)
                 .fixedSize(horizontal: true, vertical: false)
         }
-        .padding(.horizontal, 14)
+        .padding(.horizontal, 22)
         .padding(.vertical, 10)
         .frame(maxWidth: .infinity)
         .background(
@@ -357,41 +425,65 @@ struct PrivateChatView: View {
     @ToolbarContentBuilder
     private var toolbarContent: some ToolbarContent {
         ToolbarItem(placement: .principal) {
-            VStack(spacing: 2) {
-                Text(viewModel.conversation.title)
-                    .font(Font.App.headline(size: 17, weight: .semibold))
-                    .foregroundStyle(Color.primaryText)
-                    .lineLimit(1)
-
-                if viewModel.isOtherParticipantTyping {
-                    Text("chats.typing")
-                        .font(Font.App.caption())
-                        .foregroundStyle(Color.secondaryText)
-                        .italic()
-                } else if presenceStore.isOnline(profileID: viewModel.conversation.otherParticipantProfileID) {
-                    Text("chats.online")
-                        .font(Font.App.caption())
-                        .foregroundStyle(Color.secondaryText)
-                } else {
-                    Text("chats.personal")
-                        .font(Font.App.caption())
-                        .foregroundStyle(Color.secondaryText)
-                }
-            }
+            headerTitle
         }
 
         ToolbarItem(placement: .topBarTrailing) {
-            ChatAvatarView(
-                title: viewModel.conversation.title,
-                photoURL: viewModel.conversation.avatarURL,
-                photoID: viewModel.conversation.avatarPhotoID,
-                size: 38
-            )
-            .onlinePresenceRing(
-                isOnline: presenceStore.isOnline(profileID: viewModel.conversation.otherParticipantProfileID)
-            )
-            .accessibilityLabel(Text(viewModel.conversation.title))
+            headerAvatar
         }
+    }
+
+    private var headerTitle: some View {
+        VStack(spacing: 2) {
+            Text(viewModel.conversation.title)
+                .font(Font.App.headline(size: 17, weight: .semibold))
+                .foregroundStyle(Color.primaryText)
+                .lineLimit(1)
+
+            if viewModel.isOtherParticipantTyping {
+                Text("chats.typing")
+                    .font(Font.App.caption())
+                    .foregroundStyle(Color.secondaryText)
+                    .italic()
+            } else if presenceStore.isOnline(profileID: viewModel.conversation.otherParticipantProfileID) {
+                Text("chats.online")
+                    .font(Font.App.caption())
+                    .foregroundStyle(Color.secondaryText)
+            } else {
+                Text("chats.personal")
+                    .font(Font.App.caption())
+                    .foregroundStyle(Color.secondaryText)
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 6)
+        .frame(maxWidth: 210)
+        .background(
+            Capsule(style: .continuous)
+                .fill(Color.surface.opacity(0.82))
+        )
+        .overlay(
+            Capsule(style: .continuous)
+                .stroke(Color.glassBorderHighlight.opacity(0.55), lineWidth: 1)
+        )
+        .shadow(color: Color.discoverCardShadow.opacity(0.10), radius: 10, x: 0, y: 4)
+        .accessibilityElement(children: .combine)
+    }
+
+    private var headerAvatar: some View {
+        let headerAvatarSize: CGFloat = 32
+
+        return ChatAvatarView(
+            title: viewModel.conversation.title,
+            photoURL: viewModel.conversation.avatarURL,
+            photoID: viewModel.conversation.avatarPhotoID,
+            size: headerAvatarSize
+        )
+        .onlinePresenceRing(
+            isOnline: presenceStore.isOnline(profileID: viewModel.conversation.otherParticipantProfileID),
+            avatarSize: headerAvatarSize
+        )
+        .accessibilityLabel(Text(viewModel.conversation.title))
     }
 
     private func requestInitialScrollIfNeeded(_ proxy: ScrollViewProxy, animated: Bool) {
@@ -410,6 +502,9 @@ struct PrivateChatView: View {
             defer {
                 didPerformInitialScroll = true
                 initialScrollTask = nil
+                if !isNearBottom {
+                    shouldStickToBottom = false
+                }
             }
 
             let delays: [UInt64] = [0, 100, 250]
@@ -427,14 +522,52 @@ struct PrivateChatView: View {
         }
     }
 
-    private func scheduleScrollToLatest(_ proxy: ScrollViewProxy, animated: Bool) {
-        initialScrollTask?.cancel()
-        initialScrollTask = Task { @MainActor in
-            try? await Task.sleep(for: .milliseconds(50))
-            guard !Task.isCancelled else { return }
-            scrollToLatestMessage(proxy, animated: animated)
+    private func scheduleScrollToLatest(
+        _ proxy: ScrollViewProxy,
+        animated: Bool,
+        delays: [UInt64] = [50]
+    ) {
+        scrollTask?.cancel()
+        isScrollingToBottom = true
+        scrollTask = Task { @MainActor in
+            defer {
+                scrollTask = nil
+                if isScrollingToBottom, !isNearBottom {
+                    isScrollingToBottom = false
+                }
+            }
+
+            let lastIndex = delays.count - 1
+
+            for (index, delay) in delays.enumerated() {
+                if delay > 0 {
+                    try? await Task.sleep(for: .milliseconds(delay))
+                }
+                guard !Task.isCancelled else { return }
+                if isNearBottom { return }
+
+                scrollToLatestMessage(proxy, animated: animated && index == lastIndex)
+            }
         }
     }
+
+    private func requestScrollToLatestFromButton(_ proxy: ScrollViewProxy) {
+        shouldStickToBottom = true
+        scheduleScrollToLatest(proxy, animated: true, delays: [0, 60, 180, 360])
+    }
+
+    #if canImport(UIKit)
+    private func updateKeyboardHeight(from notification: Notification) {
+        guard let frame = notification.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect else {
+            return
+        }
+
+        let screenHeight = UIScreen.main.bounds.height
+        let nextKeyboardHeight = max(0, screenHeight - frame.minY)
+        guard abs(keyboardHeight - nextKeyboardHeight) > 1 else { return }
+        keyboardHeight = nextKeyboardHeight
+    }
+    #endif
 
     private func logInitialScrollTarget(_ target: ChatViewModel.InitialScrollTarget) {
         switch target {
@@ -468,7 +601,6 @@ struct PrivateChatView: View {
 
         let scroll = {
             proxy.scrollTo(lastMessageID, anchor: .bottom)
-            proxy.scrollTo(Self.bottomPaddingID, anchor: .bottom)
         }
 
         if animated {
@@ -494,6 +626,32 @@ struct PrivateChatView: View {
     }
 }
 
+@MainActor
+private enum PrivateChatPreviewState {
+    static let conversation = ChatUIMockData.conversations[0]
+
+    static func onlinePresenceStore() -> PresenceStore {
+        let store = PresenceStore.makeForTesting()
+        if let profileID = conversation.otherParticipantProfileID {
+            store.apply(profileID: profileID, status: .online, lastSeenAt: nil)
+        }
+        return store
+    }
+
+    static func typingViewModel() -> ChatViewModel {
+        var typingProfileIDs: Set<UUID> = []
+        if let profileID = conversation.otherParticipantProfileID {
+            typingProfileIDs.insert(profileID)
+        }
+
+        return .preview(
+            conversation: conversation,
+            messages: ChatUIMockData.richThread,
+            typingProfileIDs: typingProfileIDs
+        )
+    }
+}
+
 #Preview("Chat - With reactions") {
     NavigationStack {
         PrivateChatView(
@@ -502,6 +660,18 @@ struct PrivateChatView: View {
                 conversation: ChatUIMockData.conversations[0],
                 messages: ChatUIMockData.richThread
             )
+        )
+    }
+    .environment(SessionStore.shared)
+    .environment(AppRouter.shared)
+}
+
+#Preview("Chat - Online typing") {
+    NavigationStack {
+        PrivateChatView(
+            conversation: PrivateChatPreviewState.conversation,
+            previewViewModel: PrivateChatPreviewState.typingViewModel(),
+            previewPresenceStore: PrivateChatPreviewState.onlinePresenceStore()
         )
     }
     .environment(SessionStore.shared)

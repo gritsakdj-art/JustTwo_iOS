@@ -67,7 +67,7 @@ struct ChatAvatarView: View {
 
     private var initialsPlaceholder: some View {
         Circle()
-            .fill(Color.discoverVioletLight.opacity(0.35))
+            .fill(Color.discoverVioletLight.opacity(0.28))
             .overlay(
                 Text(title.prefix(1).uppercased())
                     .font(Font.App.manrope(size: size * 0.36, weight: .bold))

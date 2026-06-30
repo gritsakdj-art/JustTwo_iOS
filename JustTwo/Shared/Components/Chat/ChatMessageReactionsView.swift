@@ -4,38 +4,52 @@ struct ChatMessageReactionsView: View {
     let reactions: [ChatMessageReaction]
     var onTap: ((ChatMessageReaction) -> Void)?
 
+    @ScaledMetric(relativeTo: .caption) private var emojiSize: CGFloat = 15
+    @ScaledMetric(relativeTo: .caption) private var countFontSize: CGFloat = 11
+    @ScaledMetric(relativeTo: .caption) private var horizontalPadding: CGFloat = 9
+    @ScaledMetric(relativeTo: .caption) private var verticalPadding: CGFloat = 5
+    @ScaledMetric(relativeTo: .caption) private var chipSpacing: CGFloat = 5
+    @ScaledMetric(relativeTo: .caption) private var contentSpacing: CGFloat = 3
+
     var body: some View {
-        HStack(spacing: 5) {
+        HStack(spacing: chipSpacing) {
             ForEach(reactions) { reaction in
                 Button {
                     onTap?(reaction)
                 } label: {
-                    HStack(spacing: 3) {
+                    HStack(spacing: contentSpacing) {
                         Text(reaction.displayEmoji)
-                            .font(.system(size: 13))
+                            .font(.system(size: emojiSize))
 
                         if reaction.count > 1 {
                             Text("\(reaction.count)")
-                                .font(Font.App.manrope(size: 11, weight: .semibold))
+                                .font(
+                                    Font.App.manrope(
+                                        size: countFontSize,
+                                        weight: .semibold,
+                                        relativeTo: .caption
+                                    )
+                                )
                                 .foregroundStyle(
                                     reaction.reactedByMe ? Color.onAccentText : Color.secondaryText
                                 )
                         }
                     }
-                    .padding(.horizontal, 7)
-                    .padding(.vertical, 3)
+                    .fixedSize(horizontal: true, vertical: false)
+                    .padding(.horizontal, horizontalPadding)
+                    .padding(.vertical, verticalPadding)
                     .background {
                         Capsule(style: .continuous)
                             .fill(
                                 reaction.reactedByMe
-                                    ? Color.brandPrimary.opacity(0.92)
+                                    ? Color.chatReactionSelected.opacity(0.92)
                                     : Color.elevatedSurface.opacity(0.92)
                             )
                     }
                     .overlay {
                         Capsule(style: .continuous)
                             .strokeBorder(
-                                reaction.reactedByMe ? Color.brandPrimary : Color.hairline.opacity(0.7),
+                                reaction.reactedByMe ? Color.chatReactionSelected : Color.hairline.opacity(0.7),
                                 lineWidth: 1
                             )
                     }
@@ -44,6 +58,9 @@ struct ChatMessageReactionsView: View {
                 .disabled(onTap == nil)
             }
         }
+        .fixedSize(horizontal: true, vertical: false)
+        .layoutPriority(1)
+        .dynamicTypeSize(...DynamicTypeSize.xxLarge)
     }
 }
 

@@ -16,10 +16,7 @@ struct ChatBubbleView: View {
         static let tailWidth: CGFloat = 12
         static let textHPad: CGFloat = 14
         static let topPad: CGFloat = 10
-        static let bottomForTime: CGFloat = 22
-        static let bottomForReactionsRow: CGFloat = 30
         static let textLift: CGFloat = 3
-        static let bottomInset: CGFloat = 8
         static let maxWidth: CGFloat = 320
         static let sideInset: CGFloat = 48
         static let minWidth: CGFloat = 120
@@ -27,7 +24,14 @@ struct ChatBubbleView: View {
         static let timeClusterWidth: CGFloat = 54
         static let editedLabelWidth: CGFloat = 52
         static let receiptWidth: CGFloat = 22
+        static let reactionMetadataSpacing: CGFloat = 4
+        static let textToReactionsSpacing: CGFloat = 6
     }
+
+    @ScaledMetric(relativeTo: .caption) private var bottomForTime: CGFloat = 22
+    @ScaledMetric(relativeTo: .body) private var scaledTextToReactionsSpacing: CGFloat = UI.textToReactionsSpacing
+    @ScaledMetric(relativeTo: .caption) private var scaledReactionMetadataSpacing: CGFloat = UI.reactionMetadataSpacing
+    @ScaledMetric(relativeTo: .caption) private var bottomInset: CGFloat = 8
 
     private var bubbleMinWidth: CGFloat {
         let horizontalInsets = bottomLeadingInset + bottomTrailingInset
@@ -61,7 +65,7 @@ struct ChatBubbleView: View {
     }
 
     private var contentBottomPadding: CGFloat {
-        UI.textLift + (reactions.isEmpty ? UI.bottomForTime : UI.bottomForReactionsRow)
+        UI.textLift + bottomForTime
     }
 
     private var bottomLeadingInset: CGFloat {
@@ -73,6 +77,55 @@ struct ChatBubbleView: View {
     }
 
     private var bubbleBody: some View {
+        Group {
+            if reactions.isEmpty {
+                messageContent
+                    .padding(.top, UI.topPad)
+                    .padding(.bottom, contentBottomPadding)
+                    .padding(.leading, UI.textHPad + (isMine ? 0 : UI.tailWidth))
+                    .padding(.trailing, UI.textHPad + (isMine ? UI.tailWidth : 0))
+                    .frame(minWidth: bubbleMinWidth, alignment: .leading)
+                    .background(bubbleBackground)
+                    .overlay(alignment: .bottom) {
+                        HStack {
+                            Spacer(minLength: 0)
+                            metadataCluster
+                        }
+                        .padding(.leading, bottomLeadingInset)
+                        .padding(.trailing, bottomTrailingInset)
+                        .padding(.bottom, bottomInset)
+                    }
+            } else {
+                VStack(alignment: .leading, spacing: 0) {
+                    messageContent
+                        .padding(.top, UI.topPad)
+                        .padding(.leading, UI.textHPad + (isMine ? 0 : UI.tailWidth))
+                        .padding(.trailing, UI.textHPad + (isMine ? UI.tailWidth : 0))
+
+                    ChatMessageReactionsView(
+                        reactions: reactions,
+                        onTap: onReactionTap
+                    )
+                    .padding(.top, scaledTextToReactionsSpacing)
+                    .padding(.leading, bottomLeadingInset)
+                    .padding(.trailing, bottomTrailingInset)
+
+                    HStack {
+                        Spacer(minLength: 0)
+                        metadataCluster
+                    }
+                    .padding(.top, scaledReactionMetadataSpacing)
+                    .padding(.leading, bottomLeadingInset)
+                    .padding(.trailing, bottomTrailingInset)
+                    .padding(.bottom, bottomInset)
+                }
+                .frame(minWidth: bubbleMinWidth, alignment: .leading)
+                .background(bubbleBackground)
+            }
+        }
+    }
+
+    private var messageContent: some View {
         VStack(alignment: .leading, spacing: 6) {
             if let replyPreview {
                 Text(replyPreview)
@@ -94,60 +147,43 @@ struct ChatBubbleView: View {
                 .italic(isDeleted)
                 .multilineTextAlignment(.leading)
         }
-        .padding(.top, UI.topPad)
-        .padding(.bottom, contentBottomPadding)
-        .padding(.leading, UI.textHPad + (isMine ? 0 : UI.tailWidth))
-        .padding(.trailing, UI.textHPad + (isMine ? UI.tailWidth : 0))
-        .frame(minWidth: bubbleMinWidth, alignment: .leading)
-        .background(
-            ChatBubbleShape(isMine: isMine)
-                .fill(isMine ? Color.chatBubbleMine : Color.chatBubbleOther)
-                .overlay(
-                    ChatBubbleShape(isMine: isMine)
-                        .stroke(
-                            Color.glassBorderHighlight.opacity(isMine ? 0.18 : 0.12),
-                            lineWidth: 1
-                        )
-                )
-                .shadow(color: Color.discoverCardShadow.opacity(0.08), radius: 3, x: 0, y: 1)
-                .shadow(color: Color.discoverCardShadow.opacity(0.12), radius: 10, x: 0, y: 6)
-        )
-        .overlay(alignment: .bottom) {
-            HStack(alignment: .lastTextBaseline, spacing: 8) {
-                if !reactions.isEmpty {
-                    ChatMessageReactionsView(
-                        reactions: reactions,
-                        onTap: onReactionTap
+    }
+
+    private var bubbleBackground: some View {
+        ChatBubbleShape(isMine: isMine)
+            .fill(isMine ? Color.chatBubbleMine : Color.chatBubbleOther)
+            .overlay(
+                ChatBubbleShape(isMine: isMine)
+                    .stroke(
+                        Color.glassBorderHighlight.opacity(isMine ? 0.18 : 0.12),
+                        lineWidth: 1
                     )
-                }
+            )
+            .shadow(color: Color.discoverCardShadow.opacity(0.08), radius: 3, x: 0, y: 1)
+            .shadow(color: Color.discoverCardShadow.opacity(0.12), radius: 10, x: 0, y: 6)
+    }
 
-                Spacer(minLength: 6)
-
-                HStack(spacing: 4) {
-                    if isEdited {
-                        Text("chats.edited")
-                            .font(Font.App.caption(size: 11))
-                            .foregroundStyle(Color.secondaryText.opacity(0.75))
-                            .lineLimit(1)
-                    }
-
-                    Text(createdAt, style: .time)
-                        .font(Font.App.caption(size: 11))
-                        .foregroundStyle(Color.secondaryText.opacity(0.75))
-                        .monospacedDigit()
-                        .lineLimit(1)
-
-                    if let deliveryStatus {
-                        MessageDeliveryReceiptView(status: deliveryStatus)
-                    }
-                }
-                .fixedSize(horizontal: true, vertical: false)
-                .allowsHitTesting(false)
+    private var metadataCluster: some View {
+        HStack(spacing: 4) {
+            if isEdited {
+                Text("chats.edited")
+                    .font(Font.App.caption(size: 11))
+                    .foregroundStyle(Color.secondaryText.opacity(0.75))
+                    .lineLimit(1)
             }
-            .padding(.leading, bottomLeadingInset)
-            .padding(.trailing, bottomTrailingInset)
-            .padding(.bottom, UI.bottomInset)
+
+            Text(createdAt, style: .time)
+                .font(Font.App.caption(size: 11))
+                .foregroundStyle(Color.secondaryText.opacity(0.75))
+                .monospacedDigit()
+                .lineLimit(1)
+
+            if let deliveryStatus {
+                MessageDeliveryReceiptView(status: deliveryStatus)
+            }
         }
+        .fixedSize(horizontal: true, vertical: false)
+        .allowsHitTesting(false)
     }
 }
 
@@ -163,7 +199,7 @@ private struct MessageDeliveryReceiptView: View {
                     .font(.system(size: 10, weight: .semibold))
             }
         }
-        .foregroundStyle(status == .read ? Color.brandPrimary : Color.secondaryText.opacity(0.75))
+        .foregroundStyle(status == .read ? Color.discoverVioletLight : Color.secondaryText.opacity(0.75))
         .frame(width: status == .sent ? 10 : 16, height: 12, alignment: .trailing)
         .accessibilityHidden(true)
     }

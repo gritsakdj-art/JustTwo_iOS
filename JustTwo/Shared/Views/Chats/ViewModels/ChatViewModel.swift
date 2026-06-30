@@ -23,6 +23,7 @@ final class ChatViewModel {
     var errorMessage: String?
 
     var actionMenuMessage: ChatMessage?
+    var actionMenuAnchor: CGRect = .zero
     var pendingDeleteMessage: ChatMessage?
     var replyTarget: ChatMessage?
     var editingMessage: ChatMessage?
@@ -60,10 +61,12 @@ final class ChatViewModel {
 
     static func preview(
         conversation: ChatConversationPreview,
-        messages: [ChatMessage]
+        messages: [ChatMessage],
+        typingProfileIDs: Set<UUID> = []
     ) -> ChatViewModel {
         let viewModel = ChatViewModel(conversation: conversation)
         viewModel.messages = messages
+        viewModel.typingProfileIDs = typingProfileIDs
         viewModel.didOpen = true
         return viewModel
     }
@@ -75,7 +78,7 @@ final class ChatViewModel {
         )
     }
 
-    var composeBannerMode: ChatComposeBanner.Mode? {
+    var composeMode: MessageInputComposeMode? {
         if editingMessage != nil {
             return .edit
         }
@@ -212,12 +215,17 @@ final class ChatViewModel {
         await markRead(session: session, router: router)
     }
 
-    func openActionMenu(for message: ChatMessage) {
+    func openActionMenu(for message: ChatMessage, anchor: CGRect) {
+        #if canImport(UIKit)
+        HapticFeedback.impact(.medium)
+        #endif
+        actionMenuAnchor = anchor
         actionMenuMessage = message
     }
 
     func dismissActionMenu() {
         actionMenuMessage = nil
+        actionMenuAnchor = .zero
     }
 
     func startReply(to message: ChatMessage) {
@@ -234,8 +242,12 @@ final class ChatViewModel {
     }
 
     func cancelCompose() {
+        let wasEditing = editingMessage != nil
         replyTarget = nil
         editingMessage = nil
+        if wasEditing {
+            draftText = ""
+        }
     }
 
     func copyMessage(_ message: ChatMessage) {

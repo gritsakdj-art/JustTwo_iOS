@@ -290,5 +290,13 @@ enum ChatUIMapping {
 }
 
 enum ChatQuickReactions {
-    static let emojis = ["👍", "❤️", "😂", "😮", "😢", "🙏"]
+    static let rows: [[String]] = [
+        ["👍", "❤️", "😂", "😮", "😢", "🙏"],
+        ["🔥", "👏", "🎉", "🤔", "😍", "🥰"],
+        ["😡", "👎", "💯", "✨", "🫶", "😭"],
+    ]
+
+    static var allEmojis: [String] {
+        rows.flatMap { $0 }
+    }
 }

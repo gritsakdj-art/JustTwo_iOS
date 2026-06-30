@@ -3,8 +3,10 @@ import SwiftUI
 struct MessageRow: View {
     let message: ChatMessage
     let senderName: String?
-    let onLongPress: () -> Void
+    let onLongPress: (CGRect) -> Void
     var onReactionTap: ((ChatMessageReaction) -> Void)?
+
+    @State private var bubbleFrame: CGRect = .zero
 
     var body: some View {
         HStack {
@@ -23,11 +25,14 @@ struct MessageRow: View {
                 onReactionTap: onReactionTap
             )
             .contentShape(Rectangle())
+            .onGeometryChange(for: CGRect.self, of: { $0.frame(in: .global) }) { _, frame in
+                bubbleFrame = frame
+            }
             .onLongPressGesture(minimumDuration: 0.35) {
                 guard message.canReply || message.canCopy || message.canEdit || message.canDelete || message.canReact else {
                     return
                 }
-                onLongPress()
+                onLongPress(bubbleFrame)
             }
 
             if !message.isMine { Spacer() }
@@ -55,7 +60,7 @@ struct MessageRow: View {
                     deliveryStatus: nil
                 ),
                 senderName: "Emma",
-                onLongPress: {}
+                onLongPress: { _ in }
             )
 
             MessageRow(
@@ -76,7 +81,7 @@ struct MessageRow: View {
                     deliveryStatus: .delivered
                 ),
                 senderName: nil,
-                onLongPress: {}
+                onLongPress: { _ in }
             )
         }
         .padding(.vertical, 8)
