@@ -23,7 +23,8 @@ struct RootView: View {
             .environment(\.layoutDirection, selectedLanguage.layoutDirection(system: systemLayoutDirection))
             .preferredColorScheme(selectedTheme.colorScheme)
             .onAppear {
-                MessengerNotificationService.shared.configure(router: router)
+                PushNotificationRoutingCoordinator.shared.configure(router: router, session: session)
+                MessengerNotificationService.shared.configure()
             }
             .onOpenURL { url in
                 AppDeepLinkHandler.handle(url, router: router, session: session)

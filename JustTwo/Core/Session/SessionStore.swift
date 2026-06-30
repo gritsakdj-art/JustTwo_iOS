@@ -37,6 +37,7 @@ final class SessionStore {
 
         connectRealtimeIfEligible()
         syncPushRegistrationIfEligible()
+        PushNotificationRoutingCoordinator.shared.applyPendingRouteIfPossible()
     }
 
     func setCurrentUser(_ user: UserResponse) {
@@ -76,6 +77,7 @@ final class SessionStore {
         currentUser = nil
         currentProfile = nil
         pendingVerificationEmail = nil
+        PushNotificationRoutingCoordinator.shared.clearPendingRoute()
         AppStartupCoordinator.shared.reset()
         ProfilePhotoStore.shared.reset()
     }

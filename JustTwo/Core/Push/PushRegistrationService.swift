@@ -30,9 +30,13 @@ enum PushEnvironment: String {
 
 @MainActor
 final class PushRegistrationService: NSObject, PushRegistrationServicing {
-    static let shared = PushRegistrationService()
+    var onNotificationTap: (([AnyHashable: Any]) -> Void)? {
+        didSet {
+            deliverPendingNotificationTapIfNeeded()
+        }
+    }
 
-    var onOpenMessage: ((UUID, UUID) -> Void)?
+    private var pendingNotificationTapUserInfo: [AnyHashable: Any]?
 
     private let center = UNUserNotificationCenter.current()
     private let installationIDProvider: InstallationIDProviding
@@ -40,9 +44,15 @@ final class PushRegistrationService: NSObject, PushRegistrationServicing {
     private var inFlightSyncKey: PushDeviceSyncKey?
     private var lastSuccessfulSyncKey: PushDeviceSyncKey?
 
-    init(installationIDProvider: InstallationIDProviding = InstallationIDProvider.shared) {
+    init(installationIDProvider: InstallationIDProviding) {
         self.installationIDProvider = installationIDProvider
     }
+
+    private static func makeShared() -> PushRegistrationService {
+        PushRegistrationService(installationIDProvider: InstallationIDProvider.shared)
+    }
+
+    static let shared = makeShared()
 
     func configure() {
         center.delegate = self
@@ -223,16 +233,18 @@ extension PushRegistrationService: UNUserNotificationCenterDelegate {
         didReceive response: UNNotificationResponse
     ) async {
         let userInfo = response.notification.request.content.userInfo
-        guard let conversationRaw = userInfo[MessengerNotificationService.PayloadKey.conversationID] as? String,
-              let messageRaw = userInfo[MessengerNotificationService.PayloadKey.messageID] as? String,
-              let conversationID = UUID(uuidString: conversationRaw),
-              let messageID = UUID(uuidString: messageRaw)
-        else {
-            NetworkDebug.log("Push notification tap received")
-            return
+        if let onNotificationTap {
+            onNotificationTap(userInfo)
+        } else {
+            pendingNotificationTapUserInfo = userInfo
+            NetworkDebug.log("Push notification tap buffered until routing coordinator is ready")
         }
+    }
 
-        onOpenMessage?(conversationID, messageID)
+    private func deliverPendingNotificationTapIfNeeded() {
+        guard let onNotificationTap, let userInfo = pendingNotificationTapUserInfo else { return }
+        pendingNotificationTapUserInfo = nil
+        onNotificationTap(userInfo)
     }
 }
 

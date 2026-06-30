@@ -9,25 +9,19 @@ final class MessengerNotificationService {
     static var isAppInBackground = false
 
     enum PayloadKey {
+        static let type = "type"
+        static let route = "route"
         static let conversationID = "conversationID"
         static let messageID = "messageID"
     }
 
     private let center = UNUserNotificationCenter.current()
-    private weak var router: AppRouter?
     private var lastFireAtByConversation: [UUID: Date] = [:]
     private let minInterval: TimeInterval = 1.0
 
     private init() {}
 
-    func configure(router: AppRouter) {
-        self.router = router
-        PushRegistrationService.shared.onOpenMessage = { [weak self] conversationID, messageID in
-            Task { @MainActor in
-                self?.handleNotificationTap(conversationID: conversationID, messageID: messageID)
-            }
-        }
-
+    func configure() {
         Task {
             await requestAuthIfNeeded()
         }
@@ -90,6 +84,8 @@ final class MessengerNotificationService {
             )
             content.threadIdentifier = "conversation:\(conversationID.uuidString)"
             content.userInfo = [
+                PayloadKey.type: "message.created",
+                PayloadKey.route: "conversation",
                 PayloadKey.conversationID: conversationID.uuidString,
                 PayloadKey.messageID: messageID.uuidString
             ]
@@ -121,25 +117,6 @@ final class MessengerNotificationService {
         }
         lastFireAtByConversation[conversationID] = now
         return true
-    }
-
-    func handleNotificationTap(conversationID: UUID, messageID: UUID) {
-        guard let router else { return }
-
-        let conversation = ConversationListViewModel.shared.conversations
-            .first(where: { $0.id == conversationID })
-            ?? ChatConversationPreview(
-                id: conversationID,
-                title: String(localized: "chats.unknownParticipant"),
-                avatarURL: nil,
-                avatarPhotoID: nil,
-                lastMessageText: nil,
-                lastSenderName: nil,
-                lastMessageAt: nil,
-                unreadCount: 0
-            )
-
-        router.openChat(conversation, messageID: messageID)
     }
 
     static func makeContent(
