@@ -281,8 +281,8 @@ struct PrivateChatView: View {
                     .animation(.easeOut(duration: 0.2), value: shouldShowScrollDownButton)
                 }
             }
-            .onChange(of: viewModel.isLoading) { _, isLoading in
-                guard !isLoading else { return }
+            .onChange(of: viewModel.isLoading) { _, _ in
+                guard !viewModel.isAwaitingInitialMessagePage else { return }
                 performInitialPositioningIfNeeded(proxy)
             }
             .onChange(of: viewModel.messages.count) { oldCount, newCount in
@@ -295,7 +295,7 @@ struct PrivateChatView: View {
                     return
                 }
 
-                if !didCompleteInitialPositioning, !viewModel.isLoading {
+                if !didCompleteInitialPositioning, !viewModel.isAwaitingInitialMessagePage {
                     if isInitialPositioningInProgress, newCount > oldCount {
                         initialPositioningTask?.cancel()
                         isInitialPositioningInProgress = false
@@ -670,7 +670,7 @@ struct PrivateChatView: View {
         guard !didCompleteInitialPositioning else { return }
         guard !isInitialPositioningInProgress else { return }
         guard initialPositioningTask == nil else { return }
-        guard !viewModel.isLoading else {
+        guard !viewModel.isAwaitingInitialMessagePage else {
             logScrollPhase("waitingForMessages", target: nil)
             return
         }
@@ -699,18 +699,24 @@ struct PrivateChatView: View {
             }
 
             await Task.yield()
-            try? await Task.sleep(for: .milliseconds(layoutDelayMilliseconds(for: viewModel.messages.count)))
-            guard !Task.isCancelled, !viewModel.messages.isEmpty else { return }
 
-            applyInitialScroll(proxy, target: target, animated: false)
-
-            // LazyVStack may not have laid out distant cells on the first pass.
-            try? await Task.sleep(for: .milliseconds(32))
-            guard !Task.isCancelled, !viewModel.messages.isEmpty else { return }
-            applyInitialScroll(proxy, target: target, animated: false)
+            let delays = initialPositioningDelays(for: target, messageCount: viewModel.messages.count)
+            for delay in delays {
+                if delay > 0 {
+                    try? await Task.sleep(for: .milliseconds(delay))
+                }
+                guard !Task.isCancelled, !viewModel.messages.isEmpty else { return }
+                applyInitialScroll(proxy, target: target, animated: false)
+            }
 
             didCompleteInitialPositioning = true
-            markStuckToBottom()
+            switch target {
+            case .bottom:
+                markStuckToBottom()
+            case .unreadSeparator, .targetMessage, .lastReadMessage:
+                isNearBottom = false
+                shouldStickToBottom = false
+            }
 
             MessengerDiagnostics.event(
                 .initialPositioningCompleted,
@@ -880,6 +886,19 @@ struct PrivateChatView: View {
             scrollTo(lastMessageID, proxy: proxy, anchor: .bottom, animated: animated)
         }
         scrollTo(Self.bottomAnchorID, proxy: proxy, anchor: .bottom, animated: animated)
+    }
+
+    private func initialPositioningDelays(
+        for target: ChatViewModel.InitialScrollTarget,
+        messageCount: Int
+    ) -> [UInt64] {
+        switch target {
+        case .unreadSeparator, .targetMessage:
+            // LazyVStack may not lay out off-screen cells on the first pass.
+            return [0, 100, 250]
+        case .bottom, .lastReadMessage:
+            return [layoutDelayMilliseconds(for: messageCount), 32]
+        }
     }
 
     private func layoutDelayMilliseconds(for messageCount: Int) -> UInt64 {

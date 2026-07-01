@@ -52,6 +52,17 @@ final class ChatViewModel {
         self.initialUnreadCount = conversation.unreadCount
         self.typingEmitter = ChatTypingEmitter(conversationID: conversation.id)
         self.deliveryAckCoordinator = deliveryAckCoordinator
+        hydrateFromMessageCacheIfAvailable()
+    }
+
+    /// `true` while the first message page is still incomplete and we should not reveal the list yet.
+    var isAwaitingInitialMessagePage: Bool {
+        guard isLoading else { return false }
+        guard !messages.isEmpty else { return true }
+        if messages.count >= MessengerLimits.defaultMessagePageSize {
+            return false
+        }
+        return hasMoreOlderMessages
     }
 
     convenience init(conversation: ChatConversationPreview) {
@@ -131,6 +142,9 @@ final class ChatViewModel {
         if let pushTargetMessageID,
            messages.contains(where: { $0.id == pushTargetMessageID }) {
             return .targetMessage(pushTargetMessageID)
+        }
+        if firstUnreadMessageID != nil {
+            return .unreadSeparator
         }
         return .bottom
     }
@@ -624,6 +638,7 @@ final class ChatViewModel {
         isLoading = true
         if let cached = messageCache.messages(for: conversation.id), !cached.isEmpty {
             messages = cached
+            syncPaginationStateFromCache()
         }
         errorMessage = nil
 
@@ -1056,6 +1071,21 @@ final class ChatViewModel {
             "didOpen": "\(didOpen)",
             "isOpen": "\(isOpen)"
         ]
+    }
+
+    private func hydrateFromMessageCacheIfAvailable() {
+        guard let cached = messageCache.messages(for: conversation.id), !cached.isEmpty else { return }
+        messages = cached
+        syncPaginationStateFromCache()
+        MessengerDiagnostics.event(
+            .cacheMergeCompleted,
+            conversationID: conversation.id,
+            metadata: [
+                "source": "chatViewModelInit",
+                "messageCount": "\(cached.count)",
+                "hasMoreOlder": "\(hasMoreOlderMessages)"
+            ]
+        )
     }
 
     private func syncPaginationStateFromCache() {
