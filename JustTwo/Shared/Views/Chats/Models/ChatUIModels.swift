@@ -296,6 +296,12 @@ enum ChatQuickReactions {
         ["😡", "👎", "💯", "✨", "🫶", "😭"],
     ]
 
+    static let compactPreviewCount = 5
+
+    static var compactPreview: [String] {
+        Array(rows[0].prefix(compactPreviewCount))
+    }
+
     static var allEmojis: [String] {
         rows.flatMap { $0 }
     }

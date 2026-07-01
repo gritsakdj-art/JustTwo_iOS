@@ -1434,6 +1434,23 @@
         }
       }
     },
+    "chats.action.react_more" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "More reactions"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Больше реакций"
+          }
+        }
+      }
+    },
     "chats.action.reply" : {
       "extractionState" : "manual",
       "localizations" : {

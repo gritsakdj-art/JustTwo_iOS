@@ -79,7 +79,7 @@ struct PrivateChatView: View {
             }
             .onDisappear {
                 guard !usesPreviewData else { return }
-                viewModel.deactivateRealtime()
+                viewModel.close()
             }
             .overlay {
                 if let message = viewModel.actionMenuMessage, viewModel.actionMenuAnchor != .zero {
@@ -155,9 +155,7 @@ struct PrivateChatView: View {
         return MessageInputView(
             text: $viewModel.draftText,
             onSend: {
-                Task {
-                    await viewModel.send(session: session, router: router)
-                }
+                viewModel.send(session: session, router: router)
             },
             composeMode: viewModel.composeMode,
             onCancelCompose: {
@@ -547,6 +545,10 @@ struct PrivateChatView: View {
                 if isNearBottom { return }
 
                 scrollToLatestMessage(proxy, animated: animated && index == lastIndex)
+            }
+
+            if !Task.isCancelled, shouldStickToBottom {
+                markStuckToBottom()
             }
         }
     }

@@ -46,14 +46,9 @@ final class MessageCacheStore {
             return cached
         }
 
-        if let existingTask = loadTasks[conversationID], !force {
+        if let existingTask = loadTasks[conversationID] {
             await existingTask.value
             return entries[conversationID]?.messages ?? []
-        }
-
-        if force {
-            loadTasks[conversationID]?.cancel()
-            loadTasks.removeValue(forKey: conversationID)
         }
 
         var entry = entries[conversationID] ?? Entry(messages: [], loadedAt: .distantPast)
@@ -76,7 +71,7 @@ final class MessageCacheStore {
                 let mapped = response.messages.map {
                     ChatUIMapping.message(from: $0, currentProfileID: profileID)
                 }
-                entries[conversationID] = Entry(messages: mapped, loadedAt: .now)
+                mergeLoadedMessages(mapped, for: conversationID)
             } catch let error as NetworkError {
                 if let message = MessengerSessionSupport.handleNetworkError(error, session: session, router: router) {
                     entries[conversationID]?.errorMessage = message
@@ -131,6 +126,61 @@ final class MessageCacheStore {
         entry.loadedAt = .now
         entries[conversationID] = entry
         return true
+    }
+
+    func mergeLoadedMessages(_ loadedMessages: [ChatMessage], for conversationID: UUID) {
+        var mergedByID: [UUID: ChatMessage] = [:]
+
+        for message in entries[conversationID]?.messages ?? [] {
+            mergedByID[message.id] = message
+        }
+        for message in loadedMessages {
+            if let existing = mergedByID[message.id] {
+                mergedByID[message.id] = mergeLoadedMessage(message, withExisting: existing)
+            } else {
+                mergedByID[message.id] = message
+            }
+        }
+
+        let merged = mergedByID.values.sorted {
+            if $0.createdAt == $1.createdAt {
+                return $0.id.uuidString < $1.id.uuidString
+            }
+            return $0.createdAt < $1.createdAt
+        }
+
+        entries[conversationID] = Entry(messages: merged, loadedAt: .now)
+    }
+
+    private func mergeLoadedMessage(_ loaded: ChatMessage, withExisting existing: ChatMessage) -> ChatMessage {
+        let candidate: ChatMessage
+
+        if existing.isDeleted, !loaded.isDeleted {
+            candidate = existing
+        } else if existing.isEdited, !loaded.isEdited, !loaded.isDeleted {
+            candidate = existing
+        } else {
+            candidate = loaded
+        }
+
+        guard let highestStatus = highestDeliveryStatus(existing.deliveryStatus, loaded.deliveryStatus) else {
+            return candidate
+        }
+        return candidate.replacingDeliveryStatus(highestStatus)
+    }
+
+    private func highestDeliveryStatus(
+        _ lhs: MessageDeliveryStatus?,
+        _ rhs: MessageDeliveryStatus?
+    ) -> MessageDeliveryStatus? {
+        switch (lhs, rhs) {
+        case (.none, .none):
+            return nil
+        case (.some(let status), .none), (.none, .some(let status)):
+            return status
+        case (.some(let lhs), .some(let rhs)):
+            return lhs.rank >= rhs.rank ? lhs : rhs
+        }
     }
 
     @discardableResult

@@ -68,6 +68,105 @@ struct MessageCacheStoreTests {
     }
 
     @Test
+    func mergeLoadedMessagesPreservesRealtimeMessageNotInFetchResponse() {
+        let store = MessageCacheStore.shared
+        store.reset()
+        let fetched = makeMessage(
+            id: UUID(uuidString: "11111111-1111-1111-1111-111111111111")!,
+            createdAt: Date(timeIntervalSince1970: 1_000),
+            isMine: false,
+            status: nil
+        )
+        let realtime = makeMessage(
+            id: UUID(uuidString: "22222222-2222-2222-2222-222222222222")!,
+            createdAt: Date(timeIntervalSince1970: 2_000),
+            isMine: false,
+            status: nil
+        )
+
+        store.setMessages([realtime], for: conversationID)
+        store.mergeLoadedMessages([fetched], for: conversationID)
+
+        let messages = store.messages(for: conversationID) ?? []
+        #expect(messages.map(\.id) == [fetched.id, realtime.id])
+    }
+
+    @Test
+    func mergeLoadedMessagesDoesNotRollbackRealtimeDelete() {
+        let store = MessageCacheStore.shared
+        store.reset()
+        let messageID = UUID()
+        let staleFetched = makeMessage(
+            id: messageID,
+            createdAt: Date(timeIntervalSince1970: 1_000),
+            isMine: false,
+            status: nil,
+            text: "Original"
+        )
+        let realtimeDeleted = staleFetched.markingDeleted(deletedAt: .now)
+
+        store.setMessages([realtimeDeleted], for: conversationID)
+        store.mergeLoadedMessages([staleFetched], for: conversationID)
+
+        let message = store.messages(for: conversationID)?.first
+        #expect(message?.isDeleted == true)
+        #expect(message?.rawBody == nil)
+    }
+
+    @Test
+    func mergeLoadedMessagesDoesNotRollbackRealtimeEdit() {
+        let store = MessageCacheStore.shared
+        store.reset()
+        let messageID = UUID()
+        let staleFetched = makeMessage(
+            id: messageID,
+            createdAt: Date(timeIntervalSince1970: 1_000),
+            isMine: false,
+            status: nil,
+            text: "Original"
+        )
+        let realtimeEdited = makeMessage(
+            id: messageID,
+            createdAt: Date(timeIntervalSince1970: 1_000),
+            isMine: false,
+            status: nil,
+            text: "Edited",
+            isEdited: true
+        )
+
+        store.setMessages([realtimeEdited], for: conversationID)
+        store.mergeLoadedMessages([staleFetched], for: conversationID)
+
+        let message = store.messages(for: conversationID)?.first
+        #expect(message?.displayText == "Edited")
+        #expect(message?.isEdited == true)
+    }
+
+    @Test
+    func mergeLoadedMessagesDoesNotDowngradeRealtimeReceipt() {
+        let store = MessageCacheStore.shared
+        store.reset()
+        let messageID = UUID()
+        let staleFetched = makeMessage(
+            id: messageID,
+            createdAt: Date(timeIntervalSince1970: 1_000),
+            isMine: true,
+            status: .sent
+        )
+        let realtimeRead = makeMessage(
+            id: messageID,
+            createdAt: Date(timeIntervalSince1970: 1_000),
+            isMine: true,
+            status: .read
+        )
+
+        store.setMessages([realtimeRead], for: conversationID)
+        store.mergeLoadedMessages([staleFetched], for: conversationID)
+
+        #expect(store.messages(for: conversationID)?.first?.deliveryStatus == .read)
+    }
+
+    @Test
     func markMessageDeletedUpdatesCache() {
         let store = MessageCacheStore.shared
         store.reset()
@@ -152,16 +251,18 @@ struct MessageCacheStoreTests {
         id: UUID,
         createdAt: Date,
         isMine: Bool,
-        status: MessageDeliveryStatus?
+        status: MessageDeliveryStatus?,
+        text: String = "Message",
+        isEdited: Bool = false
     ) -> ChatMessage {
         ChatMessage(
             id: id,
-            displayText: "Message",
-            rawBody: "Message",
+            displayText: text,
+            rawBody: text,
             createdAt: createdAt,
             isMine: isMine,
             isDeleted: false,
-            isEdited: false,
+            isEdited: isEdited,
             replyPreview: nil,
             reactions: [],
             deliveryStatus: status

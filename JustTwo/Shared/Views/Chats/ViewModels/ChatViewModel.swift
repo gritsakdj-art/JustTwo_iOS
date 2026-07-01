@@ -30,7 +30,11 @@ final class ChatViewModel {
 
     private var currentProfileID: UUID?
     private var didOpen = false
+    private var isOpen = false
     private var isRealtimeActive = false
+    private var lifecycleGeneration = 0
+    private var loadTask: Task<Void, Never>?
+    private var sendTask: Task<Void, Never>?
     private var typingTimeoutTasks: [UUID: Task<Void, Never>] = [:]
     private let typingEmitter: ChatTypingEmitter
     private let typingTimeout: TimeInterval = 5
@@ -144,9 +148,17 @@ final class ChatViewModel {
     }
 
     func open(session: SessionStore, router: AppRouter) async {
-        guard !didOpen else { return }
-        didOpen = true
-        await loadMessages(session: session, router: router)
+        isOpen = true
+        let generation = lifecycleGeneration
+
+        if !didOpen {
+            await loadMessages(session: session, router: router, generation: generation)
+            guard generation == lifecycleGeneration, isOpen else { return }
+            didOpen = true
+        } else if let cached = messageCache.messages(for: conversation.id), !cached.isEmpty {
+            messages = cached
+        }
+
         await markDelivered(session: session, router: router)
         await markRead(session: session, router: router)
     }
@@ -162,6 +174,16 @@ final class ChatViewModel {
         isRealtimeActive = false
         stopTyping()
         MessengerRealtimeCoordinator.shared.deactivateChat(self)
+    }
+
+    func close() {
+        lifecycleGeneration += 1
+        isOpen = false
+        isLoading = false
+        loadTask?.cancel()
+        loadTask = nil
+        clearTypingState()
+        deactivateRealtime()
     }
 
     func stopTyping() {
@@ -206,11 +228,16 @@ final class ChatViewModel {
     }
 
     func reload(session: SessionStore, router: AppRouter) async {
-        await loadMessages(session: session, router: router)
+        lifecycleGeneration += 1
+        let generation = lifecycleGeneration
+        await loadMessages(session: session, router: router, generation: generation)
     }
 
     func refreshFromRealtime(session: SessionStore, router: AppRouter) async {
-        await loadMessages(session: session, router: router)
+        guard isOpen else { return }
+        let generation = lifecycleGeneration
+        await loadMessages(session: session, router: router, generation: generation)
+        guard generation == lifecycleGeneration, isOpen else { return }
         await markDelivered(session: session, router: router)
         await markRead(session: session, router: router)
     }
@@ -266,51 +293,87 @@ final class ChatViewModel {
         }
     }
 
-    func send(session: SessionStore, router: AppRouter) async {
+    func send(session: SessionStore, router: AppRouter) {
         let trimmed = draftText.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty, !isSending else { return }
+        guard !trimmed.isEmpty, !isSending, sendTask == nil else { return }
         guard trimmed.count <= MessengerLimits.maxMessageLength else {
             errorMessage = String(localized: "chats.error.message_too_long")
             return
         }
 
+        let originalDraftText = draftText
+        let activeReplyTarget = replyTarget
+        let activeEditingMessage = editingMessage
+        let clientMessageID = UUID().uuidString
+
         isSending = true
         errorMessage = nil
+        draftText = ""
+        typingEmitter.messageSent()
+
+        sendTask = Task { @MainActor [weak self] in
+            await self?.performSend(
+                body: trimmed,
+                originalDraftText: originalDraftText,
+                replyTarget: activeReplyTarget,
+                editingMessage: activeEditingMessage,
+                clientMessageID: clientMessageID,
+                session: session,
+                router: router
+            )
+        }
+    }
+
+    private func performSend(
+        body trimmed: String,
+        originalDraftText: String,
+        replyTarget activeReplyTarget: ChatMessage?,
+        editingMessage activeEditingMessage: ChatMessage?,
+        clientMessageID: String,
+        session: SessionStore,
+        router: AppRouter
+    ) async {
+        defer {
+            isSending = false
+            sendTask = nil
+        }
 
         do {
             let profileID = try await MessengerSessionSupport.resolveCurrentProfileID(session: session)
             currentProfileID = profileID
 
             let dto: MessageDTO
-            if let editing = editingMessage {
+            if let editing = activeEditingMessage {
                 dto = try await MessageService.editMessage(messageID: editing.id, body: trimmed)
-                self.editingMessage = nil
             } else {
                 dto = try await MessageService.sendMessage(
                     conversationID: conversation.id,
                     body: trimmed,
-                    replyToID: replyTarget?.id,
-                    clientMessageID: UUID().uuidString
+                    replyToID: activeReplyTarget?.id,
+                    clientMessageID: clientMessageID
                 )
-                replyTarget = nil
             }
 
-            draftText = ""
-            typingEmitter.messageSent()
+            if editingMessage?.id == activeEditingMessage?.id {
+                editingMessage = nil
+            }
+            if replyTarget?.id == activeReplyTarget?.id {
+                replyTarget = nil
+            }
             let mapped = ChatUIMapping.message(from: dto, currentProfileID: profileID)
             appendOrReplace(mapped)
             messageCache.upsertMessage(mapped, conversationID: conversation.id)
         } catch let error as NetworkError {
+            restoreDraftAfterFailedSend(originalDraftText, replyTarget: activeReplyTarget, editingMessage: activeEditingMessage)
             if error.isUserBlocked {
                 errorMessage = String(localized: "chats.error.user_blocked")
             } else if let message = MessengerSessionSupport.handleNetworkError(error, session: session, router: router) {
                 errorMessage = message
             }
         } catch {
+            restoreDraftAfterFailedSend(originalDraftText, replyTarget: activeReplyTarget, editingMessage: activeEditingMessage)
             errorMessage = error.localizedDescription
         }
-
-        isSending = false
     }
 
     func deletePendingMessage(session: SessionStore, router: AppRouter) async {
@@ -403,7 +466,33 @@ final class ChatViewModel {
         }
     }
 
-    private func loadMessages(session: SessionStore, router: AppRouter) async {
+    private func restoreDraftAfterFailedSend(
+        _ originalDraftText: String,
+        replyTarget activeReplyTarget: ChatMessage?,
+        editingMessage activeEditingMessage: ChatMessage?
+    ) {
+        if draftText.isEmpty {
+            draftText = originalDraftText
+        }
+        if replyTarget == nil {
+            replyTarget = activeReplyTarget
+        }
+        if editingMessage == nil {
+            editingMessage = activeEditingMessage
+        }
+    }
+
+    private func loadMessages(
+        session: SessionStore,
+        router: AppRouter,
+        generation: Int
+    ) async {
+        defer {
+            if generation == lifecycleGeneration {
+                isLoading = false
+            }
+        }
+
         if let cached = messageCache.messages(for: conversation.id), !cached.isEmpty {
             messages = cached
             isLoading = false
@@ -414,15 +503,28 @@ final class ChatViewModel {
 
         do {
             let profileID = try await MessengerSessionSupport.resolveCurrentProfileID(session: session)
+            guard generation == lifecycleGeneration, isOpen else { return }
             currentProfileID = profileID
 
-            let loaded = await messageCache.loadRecentMessagesIfNeeded(
-                conversationID: conversation.id,
-                limit: MessengerLimits.defaultMessagePageSize,
-                session: session,
-                router: router,
-                force: true
-            )
+            if loadTask == nil {
+                loadTask = Task { @MainActor [weak self] in
+                    guard let self else { return }
+                    _ = await self.messageCache.loadRecentMessagesIfNeeded(
+                        conversationID: self.conversation.id,
+                        limit: MessengerLimits.defaultMessagePageSize,
+                        session: session,
+                        router: router,
+                        force: true
+                    )
+                }
+            }
+
+            await loadTask?.value
+            if generation == lifecycleGeneration {
+                loadTask = nil
+            }
+            guard generation == lifecycleGeneration, isOpen else { return }
+            let loaded = messageCache.messages(for: conversation.id) ?? []
             messages = loaded
             if let cacheError = messageCache.entry(for: conversation.id)?.errorMessage {
                 errorMessage = cacheError
@@ -434,12 +536,10 @@ final class ChatViewModel {
         } catch {
             errorMessage = error.localizedDescription
         }
-
-        isLoading = false
     }
 
     private func markRead(session: SessionStore, router: AppRouter) async {
-        guard didOpen, MessengerSessionSupport.isAppForegroundActive else {
+        guard didOpen, isOpen, MessengerSessionSupport.isAppForegroundActive else {
             NetworkDebug.log("Messenger read ack skipped: inactive chat or background")
             return
         }
@@ -461,6 +561,7 @@ final class ChatViewModel {
                 lastReadMessageID: messageID
             )
             deliveryAckCoordinator.markReadAcked(conversationID: conversation.id, messageID: messageID)
+            MessengerRealtimeCoordinator.shared.markActiveConversationReadLocally(conversationID: conversation.id)
             NetworkDebug.log("Messenger read ack sent: \(conversation.id)")
         } catch let error as NetworkError {
             _ = MessengerSessionSupport.handleNetworkError(error, session: session, router: router)
@@ -470,6 +571,10 @@ final class ChatViewModel {
     }
 
     private func markDelivered(session: SessionStore, router: AppRouter) async {
+        guard isOpen else {
+            NetworkDebug.log("Messenger delivered ack skipped: inactive chat")
+            return
+        }
         guard MessengerSessionSupport.isAppForegroundActive else {
             NetworkDebug.log("Messenger delivered ack skipped: background")
             return

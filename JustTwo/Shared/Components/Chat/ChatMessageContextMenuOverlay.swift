@@ -11,7 +11,7 @@ struct ChatMessageContextMenuOverlay: View {
     let onDismiss: () -> Void
 
     @Environment(\.colorScheme) private var colorScheme
-    @State private var revealedReactionRows = 0
+    @State private var areReactionsExpanded = false
 
     private let reactionColumns = Array(repeating: GridItem(.flexible(), spacing: 6), count: 6)
     private let panelWidth: CGFloat = 312
@@ -23,23 +23,31 @@ struct ChatMessageContextMenuOverlay: View {
             let safeTop = geometry.safeAreaInsets.top + 8
             let safeBottom = geometry.safeAreaInsets.bottom + 8
             let panelLeadingX = panelLeadingX(in: geometry, localAnchor: localAnchor)
+            let placement = menuPlacement(
+                anchor: localAnchor,
+                safeTop: safeTop,
+                safeBottom: safeBottom,
+                containerHeight: geometry.size.height
+            )
+            let positions = panelPositions(
+                placement: placement,
+                anchor: localAnchor,
+                safeTop: safeTop,
+                safeBottom: safeBottom,
+                containerHeight: geometry.size.height
+            )
 
             ZStack(alignment: .topLeading) {
                 Color.black.opacity(colorScheme == .dark ? 0.44 : 0.28)
                     .ignoresSafeArea()
                     .onTapGesture(perform: onDismiss)
 
-                if message.canReact {
+                if message.canReact, let reactionsY = positions.reactionsCenterY {
                     reactionsPanel
                         .frame(width: panelWidth)
                         .position(
                             x: panelLeadingX + panelWidth / 2,
-                            y: clampedReactionsCenterY(
-                                anchor: localAnchor,
-                                safeTop: safeTop,
-                                safeBottom: safeBottom,
-                                containerHeight: geometry.size.height
-                            )
+                            y: reactionsY
                         )
                 }
 
@@ -47,32 +55,40 @@ struct ChatMessageContextMenuOverlay: View {
                     .frame(width: panelWidth)
                     .position(
                         x: panelLeadingX + panelWidth / 2,
-                        y: clampedActionsCenterY(
-                            anchor: localAnchor,
-                            safeTop: safeTop,
-                            safeBottom: safeBottom,
-                            containerHeight: geometry.size.height
-                        )
+                        y: positions.actionsCenterY
                     )
             }
         }
         .ignoresSafeArea()
         .onAppear {
-            animateReactionRowsIn()
+            areReactionsExpanded = false
         }
         .transition(.opacity)
     }
 
     private var reactionsPanel: some View {
         VStack(alignment: .leading, spacing: 8) {
-            ForEach(Array(ChatQuickReactions.rows.enumerated()), id: \.offset) { index, row in
-                if index < revealedReactionRows {
+            if areReactionsExpanded {
+                ForEach(Array(ChatQuickReactions.rows.enumerated()), id: \.offset) { _, row in
                     LazyVGrid(columns: reactionColumns, spacing: 6) {
                         ForEach(row, id: \.self) { emoji in
                             reactionButton(emoji)
                         }
                     }
-                    .transition(.scale(scale: 0.88, anchor: .bottom).combined(with: .opacity))
+                }
+
+                HStack {
+                    Spacer(minLength: 0)
+                    expandReactionsButton
+                        .frame(width: 46)
+                    Spacer(minLength: 0)
+                }
+            } else {
+                LazyVGrid(columns: reactionColumns, spacing: 6) {
+                    ForEach(ChatQuickReactions.compactPreview, id: \.self) { emoji in
+                        reactionButton(emoji)
+                    }
+                    expandReactionsButton
                 }
             }
         }
@@ -85,6 +101,32 @@ struct ChatMessageContextMenuOverlay: View {
                 .strokeBorder(Color.glassBorderHighlight.opacity(0.28), lineWidth: 1)
         }
         .shadow(color: Color.discoverCardShadow.opacity(0.18), radius: 18, x: 0, y: 8)
+        .animation(.spring(response: 0.34, dampingFraction: 0.82), value: areReactionsExpanded)
+    }
+
+    private var expandReactionsButton: some View {
+        Button {
+            #if canImport(UIKit)
+            HapticFeedback.impact(.light)
+            #endif
+            areReactionsExpanded.toggle()
+        } label: {
+            Image(systemName: areReactionsExpanded ? "chevron.up" : "chevron.down")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(Color.discoverViolet)
+                .frame(maxWidth: .infinity)
+                .frame(height: 40)
+                .background(
+                    Circle()
+                        .fill(Color.cardSurface.opacity(colorScheme == .dark ? 0.55 : 0.72))
+                )
+                .overlay {
+                    Circle()
+                        .strokeBorder(Color.glassBorderHighlight.opacity(0.22), lineWidth: 1)
+                }
+        }
+        .buttonStyle(.spring(pressedScale: 0.9))
+        .accessibilityLabel(String(localized: "chats.action.react_more"))
     }
 
     private var actionsPanel: some View {
@@ -201,18 +243,151 @@ struct ChatMessageContextMenuOverlay: View {
         action(value)
     }
 
-    private func animateReactionRowsIn() {
-        revealedReactionRows = 0
-        guard message.canReact else { return }
+    // MARK: - Placement
 
-        for index in ChatQuickReactions.rows.indices {
-            let delay = Double(index) * 0.05
-            DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
-                withAnimation(.spring(response: 0.34, dampingFraction: 0.82)) {
-                    revealedReactionRows = index + 1
-                }
-            }
+    private enum MenuPlacement {
+        case split
+        case bothBelow
+        case bothAbove
+    }
+
+    private struct PanelPositions {
+        var reactionsCenterY: CGFloat?
+        var actionsCenterY: CGFloat
+    }
+
+    private func menuPlacement(
+        anchor: CGRect,
+        safeTop: CGFloat,
+        safeBottom: CGFloat,
+        containerHeight: CGFloat
+    ) -> MenuPlacement {
+        let usableHeight = max(containerHeight - safeTop - safeBottom, 1)
+        let relativeY = (anchor.midY - safeTop) / usableHeight
+
+        if relativeY < 0.33 {
+            return .bothBelow
+        } else if relativeY > 0.66 {
+            return .bothAbove
+        } else {
+            return .split
         }
+    }
+
+    private func panelPositions(
+        placement: MenuPlacement,
+        anchor: CGRect,
+        safeTop: CGFloat,
+        safeBottom: CGFloat,
+        containerHeight: CGFloat
+    ) -> PanelPositions {
+        let reactionsH = reactionsPanelHeight
+        let actionsH = actionsPanelHeight
+
+        switch placement {
+        case .split:
+            let reactionsY = message.canReact
+                ? clampCenterY(
+                    anchor.minY - panelGap - reactionsH / 2,
+                    panelHeight: reactionsH,
+                    safeTop: safeTop,
+                    safeBottom: safeBottom,
+                    containerHeight: containerHeight
+                )
+                : nil
+            let actionsY = clampCenterY(
+                anchor.maxY + panelGap + actionsH / 2,
+                panelHeight: actionsH,
+                safeTop: safeTop,
+                safeBottom: safeBottom,
+                containerHeight: containerHeight
+            )
+            return PanelPositions(reactionsCenterY: reactionsY, actionsCenterY: actionsY)
+
+        case .bothBelow:
+            var cursor = anchor.maxY + panelGap
+            var reactionsY: CGFloat?
+            if message.canReact {
+                reactionsY = cursor + reactionsH / 2
+                cursor += reactionsH + panelGap
+            }
+            let actionsY = cursor + actionsH / 2
+            return clampStack(
+                reactionsCenterY: reactionsY,
+                actionsCenterY: actionsY,
+                reactionsHeight: reactionsH,
+                actionsHeight: actionsH,
+                safeTop: safeTop,
+                safeBottom: safeBottom,
+                containerHeight: containerHeight
+            )
+
+        case .bothAbove:
+            var cursor = anchor.minY - panelGap
+            let actionsY = cursor - actionsH / 2
+            cursor -= actionsH + panelGap
+            var reactionsY: CGFloat?
+            if message.canReact {
+                reactionsY = cursor - reactionsH / 2
+            }
+            return clampStack(
+                reactionsCenterY: reactionsY,
+                actionsCenterY: actionsY,
+                reactionsHeight: reactionsH,
+                actionsHeight: actionsH,
+                safeTop: safeTop,
+                safeBottom: safeBottom,
+                containerHeight: containerHeight
+            )
+        }
+    }
+
+    private func clampCenterY(
+        _ centerY: CGFloat,
+        panelHeight: CGFloat,
+        safeTop: CGFloat,
+        safeBottom: CGFloat,
+        containerHeight: CGFloat
+    ) -> CGFloat {
+        let minY = safeTop + panelHeight / 2
+        let maxY = containerHeight - safeBottom - panelHeight / 2
+        return min(max(centerY, minY), maxY)
+    }
+
+    private func clampStack(
+        reactionsCenterY: CGFloat?,
+        actionsCenterY: CGFloat,
+        reactionsHeight: CGFloat,
+        actionsHeight: CGFloat,
+        safeTop: CGFloat,
+        safeBottom: CGFloat,
+        containerHeight: CGFloat
+    ) -> PanelPositions {
+        let stackTop: CGFloat
+        let stackBottom: CGFloat
+
+        if let reactionsCenterY {
+            stackTop = reactionsCenterY - reactionsHeight / 2
+            stackBottom = actionsCenterY + actionsHeight / 2
+        } else {
+            stackTop = actionsCenterY - actionsHeight / 2
+            stackBottom = actionsCenterY + actionsHeight / 2
+        }
+
+        let minTop = safeTop
+        let maxBottom = containerHeight - safeBottom
+        var offset: CGFloat = 0
+
+        if stackBottom > maxBottom {
+            offset = maxBottom - stackBottom
+        } else if stackTop < minTop {
+            offset = minTop - stackTop
+        }
+
+        return PanelPositions(
+            reactionsCenterY: reactionsCenterY.map { $0 + offset },
+            actionsCenterY: actionsCenterY + offset
+        )
     }
 
     private func anchorInLocalSpace(_ anchor: CGRect, container: GeometryProxy) -> CGRect {
@@ -230,35 +405,12 @@ struct ChatMessageContextMenuOverlay: View {
         return max(margin, min(localAnchor.minX, maxX))
     }
 
-    private func clampedReactionsCenterY(
-        anchor: CGRect,
-        safeTop: CGFloat,
-        safeBottom: CGFloat,
-        containerHeight: CGFloat
-    ) -> CGFloat {
-        let estimatedHeight = reactionsPanelHeight
-        let preferred = anchor.minY - panelGap - estimatedHeight / 2
-        let minY = safeTop + estimatedHeight / 2
-        let maxY = containerHeight - safeBottom - estimatedHeight / 2
-        return min(max(preferred, minY), maxY)
-    }
-
-    private func clampedActionsCenterY(
-        anchor: CGRect,
-        safeTop: CGFloat,
-        safeBottom: CGFloat,
-        containerHeight: CGFloat
-    ) -> CGFloat {
-        let estimatedHeight = actionsPanelHeight
-        let preferred = anchor.maxY + panelGap + estimatedHeight / 2
-        let minY = safeTop + estimatedHeight / 2
-        let maxY = containerHeight - safeBottom - estimatedHeight / 2
-        return min(max(preferred, minY), maxY)
-    }
-
     private var reactionsPanelHeight: CGFloat {
-        let rowCount = CGFloat(max(revealedReactionRows, ChatQuickReactions.rows.count))
-        return rowCount * 46 + 24
+        if areReactionsExpanded {
+            let rowCount = CGFloat(ChatQuickReactions.rows.count)
+            return rowCount * 46 + 46 + 24
+        }
+        return 46 + 24
     }
 
     private var actionsPanelHeight: CGFloat {

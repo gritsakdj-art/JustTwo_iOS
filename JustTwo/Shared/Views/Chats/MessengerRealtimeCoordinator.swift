@@ -62,13 +62,17 @@ final class MessengerRealtimeCoordinator {
     ) {
         activeChatViewModel = viewModel
         activeConversationID = viewModel.conversation.id
-        _ = conversationListViewModel?.markConversationReadLocally(conversationID: viewModel.conversation.id)
         updateContext(session: session, router: router)
         startListeningIfNeeded()
 
         Task { [weak self] in
             await self?.subscribeActiveConversationIfNeeded()
         }
+    }
+
+    func markActiveConversationReadLocally(conversationID: UUID) {
+        guard activeConversationID == conversationID else { return }
+        _ = conversationListViewModel?.markConversationReadLocally(conversationID: conversationID)
     }
 
     func deactivateChat(_ viewModel: ChatViewModel) {
