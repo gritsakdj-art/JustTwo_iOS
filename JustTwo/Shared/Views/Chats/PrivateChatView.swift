@@ -6,6 +6,7 @@ import UIKit
 struct PrivateChatView: View {
     private static let unreadSeparatorID = "private-chat-unread-separator"
     private static let loadOlderHeaderID = "private-chat-load-older-header"
+    private static let bottomAnchorID = "private-chat-bottom-anchor"
     private static let bottomClearance: CGFloat = 28
     private static let bottomVisibilityThreshold: CGFloat = 0.92
 
@@ -18,16 +19,14 @@ struct PrivateChatView: View {
     private let usesPreviewData: Bool
     private let targetMessageID: UUID?
 
-    @State private var didScrollToTargetMessage = false
-    @State private var didPerformInitialScroll = false
-    @State private var isLastReadMessageVisible = true
-    @State private var isLatestMessageVisible = true
+    @State private var didCompleteInitialPositioning = false
+    @State private var isInitialPositioningInProgress = false
     @State private var isNearBottom = false
     @State private var shouldStickToBottom = true
     @State private var isScrollingToBottom = false
     @State private var keyboardHeight: CGFloat = 0
     @State private var didTriggerOlderLoadForCurrentTopReach = false
-    @State private var initialScrollTask: Task<Void, Never>?
+    @State private var initialPositioningTask: Task<Void, Never>?
     @State private var scrollTask: Task<Void, Never>?
     @State private var olderMessagesScrollAnchorID: UUID?
     @State private var isRestoringOlderMessagesScroll = false
@@ -95,7 +94,7 @@ struct PrivateChatView: View {
                     conversationID: viewModel.conversation.id,
                     metadata: [
                         "messageCount": "\(viewModel.messages.count)",
-                        "didPerformInitialScroll": "\(didPerformInitialScroll)"
+                        "didCompleteInitialPositioning": "\(didCompleteInitialPositioning)"
                     ]
                 )
                 viewModel.close()
@@ -189,7 +188,12 @@ struct PrivateChatView: View {
 
     @ViewBuilder
     private var messageList: some View {
-        Group {
+        ZStack {
+            if !viewModel.messages.isEmpty {
+                messageScrollView
+                    .opacity(shouldShowMessageList ? 1 : 0)
+            }
+
             if viewModel.isLoading, viewModel.messages.isEmpty {
                 VStack(spacing: AppSpacing.sm) {
                     ProgressView()
@@ -210,12 +214,14 @@ struct PrivateChatView: View {
                         }
                     }
                 )
-            } else {
-                messageScrollView
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .hideKeyboardOnTap()
+    }
+
+    private var shouldShowMessageList: Bool {
+        usesPreviewData || didCompleteInitialPositioning
     }
 
     private var messageScrollView: some View {
@@ -243,10 +249,15 @@ struct PrivateChatView: View {
 
                             messageRow(for: message)
                         }
+
+                        Color.clear
+                            .frame(height: 1)
+                            .id(Self.bottomAnchorID)
                     }
                     .padding(.horizontal, 12)
                     .padding(.top, 8)
                 }
+                .defaultScrollAnchor(.bottom)
                 .scrollIndicators(.hidden)
                 .scrollDismissesKeyboard(.interactively)
                 .refreshable {
@@ -270,9 +281,9 @@ struct PrivateChatView: View {
                     .animation(.easeOut(duration: 0.2), value: shouldShowScrollDownButton)
                 }
             }
-            .onChange(of: viewModel.isLoading) { wasLoading, isLoading in
-                guard wasLoading, !isLoading else { return }
-                requestInitialScrollIfNeeded(proxy, animated: false)
+            .onChange(of: viewModel.isLoading) { _, isLoading in
+                guard !isLoading else { return }
+                performInitialPositioningIfNeeded(proxy)
             }
             .onChange(of: viewModel.messages.count) { oldCount, newCount in
                 if isRestoringOlderMessagesScroll,
@@ -284,28 +295,57 @@ struct PrivateChatView: View {
                     return
                 }
 
-                guard oldCount == 0, newCount > 0, !viewModel.isLoading else { return }
-                requestInitialScrollIfNeeded(proxy, animated: false)
+                if !didCompleteInitialPositioning, !viewModel.isLoading {
+                    if isInitialPositioningInProgress, newCount > oldCount {
+                        initialPositioningTask?.cancel()
+                        isInitialPositioningInProgress = false
+                        initialPositioningTask = nil
+                    }
+                    performInitialPositioningIfNeeded(proxy)
+                }
             }
             .onChange(of: viewModel.messages.last?.id) { oldValue, newValue in
+                guard didCompleteInitialPositioning else { return }
                 guard oldValue != nil, newValue != nil else { return }
+
                 if shouldAutoScrollToNewLatestMessage {
                     MessengerDiagnostics.event(
-                        .scrollToBottomRequested,
+                        .runtimeAutoScrollRequested,
                         conversationID: viewModel.conversation.id,
                         metadata: [
                             "reason": "newLatestMessage",
                             "messageCount": "\(viewModel.messages.count)",
                             "isNearBottom": "\(isNearBottom)",
-                            "force": "true"
+                            "isMine": "\(viewModel.messages.last?.isMine == true)"
                         ]
                     )
                     scheduleScrollToLatest(proxy, animated: true, force: true)
+                } else {
+                    MessengerDiagnostics.event(
+                        .runtimeAutoScrollSkipped,
+                        conversationID: viewModel.conversation.id,
+                        metadata: [
+                            "reason": "userReadingHistory",
+                            "messageCount": "\(viewModel.messages.count)",
+                            "isNearBottom": "\(isNearBottom)"
+                        ]
+                    )
                 }
             }
             .onChange(of: keyboardHeight) { oldValue, newValue in
-                guard abs(newValue - oldValue) > 1, shouldStickToBottom else { return }
-                scheduleScrollToLatest(proxy, animated: true, delays: [0, 120, 280], force: true)
+                guard didCompleteInitialPositioning else { return }
+                guard abs(newValue - oldValue) > 1 else { return }
+                guard shouldStickToBottom else { return }
+
+                MessengerDiagnostics.event(
+                    .keyboardBottomStickRequested,
+                    conversationID: viewModel.conversation.id,
+                    metadata: [
+                        "previousHeight": "\(oldValue)",
+                        "nextHeight": "\(newValue)"
+                    ]
+                )
+                scheduleScrollToLatest(proxy, animated: false, delays: [0], force: true)
             }
             #if canImport(UIKit)
             .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillChangeFrameNotification)) { notification in
@@ -316,15 +356,18 @@ struct PrivateChatView: View {
             }
             #endif
             .onAppear {
-                isLastReadMessageVisible = true
-                isLatestMessageVisible = true
-                isNearBottom = false
-                shouldStickToBottom = true
-                requestInitialScrollIfNeeded(proxy, animated: false)
+                if usesPreviewData {
+                    didCompleteInitialPositioning = true
+                    markStuckToBottom()
+                } else {
+                    isNearBottom = false
+                    shouldStickToBottom = true
+                    performInitialPositioningIfNeeded(proxy)
+                }
             }
             .onDisappear {
-                initialScrollTask?.cancel()
-                initialScrollTask = nil
+                initialPositioningTask?.cancel()
+                initialPositioningTask = nil
                 scrollTask?.cancel()
                 scrollTask = nil
             }
@@ -332,16 +375,16 @@ struct PrivateChatView: View {
     }
 
     private var shouldShowScrollDownButton: Bool {
-        didPerformInitialScroll && !viewModel.messages.isEmpty && !isNearBottom
+        didCompleteInitialPositioning && !viewModel.messages.isEmpty && !isNearBottom
     }
 
     private var shouldAutoScrollToNewLatestMessage: Bool {
-        guard didPerformInitialScroll, let latestMessage = viewModel.messages.last else { return false }
+        guard didCompleteInitialPositioning, let latestMessage = viewModel.messages.last else { return false }
         return latestMessage.isMine || isNearBottom
     }
 
     private func updateBottomProximity(_ isVisible: Bool) {
-        guard didPerformInitialScroll else { return }
+        guard didCompleteInitialPositioning else { return }
 
         let isAtBottom = isVisible
         guard isNearBottom != isAtBottom else { return }
@@ -357,7 +400,6 @@ struct PrivateChatView: View {
 
     private func markStuckToBottom() {
         isNearBottom = true
-        isLatestMessageVisible = true
         shouldStickToBottom = true
     }
 
@@ -390,12 +432,6 @@ struct PrivateChatView: View {
                     .onScrollVisibilityChange(threshold: Self.bottomVisibilityThreshold) { isVisible in
                         updateBottomProximity(isVisible)
                     }
-            } else if message.id == viewModel.lastReadVisibilityMessageID {
-                row.onScrollVisibilityChange(threshold: 0.08) { isVisible in
-                    guard didPerformInitialScroll else { return }
-                    guard isLastReadMessageVisible != isVisible else { return }
-                    isLastReadMessageVisible = isVisible
-                }
             } else {
                 row
             }
@@ -622,46 +658,76 @@ struct PrivateChatView: View {
         .accessibilityLabel(Text(viewModel.conversation.title))
     }
 
-    private func requestInitialScrollIfNeeded(_ proxy: ScrollViewProxy, animated: Bool) {
-        guard !didPerformInitialScroll, !viewModel.isLoading, !viewModel.messages.isEmpty else { return }
-        scheduleInitialScroll(proxy, animated: animated)
-    }
+    private func performInitialPositioningIfNeeded(_ proxy: ScrollViewProxy) {
+        if usesPreviewData {
+            if !didCompleteInitialPositioning {
+                didCompleteInitialPositioning = true
+                markStuckToBottom()
+            }
+            return
+        }
 
-    private func scheduleInitialScroll(_ proxy: ScrollViewProxy, animated: Bool) {
-        guard !didPerformInitialScroll, !viewModel.messages.isEmpty else { return }
-        guard initialScrollTask == nil else { return }
+        guard !didCompleteInitialPositioning else { return }
+        guard !isInitialPositioningInProgress else { return }
+        guard initialPositioningTask == nil else { return }
+        guard !viewModel.isLoading else {
+            logScrollPhase("waitingForMessages", target: nil)
+            return
+        }
+        guard !viewModel.messages.isEmpty else {
+            logScrollPhase("waitingForMessages", target: nil)
+            return
+        }
 
         let target = viewModel.initialScrollTarget(pushTargetMessageID: targetMessageID)
         logInitialScrollTarget(target)
+        isInitialPositioningInProgress = true
 
-        initialScrollTask = Task { @MainActor in
+        MessengerDiagnostics.event(
+            .initialPositioningStarted,
+            conversationID: viewModel.conversation.id,
+            metadata: [
+                "messageCount": "\(viewModel.messages.count)",
+                "target": initialScrollTargetName(target)
+            ]
+        )
+
+        initialPositioningTask = Task { @MainActor in
             defer {
-                didPerformInitialScroll = true
-                initialScrollTask = nil
-                if !isNearBottom {
-                    shouldStickToBottom = false
-                }
+                initialPositioningTask = nil
+                isInitialPositioningInProgress = false
             }
 
-            let delays: [UInt64] = [0, 100, 250]
-            for delay in delays {
-                if delay > 0 {
-                    try? await Task.sleep(for: .milliseconds(delay))
-                }
-                guard !Task.isCancelled, !viewModel.messages.isEmpty else { return }
-                applyInitialScroll(
-                    proxy,
-                    target: target,
-                    animated: animated && delay == 0
-                )
-            }
+            await Task.yield()
+            try? await Task.sleep(for: .milliseconds(layoutDelayMilliseconds(for: viewModel.messages.count)))
+            guard !Task.isCancelled, !viewModel.messages.isEmpty else { return }
+
+            applyInitialScroll(proxy, target: target, animated: false)
+
+            // LazyVStack may not have laid out distant cells on the first pass.
+            try? await Task.sleep(for: .milliseconds(32))
+            guard !Task.isCancelled, !viewModel.messages.isEmpty else { return }
+            applyInitialScroll(proxy, target: target, animated: false)
+
+            didCompleteInitialPositioning = true
+            markStuckToBottom()
+
+            MessengerDiagnostics.event(
+                .initialPositioningCompleted,
+                conversationID: viewModel.conversation.id,
+                metadata: [
+                    "messageCount": "\(viewModel.messages.count)",
+                    "target": initialScrollTargetName(target)
+                ]
+            )
+            logScrollPhase("ready", target: target)
         }
     }
 
     private func scheduleScrollToLatest(
         _ proxy: ScrollViewProxy,
         animated: Bool,
-        delays: [UInt64] = [50],
+        delays: [UInt64] = [0],
         force: Bool = false
     ) {
         scrollTask?.cancel()
@@ -674,9 +740,7 @@ struct PrivateChatView: View {
                 }
             }
 
-            let lastIndex = delays.count - 1
-
-            for (index, delay) in delays.enumerated() {
+            for delay in delays {
                 if delay > 0 {
                     try? await Task.sleep(for: .milliseconds(delay))
                 }
@@ -694,17 +758,18 @@ struct PrivateChatView: View {
                     return
                 }
 
-                scrollToLatestMessage(proxy, animated: animated && index == lastIndex)
+                scrollToLatestMessage(proxy, animated: animated)
             }
 
-            if !Task.isCancelled, shouldStickToBottom {
+            if !Task.isCancelled, shouldStickToBottom || force {
                 markStuckToBottom()
                 MessengerDiagnostics.event(
                     .scrollToBottomCompleted,
                     conversationID: viewModel.conversation.id,
                     metadata: [
                         "messageCount": "\(viewModel.messages.count)",
-                        "isNearBottom": "\(isNearBottom)"
+                        "isNearBottom": "\(isNearBottom)",
+                        "force": "\(force)"
                     ]
                 )
             }
@@ -718,12 +783,11 @@ struct PrivateChatView: View {
             metadata: [
                 "reason": "button",
                 "messageCount": "\(viewModel.messages.count)",
-                "isNearBottom": "\(isNearBottom)",
-                "isLatestMessageVisible": "\(isLatestMessageVisible)"
+                "isNearBottom": "\(isNearBottom)"
             ]
         )
         shouldStickToBottom = true
-        scheduleScrollToLatest(proxy, animated: true, delays: [0, 60, 180, 360], force: true)
+        scheduleScrollToLatest(proxy, animated: true, delays: [0], force: true)
     }
 
     #if canImport(UIKit)
@@ -750,31 +814,48 @@ struct PrivateChatView: View {
     #endif
 
     private func logInitialScrollTarget(_ target: ChatViewModel.InitialScrollTarget) {
-        let targetName: String
-        switch target {
-        case .targetMessage:
-            targetName = "pushMessage"
-            NetworkDebug.log("Chat initial scroll target: push message")
-        case .unreadSeparator:
-            targetName = "unreadSeparator"
-            NetworkDebug.log("Chat initial scroll target: unread separator centered")
-        case .lastReadMessage:
-            targetName = "lastReadMessage"
-            NetworkDebug.log("Chat initial scroll target: last read message")
-        case .bottom:
-            targetName = "bottom"
-            NetworkDebug.log("Chat initial scroll target: bottom")
-        }
+        NetworkDebug.log("Chat initial scroll target: \(initialScrollTargetName(target))")
         MessengerDiagnostics.event(
             .scrollInitialTargetSelected,
             conversationID: viewModel.conversation.id,
             metadata: [
-                "target": targetName,
+                "target": initialScrollTargetName(target),
                 "messageCount": "\(viewModel.messages.count)",
-                "isNearBottom": "\(isNearBottom)",
-                "isLatestMessageVisible": "\(isLatestMessageVisible)"
+                "isNearBottom": "\(isNearBottom)"
             ]
         )
+    }
+
+    private func logScrollPhase(
+        _ phase: String,
+        target: ChatViewModel.InitialScrollTarget?
+    ) {
+        var metadata = [
+            "phase": phase,
+            "messageCount": "\(viewModel.messages.count)",
+            "isLoading": "\(viewModel.isLoading)"
+        ]
+        if let target {
+            metadata["target"] = initialScrollTargetName(target)
+        }
+        MessengerDiagnostics.event(
+            .scrollPhase,
+            conversationID: viewModel.conversation.id,
+            metadata: metadata
+        )
+    }
+
+    private func initialScrollTargetName(_ target: ChatViewModel.InitialScrollTarget) -> String {
+        switch target {
+        case .targetMessage:
+            return "pushMessage"
+        case .unreadSeparator:
+            return "unreadSeparator"
+        case .lastReadMessage:
+            return "lastReadMessage"
+        case .bottom:
+            return "bottom"
+        }
     }
 
     private func applyInitialScroll(
@@ -784,29 +865,29 @@ struct PrivateChatView: View {
     ) {
         switch target {
         case .targetMessage(let messageID):
-            didScrollToTargetMessage = true
             scrollTo(messageID, proxy: proxy, anchor: .center, animated: animated)
         case .unreadSeparator:
             scrollTo(Self.unreadSeparatorID, proxy: proxy, anchor: .center, animated: animated)
         case .lastReadMessage(let messageID):
             scrollTo(messageID, proxy: proxy, anchor: .bottom, animated: animated)
         case .bottom:
-            scrollToLatestMessage(proxy, animated: animated)
+            scrollToBottom(proxy, animated: animated)
         }
     }
 
+    private func scrollToBottom(_ proxy: ScrollViewProxy, animated: Bool) {
+        if let lastMessageID = viewModel.messages.last?.id {
+            scrollTo(lastMessageID, proxy: proxy, anchor: .bottom, animated: animated)
+        }
+        scrollTo(Self.bottomAnchorID, proxy: proxy, anchor: .bottom, animated: animated)
+    }
+
+    private func layoutDelayMilliseconds(for messageCount: Int) -> UInt64 {
+        min(64, max(16, UInt64(messageCount) * 2))
+    }
+
     private func scrollToLatestMessage(_ proxy: ScrollViewProxy, animated: Bool) {
-        guard let lastMessageID = viewModel.messages.last?.id else { return }
-
-        let scroll = {
-            proxy.scrollTo(lastMessageID, anchor: .bottom)
-        }
-
-        if animated {
-            withAnimation(.easeOut(duration: 0.25), scroll)
-        } else {
-            scroll()
-        }
+        scrollToBottom(proxy, animated: animated)
     }
 
     private func scrollTo<ID: Hashable>(

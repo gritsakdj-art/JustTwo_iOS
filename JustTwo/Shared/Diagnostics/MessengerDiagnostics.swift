@@ -110,7 +110,15 @@ enum MessengerDiagnosticEvent: String, Sendable {
     case scrollToBottomCompleted
     case scrollSkipped
     case keyboardHeightChanged
+    case keyboardBottomStickRequested
     case isSendingReset
+
+    case initialPositioningStarted
+    case initialPositioningCompleted
+    case initialPositioningSkipped
+    case runtimeAutoScrollRequested
+    case runtimeAutoScrollSkipped
+    case scrollPhase
 }
 
 enum MessengerDiagnostics {

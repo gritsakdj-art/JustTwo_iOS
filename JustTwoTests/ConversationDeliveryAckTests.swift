@@ -135,8 +135,8 @@ struct ConversationDeliveryAckTests {
         #expect(deliveredCalls.count == 1)
     }
 
-    @Test("initial scroll target centers unread separator when unread exists")
-    func initialScrollTargetCentersUnreadSeparator() {
+    @Test("initial scroll target opens at bottom when unread exists")
+    func initialScrollTargetOpensAtBottomWithUnread() {
         let conversation = makeConversation(unreadCount: 2)
         let messages = [
             makeChatMessage(id: fixedMessageID(offset: 1), isMine: false, body: "older"),
@@ -146,12 +146,12 @@ struct ConversationDeliveryAckTests {
         ]
         let viewModel = ChatViewModel.preview(conversation: conversation, messages: messages)
 
-        #expect(viewModel.initialScrollTarget(pushTargetMessageID: nil) == .unreadSeparator)
+        #expect(viewModel.initialScrollTarget(pushTargetMessageID: nil) == .bottom)
         #expect(viewModel.firstUnreadMessageID == fixedMessageID(offset: 3))
     }
 
-    @Test("initial scroll target uses last message when no unread exists")
-    func initialScrollTargetUsesLastMessageWithoutUnread() {
+    @Test("initial scroll target opens at bottom when no unread exists")
+    func initialScrollTargetOpensAtBottomWithoutUnread() {
         let conversation = makeConversation(unreadCount: 0)
         let messageID = fixedMessageID()
         let viewModel = ChatViewModel.preview(
@@ -159,7 +159,22 @@ struct ConversationDeliveryAckTests {
             messages: [makeChatMessage(id: messageID, isMine: false, body: "hello")]
         )
 
-        #expect(viewModel.initialScrollTarget(pushTargetMessageID: nil) == .lastReadMessage(messageID))
+        #expect(viewModel.initialScrollTarget(pushTargetMessageID: nil) == .bottom)
+    }
+
+    @Test("initial scroll target uses push message when provided")
+    func initialScrollTargetUsesPushMessage() {
+        let conversation = makeConversation(unreadCount: 0)
+        let targetID = fixedMessageID(offset: 2)
+        let viewModel = ChatViewModel.preview(
+            conversation: conversation,
+            messages: [
+                makeChatMessage(id: fixedMessageID(offset: 1), isMine: false, body: "older"),
+                makeChatMessage(id: targetID, isMine: false, body: "target")
+            ]
+        )
+
+        #expect(viewModel.initialScrollTarget(pushTargetMessageID: targetID) == .targetMessage(targetID))
     }
 
     @Test("down button visibility tracks last read message frame")

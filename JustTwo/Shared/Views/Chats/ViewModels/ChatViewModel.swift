@@ -132,12 +132,6 @@ final class ChatViewModel {
            messages.contains(where: { $0.id == pushTargetMessageID }) {
             return .targetMessage(pushTargetMessageID)
         }
-        if firstUnreadMessageID != nil {
-            return .unreadSeparator
-        }
-        if let lastMessageID = messages.last?.id {
-            return .lastReadMessage(lastMessageID)
-        }
         return .bottom
     }
 
@@ -627,11 +621,9 @@ final class ChatViewModel {
             }
         }
 
+        isLoading = true
         if let cached = messageCache.messages(for: conversation.id), !cached.isEmpty {
             messages = cached
-            isLoading = false
-        } else {
-            isLoading = true
         }
         errorMessage = nil
 
