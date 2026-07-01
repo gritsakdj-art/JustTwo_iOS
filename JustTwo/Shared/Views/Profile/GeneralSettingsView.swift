@@ -1,5 +1,8 @@
 import SwiftUI
 import UserNotifications
+#if canImport(UIKit)
+import UIKit
+#endif
 
 struct GeneralSettingsView: View {
     @AppStorage("app.language") private var selectedLanguageRawValue = AppLanguage.system.rawValue
@@ -9,6 +12,8 @@ struct GeneralSettingsView: View {
     @State private var expandedPicker: SettingsPickerKind?
     @State private var authorizationStatus: UNAuthorizationStatus = .notDetermined
     @State private var isRequestingPermission = false
+    @State private var diagnosticsAlertMessage = ""
+    @State private var isDiagnosticsAlertPresented = false
 
     var body: some View {
         ScrollView(showsIndicators: false) {
@@ -16,6 +21,9 @@ struct GeneralSettingsView: View {
                 themePicker
                 languagePicker
                 notificationsSection
+                if AppBuildEnvironment.showsInternalDiagnostics {
+                    diagnosticsSection
+                }
             }
             .id(selectedLanguageRawValue)
             .padding(.horizontal, AppSpacing.xl)
@@ -28,6 +36,11 @@ struct GeneralSettingsView: View {
         .toolbarBackground(.hidden, for: .navigationBar)
         .task {
             authorizationStatus = await MessengerNotificationService.shared.authorizationStatus()
+        }
+        .alert(Text("settings.diagnostics.alert.title"), isPresented: $isDiagnosticsAlertPresented) {
+            Button("common.done", role: .cancel) {}
+        } message: {
+            Text(diagnosticsAlertMessage)
         }
     }
 
@@ -164,6 +177,48 @@ struct GeneralSettingsView: View {
         }
     }
 
+    private var diagnosticsSection: some View {
+        VStack(alignment: .leading, spacing: AppSpacing.sm) {
+            Text("settings.diagnostics.section")
+                .font(Font.App.manrope(size: 13, weight: .bold))
+                .foregroundStyle(Color.secondaryText)
+                .textCase(.uppercase)
+                .padding(.horizontal, 4)
+
+            VStack(spacing: 0) {
+                Button {
+                    copyMessengerDiagnostics()
+                } label: {
+                    SettingsDiagnosticsActionRow(
+                        iconName: "doc.on.doc.fill",
+                        title: "settings.diagnostics.copy_logs.title",
+                        subtitle: "settings.diagnostics.copy_logs.subtitle"
+                    )
+                }
+                .buttonStyle(.spring(pressedScale: 0.98, pressedOpacity: 0.9))
+            }
+            .background(Color.cardSurface, in: RoundedRectangle(cornerRadius: AppCornerRadius.card, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: AppCornerRadius.card, style: .continuous)
+                    .stroke(Color.hairline, lineWidth: 1)
+            )
+            .shadow(color: Color.discoverCardShadow.opacity(0.08), radius: 24, x: 0, y: 10)
+        }
+    }
+
+    private func copyMessengerDiagnostics() {
+        let exportText = MessengerDiagnostics.exportTextForClipboard()
+
+        #if canImport(UIKit)
+        UIPasteboard.general.string = exportText
+        #endif
+
+        diagnosticsAlertMessage = exportText == MessengerDiagnostics.emptyExportText
+            ? String(localized: "settings.diagnostics.empty")
+            : String(localized: "settings.diagnostics.copied")
+        isDiagnosticsAlertPresented = true
+    }
+
     private func handleMessagesToggleEnabled() async {
         isRequestingPermission = true
         defer { isRequestingPermission = false }
@@ -270,6 +325,52 @@ private struct SettingsPickerDivider: View {
             .frame(height: 1)
             .padding(.leading, 58)
             .padding(.trailing, AppSpacing.sm)
+    }
+}
+
+private struct SettingsDiagnosticsActionRow: View {
+    let iconName: String
+    let title: LocalizedStringResource
+    let subtitle: LocalizedStringResource
+
+    var body: some View {
+        HStack(spacing: AppSpacing.sm) {
+            Image(systemName: iconName)
+                .font(.system(size: 17, weight: .semibold))
+                .foregroundStyle(Color.onAccentText)
+                .frame(width: 38, height: 38)
+                .background {
+                    Color.brandPrimaryGradient
+                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                }
+                .overlay {
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .strokeBorder(Color.glassBorderHighlight.opacity(0.34), lineWidth: 0.6)
+                }
+                .shadow(color: Color.discoverViolet.opacity(0.18), radius: 8, x: 0, y: 3)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(Font.App.manrope(size: 16, weight: .semibold))
+                    .foregroundStyle(Color.primaryText)
+
+                Text(subtitle)
+                    .font(Font.App.caption(size: 12, weight: .medium))
+                    .foregroundStyle(Color.secondaryText)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            Spacer(minLength: AppSpacing.sm)
+
+            Image(systemName: "doc.on.doc")
+                .font(.system(size: 17, weight: .semibold))
+                .foregroundStyle(Color.brandPrimary)
+        }
+        .frame(minHeight: 60)
+        .padding(.horizontal, AppSpacing.sm)
+        .padding(.vertical, 2)
+        .contentShape(Rectangle())
+        .accessibilityElement(children: .combine)
     }
 }
 

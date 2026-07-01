@@ -62,6 +62,11 @@ final class MessengerRealtimeCoordinator {
     ) {
         activeChatViewModel = viewModel
         activeConversationID = viewModel.conversation.id
+        MessengerDiagnostics.event(
+            .activeConversationChanged,
+            conversationID: viewModel.conversation.id,
+            metadata: ["state": "activated"]
+        )
         updateContext(session: session, router: router)
         startListeningIfNeeded()
 
@@ -84,6 +89,13 @@ final class MessengerRealtimeCoordinator {
         activeChatViewModel = nil
         activeConversationID = nil
         subscribedConversationID = nil
+        if let conversationID {
+            MessengerDiagnostics.event(
+                .activeConversationChanged,
+                conversationID: conversationID,
+                metadata: ["state": "deactivated"]
+            )
+        }
 
         guard let conversationID else { return }
         guard !conversationListSubscriptionIDs.contains(conversationID) else {
@@ -143,6 +155,17 @@ final class MessengerRealtimeCoordinator {
     }
 
     private func handle(_ event: RealtimeEvent) {
+        let ids = diagnosticIDs(for: event)
+        MessengerDiagnostics.event(
+            .realtimeEventReceived,
+            conversationID: ids.conversationID,
+            messageID: ids.messageID,
+            metadata: [
+                "type": event.type,
+                "activeConversationID": activeConversationID?.uuidString ?? "none"
+            ]
+        )
+
         switch event {
         case .connectionReady:
             Task { [weak self] in
@@ -202,12 +225,27 @@ final class MessengerRealtimeCoordinator {
                         session: self.session,
                         router: self.router
                     )
+                    MessengerDiagnostics.event(
+                        inserted ? .realtimeEventApplied : .realtimeEventSkipped,
+                        conversationID: conversationID,
+                        messageID: message.id,
+                        metadata: [
+                            "type": "message.created",
+                            "reason": inserted ? "activeChatInserted" : "duplicateOrUpdated"
+                        ]
+                    )
                     NetworkDebug.log(inserted ? "Messenger realtime message.created applied" : "Messenger realtime duplicate/updated message.created handled")
                 } else if let profileID {
                     _ = MessageCacheStore.shared.applyRealtimeMessage(
                         message,
                         conversationID: conversationID,
                         currentProfileID: profileID
+                    )
+                    MessengerDiagnostics.event(
+                        .realtimeEventApplied,
+                        conversationID: conversationID,
+                        messageID: message.id,
+                        metadata: ["type": "message.created", "reason": "cachedInactiveConversation"]
                     )
                 }
 
@@ -219,9 +257,21 @@ final class MessengerRealtimeCoordinator {
                         router: self.router
                     ) ?? false
                     if !applied {
+                        MessengerDiagnostics.event(
+                            .realtimeEventFallbackRefresh,
+                            conversationID: conversationID,
+                            messageID: message.id,
+                            metadata: ["type": "message.created", "reason": "conversationMissingFromList"]
+                        )
                         self.refreshConversationsFromRealtime()
                     }
                 } else {
+                    MessengerDiagnostics.event(
+                        .realtimeEventFallbackRefresh,
+                        conversationID: conversationID,
+                        messageID: message.id,
+                        metadata: ["type": "message.created", "reason": "missingCurrentProfileID"]
+                    )
                     self.refreshConversationsFromRealtime()
                 }
             }
@@ -248,12 +298,24 @@ final class MessengerRealtimeCoordinator {
             await MainActor.run {
                 if self.activeConversationID == conversationID, let profileID {
                     _ = self.activeChatViewModel?.applyRealtimeMessage(message, currentProfileID: profileID)
+                    MessengerDiagnostics.event(
+                        .realtimeEventApplied,
+                        conversationID: conversationID,
+                        messageID: message.id,
+                        metadata: ["type": "message.edited", "reason": "activeChat"]
+                    )
                     NetworkDebug.log("Messenger realtime message.edited applied")
                 } else if let profileID {
                     _ = MessageCacheStore.shared.applyRealtimeMessage(
                         message,
                         conversationID: conversationID,
                         currentProfileID: profileID
+                    )
+                    MessengerDiagnostics.event(
+                        .realtimeEventApplied,
+                        conversationID: conversationID,
+                        messageID: message.id,
+                        metadata: ["type": "message.edited", "reason": "cache"]
                     )
                 }
 
@@ -266,14 +328,32 @@ final class MessengerRealtimeCoordinator {
         if activeConversationID == conversationID {
             let applied = activeChatViewModel?.applyRealtimeDeletedMessage(payload) ?? false
             if !applied {
+                MessengerDiagnostics.event(
+                    .realtimeEventFallbackRefresh,
+                    conversationID: conversationID,
+                    messageID: payload.messageID,
+                    metadata: ["type": "message.deleted", "reason": "messageMissingInActiveChat"]
+                )
                 refreshActiveChatFromRealtime()
             }
+            MessengerDiagnostics.event(
+                applied ? .realtimeEventApplied : .realtimeEventSkipped,
+                conversationID: conversationID,
+                messageID: payload.messageID,
+                metadata: ["type": "message.deleted", "reason": applied ? "activeChat" : "fallbackRefresh"]
+            )
             NetworkDebug.log("Messenger realtime message.deleted applied")
         } else {
             _ = MessageCacheStore.shared.markMessageDeleted(
                 conversationID: conversationID,
                 messageID: payload.messageID,
                 deletedAt: payload.deletedAt
+            )
+            MessengerDiagnostics.event(
+                .realtimeEventApplied,
+                conversationID: conversationID,
+                messageID: payload.messageID,
+                metadata: ["type": "message.deleted", "reason": "cache"]
             )
         }
 
@@ -387,7 +467,18 @@ final class MessengerRealtimeCoordinator {
     private func handleConversationUpdated(_ payload: ConversationUpdatedPayload) {
         let applied = conversationListViewModel?.applyRealtimeConversationUpdated(payload) ?? false
         if !applied {
+            MessengerDiagnostics.event(
+                .realtimeEventFallbackRefresh,
+                conversationID: payload.conversationID,
+                metadata: ["type": "conversation.updated", "reason": "conversationMissingFromList"]
+            )
             refreshConversationsFromRealtime()
+        } else {
+            MessengerDiagnostics.event(
+                .realtimeEventApplied,
+                conversationID: payload.conversationID,
+                metadata: ["type": "conversation.updated", "reason": "conversationList"]
+            )
         }
     }
 
@@ -449,12 +540,21 @@ final class MessengerRealtimeCoordinator {
     }
 
     private func refreshConversationsFromRealtime() {
+        MessengerDiagnostics.event(
+            .realtimeEventFallbackRefresh,
+            metadata: ["target": "conversationList"]
+        )
         Task { [weak self] in
             await self?.refreshConversations()
         }
     }
 
     private func refreshActiveChatFromRealtime() {
+        MessengerDiagnostics.event(
+            .realtimeEventFallbackRefresh,
+            conversationID: activeConversationID,
+            metadata: ["target": "activeChat"]
+        )
         Task { [weak self] in
             await self?.refreshActiveChat()
         }
@@ -560,5 +660,31 @@ final class MessengerRealtimeCoordinator {
         }
 
         return try? await MessengerSessionSupport.resolveCurrentProfileID(session: session)
+    }
+
+    private func diagnosticIDs(for event: RealtimeEvent) -> (conversationID: UUID?, messageID: UUID?) {
+        switch event {
+        case .messageCreated(let conversationID, let message),
+             .messageEdited(let conversationID, let message):
+            return (conversationID, message.id)
+        case .messageDeleted(let conversationID, let payload):
+            return (conversationID, payload.messageID)
+        case .reactionAdded(let conversationID, let payload):
+            return (conversationID, payload.messageID)
+        case .reactionRemoved(let conversationID, let payload):
+            return (conversationID, payload.messageID)
+        case .conversationRead(let conversationID, let payload):
+            return (conversationID, payload.messageID)
+        case .conversationDelivered(let conversationID, let payload):
+            return (conversationID, payload.messageID)
+        case .conversationUpdated(let conversationID, _),
+             .typingStarted(let conversationID, _),
+             .typingStopped(let conversationID, _),
+             .subscriptionReady(let conversationID),
+             .subscriptionRemoved(let conversationID):
+            return (conversationID, nil)
+        case .connectionReady, .pong, .error, .presenceChanged, .unknown:
+            return (nil, nil)
+        }
     }
 }

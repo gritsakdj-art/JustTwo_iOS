@@ -101,6 +101,15 @@ struct ChatsView: View {
         conversation: ChatConversationPreview,
         targetMessageID: UUID? = nil
     ) {
+        MessengerDiagnostics.event(
+            .navigationRequested,
+            conversationID: conversation.id,
+            messageID: targetMessageID,
+            metadata: [
+                "hasTargetMessage": "\(targetMessageID != nil)",
+                "unreadCount": "\(conversation.unreadCount)"
+            ]
+        )
         route = ChatRoute(
             conversation: conversation,
             targetMessageID: targetMessageID
@@ -154,6 +163,16 @@ struct ChatsView: View {
                         conversation: conversation,
                         isOnline: presenceStore.isOnline(profileID: conversation.otherParticipantProfileID)
                     ) {
+                        MessengerDiagnostics.event(
+                            .conversationRowTapped,
+                            conversationID: conversation.id,
+                            metadata: [
+                                "unreadCount": "\(conversation.unreadCount)",
+                                "hasLastMessage": "\(conversation.lastMessageText != nil)",
+                                "isLastMessageOwn": "unknown",
+                                "isAppActive": "\(MessengerSessionSupport.isAppForegroundActive)"
+                            ]
+                        )
                         presentPrivateChat(conversation: conversation)
                     }
 

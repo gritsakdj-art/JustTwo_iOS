@@ -75,10 +75,26 @@ struct PrivateChatView: View {
             }
             .onAppear {
                 guard !usesPreviewData else { return }
+                MessengerDiagnostics.event(
+                    .chatAppeared,
+                    conversationID: viewModel.conversation.id,
+                    metadata: [
+                        "messageCount": "\(viewModel.messages.count)",
+                        "isNearBottom": "\(isNearBottom)"
+                    ]
+                )
                 viewModel.activateRealtime(session: session, router: router)
             }
             .onDisappear {
                 guard !usesPreviewData else { return }
+                MessengerDiagnostics.event(
+                    .chatDisappeared,
+                    conversationID: viewModel.conversation.id,
+                    metadata: [
+                        "messageCount": "\(viewModel.messages.count)",
+                        "didPerformInitialScroll": "\(didPerformInitialScroll)"
+                    ]
+                )
                 viewModel.close()
             }
             .overlay {
@@ -542,18 +558,46 @@ struct PrivateChatView: View {
                     try? await Task.sleep(for: .milliseconds(delay))
                 }
                 guard !Task.isCancelled else { return }
-                if isNearBottom { return }
+                if isNearBottom {
+                    MessengerDiagnostics.event(
+                        .scrollSkipped,
+                        conversationID: viewModel.conversation.id,
+                        metadata: [
+                            "reason": "alreadyNearBottom",
+                            "messageCount": "\(viewModel.messages.count)"
+                        ]
+                    )
+                    return
+                }
 
                 scrollToLatestMessage(proxy, animated: animated && index == lastIndex)
             }
 
             if !Task.isCancelled, shouldStickToBottom {
                 markStuckToBottom()
+                MessengerDiagnostics.event(
+                    .scrollToBottomCompleted,
+                    conversationID: viewModel.conversation.id,
+                    metadata: [
+                        "messageCount": "\(viewModel.messages.count)",
+                        "isNearBottom": "\(isNearBottom)"
+                    ]
+                )
             }
         }
     }
 
     private func requestScrollToLatestFromButton(_ proxy: ScrollViewProxy) {
+        MessengerDiagnostics.event(
+            .scrollToBottomRequested,
+            conversationID: viewModel.conversation.id,
+            metadata: [
+                "reason": "button",
+                "messageCount": "\(viewModel.messages.count)",
+                "isNearBottom": "\(isNearBottom)",
+                "isLatestMessageVisible": "\(isLatestMessageVisible)"
+            ]
+        )
         shouldStickToBottom = true
         scheduleScrollToLatest(proxy, animated: true, delays: [0, 60, 180, 360])
     }
@@ -572,14 +616,28 @@ struct PrivateChatView: View {
     #endif
 
     private func logInitialScrollTarget(_ target: ChatViewModel.InitialScrollTarget) {
+        let targetName: String
         switch target {
         case .targetMessage:
+            targetName = "pushMessage"
             NetworkDebug.log("Chat initial scroll target: push message")
         case .lastReadMessage:
+            targetName = "lastReadMessage"
             NetworkDebug.log("Chat initial scroll target: last read message")
         case .bottom:
+            targetName = "bottom"
             NetworkDebug.log("Chat initial scroll target: bottom")
         }
+        MessengerDiagnostics.event(
+            .scrollInitialTargetSelected,
+            conversationID: viewModel.conversation.id,
+            metadata: [
+                "target": targetName,
+                "messageCount": "\(viewModel.messages.count)",
+                "isNearBottom": "\(isNearBottom)",
+                "isLatestMessageVisible": "\(isLatestMessageVisible)"
+            ]
+        )
     }
 
     private func applyInitialScroll(

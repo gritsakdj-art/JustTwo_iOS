@@ -58,10 +58,18 @@ final class ConversationDeliveryAckCoordinator {
         if markDeliveredHandler == nil {
             guard session.isFullyAuthenticated else {
                 NetworkDebug.log("Messenger delivered ack batch skipped: unauthenticated")
+                MessengerDiagnostics.event(
+                    .deliveredAckSkipped,
+                    metadata: ["reason": "unauthenticated", "source": "conversationListBatch"]
+                )
                 return
             }
             guard MessengerSessionSupport.isAppForegroundActive else {
                 NetworkDebug.log("Messenger delivered ack batch skipped: background")
+                MessengerDiagnostics.event(
+                    .deliveredAckSkipped,
+                    metadata: ["reason": "background", "source": "conversationListBatch"]
+                )
                 return
             }
         }
@@ -84,6 +92,11 @@ final class ConversationDeliveryAckCoordinator {
     ) async {
         guard let message = conversation.lastMessage else {
             NetworkDebug.log("Messenger delivered ack skipped: no lastMessage \(conversation.id)")
+            MessengerDiagnostics.event(
+                .deliveredAckSkipped,
+                conversationID: conversation.id,
+                metadata: ["reason": "missingMessageID", "source": "conversationList"]
+            )
             return
         }
 
@@ -110,6 +123,12 @@ final class ConversationDeliveryAckCoordinator {
     ) async {
         guard let session, let router else {
             NetworkDebug.log("Messenger delivered ack skipped: missing session/router")
+            MessengerDiagnostics.event(
+                .deliveredAckSkipped,
+                conversationID: conversationID,
+                messageID: message.id,
+                metadata: ["reason": "missingSessionOrRouter", "source": "realtimeInactiveConversation"]
+            )
             return
         }
 
@@ -141,29 +160,65 @@ final class ConversationDeliveryAckCoordinator {
     ) async {
         guard !isDeleted else {
             NetworkDebug.log("Messenger delivered ack skipped: deleted message \(conversationID)")
+            MessengerDiagnostics.event(
+                .deliveredAckSkipped,
+                conversationID: conversationID,
+                messageID: messageID,
+                metadata: ["reason": "deletedMessage", "source": source]
+            )
             return
         }
         guard senderProfileID != currentProfileID else {
             NetworkDebug.log("Messenger delivered ack skipped: own message \(conversationID)")
+            MessengerDiagnostics.event(
+                .deliveredAckSkipped,
+                conversationID: conversationID,
+                messageID: messageID,
+                metadata: ["reason": "ownMessage", "source": source, "isOwnMessage": "true"]
+            )
             return
         }
         if markDeliveredHandler == nil {
             guard session.isFullyAuthenticated else {
                 NetworkDebug.log("Messenger delivered ack skipped: unauthenticated")
+                MessengerDiagnostics.event(
+                    .deliveredAckSkipped,
+                    conversationID: conversationID,
+                    messageID: messageID,
+                    metadata: ["reason": "unauthenticated", "source": source]
+                )
                 return
             }
             guard MessengerSessionSupport.isAppForegroundActive else {
                 NetworkDebug.log("Messenger delivered ack skipped: background")
+                MessengerDiagnostics.event(
+                    .deliveredAckSkipped,
+                    conversationID: conversationID,
+                    messageID: messageID,
+                    metadata: ["reason": "background", "source": source, "isAppForeground": "false"]
+                )
                 return
             }
         }
         if let lastReadAt, let messageCreatedAt, lastReadAt >= messageCreatedAt {
             markReadAcked(conversationID: conversationID, messageID: messageID)
             NetworkDebug.log("Messenger delivered ack skipped: already read \(conversationID)")
+            MessengerDiagnostics.event(
+                .deliveredAckSkipped,
+                conversationID: conversationID,
+                messageID: messageID,
+                metadata: ["reason": "alreadyRead", "source": source]
+            )
             return
         }
         guard shouldSendDelivered(conversationID: conversationID, messageID: messageID) else {
             NetworkDebug.log("Messenger delivered ack skipped: duplicate \(conversationID)")
+            MessengerDiagnostics.event(
+                .deliveredAckSkipped,
+                conversationID: conversationID,
+                messageID: messageID,
+                metadata: ["reason": "duplicate", "source": source, "isDuplicate": "true"]
+            )
             return
         }
 
@@ -178,10 +233,28 @@ final class ConversationDeliveryAckCoordinator {
             }
             markDeliveredAcked(conversationID: conversationID, messageID: messageID)
             NetworkDebug.log("Messenger delivered ack sent from \(source): \(conversationID)")
+            MessengerDiagnostics.event(
+                .deliveredAckSent,
+                conversationID: conversationID,
+                messageID: messageID,
+                metadata: ["source": source, "isAppForeground": "\(MessengerSessionSupport.isAppForegroundActive)"]
+            )
         } catch let error as NetworkError {
+            MessengerDiagnostics.event(
+                .deliveredAckFailed,
+                conversationID: conversationID,
+                messageID: messageID,
+                metadata: ["source": source, "errorCategory": MessengerDiagnostics.sanitizeError(error)]
+            )
             _ = MessengerSessionSupport.handleNetworkError(error, session: session, router: router)
         } catch {
             NetworkDebug.log("Messenger delivered ack failed: \(conversationID)")
+            MessengerDiagnostics.event(
+                .deliveredAckFailed,
+                conversationID: conversationID,
+                messageID: messageID,
+                metadata: ["source": source, "errorCategory": MessengerDiagnostics.sanitizeError(error)]
+            )
         }
     }
 }

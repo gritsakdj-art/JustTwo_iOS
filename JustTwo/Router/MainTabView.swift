@@ -62,17 +62,12 @@ struct MainTabView: View {
 
     @ViewBuilder
     private var chatsTab: some View {
-        let view = ChatsView(viewModel: chatsViewModel)
+        ChatsView(viewModel: chatsViewModel)
             .tag(AppTab.chats)
             .tabItem {
                 tabItem(for: .chats)
             }
-
-        if chatsViewModel.totalUnreadCount > 0 {
-            view.badge(chatsViewModel.totalUnreadCount)
-        } else {
-            view
-        }
+            .badge(chatsViewModel.totalUnreadCount)
     }
 
     private func tabItem(for tab: AppTab) -> some View {

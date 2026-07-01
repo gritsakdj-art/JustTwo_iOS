@@ -150,10 +150,22 @@ final class ChatViewModel {
     func open(session: SessionStore, router: AppRouter) async {
         isOpen = true
         let generation = lifecycleGeneration
+        MessengerDiagnostics.event(
+            .chatOpenStarted,
+            conversationID: conversation.id,
+            metadata: lifecycleMetadata(generation: generation)
+        )
 
         if !didOpen {
             await loadMessages(session: session, router: router, generation: generation)
-            guard generation == lifecycleGeneration, isOpen else { return }
+            guard generation == lifecycleGeneration, isOpen else {
+                MessengerDiagnostics.event(
+                    .loadMessagesIgnoredStaleGeneration,
+                    conversationID: conversation.id,
+                    metadata: lifecycleMetadata(generation: generation)
+                )
+                return
+            }
             didOpen = true
         } else if let cached = messageCache.messages(for: conversation.id), !cached.isEmpty {
             messages = cached
@@ -161,6 +173,11 @@ final class ChatViewModel {
 
         await markDelivered(session: session, router: router)
         await markRead(session: session, router: router)
+        MessengerDiagnostics.event(
+            .chatOpenCompleted,
+            conversationID: conversation.id,
+            metadata: lifecycleMetadata(generation: generation)
+        )
     }
 
     func activateRealtime(session: SessionStore, router: AppRouter) {
@@ -177,6 +194,11 @@ final class ChatViewModel {
     }
 
     func close() {
+        MessengerDiagnostics.event(
+            .chatCloseStarted,
+            conversationID: conversation.id,
+            metadata: lifecycleMetadata(generation: lifecycleGeneration)
+        )
         lifecycleGeneration += 1
         isOpen = false
         isLoading = false
@@ -184,6 +206,11 @@ final class ChatViewModel {
         loadTask = nil
         clearTypingState()
         deactivateRealtime()
+        MessengerDiagnostics.event(
+            .chatCloseCompleted,
+            conversationID: conversation.id,
+            metadata: lifecycleMetadata(generation: lifecycleGeneration)
+        )
     }
 
     func stopTyping() {
@@ -295,7 +322,18 @@ final class ChatViewModel {
 
     func send(session: SessionStore, router: AppRouter) {
         let trimmed = draftText.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty, !isSending, sendTask == nil else { return }
+        guard !trimmed.isEmpty else { return }
+        guard !isSending, sendTask == nil else {
+            MessengerDiagnostics.event(
+                .sendSkippedAlreadySending,
+                conversationID: conversation.id,
+                metadata: [
+                    "isSendingBefore": "\(isSending)",
+                    "hasSendTask": "\(sendTask != nil)"
+                ]
+            )
+            return
+        }
         guard trimmed.count <= MessengerLimits.maxMessageLength else {
             errorMessage = String(localized: "chats.error.message_too_long")
             return
@@ -310,6 +348,16 @@ final class ChatViewModel {
         errorMessage = nil
         draftText = ""
         typingEmitter.messageSent()
+        MessengerDiagnostics.event(
+            .sendStarted,
+            conversationID: conversation.id,
+            clientMessageID: clientMessageID,
+            metadata: [
+                "isSendingBefore": "false",
+                "isEditing": "\(activeEditingMessage != nil)",
+                "hasReply": "\(activeReplyTarget != nil)"
+            ]
+        )
 
         sendTask = Task { @MainActor [weak self] in
             await self?.performSend(
@@ -333,6 +381,7 @@ final class ChatViewModel {
         session: SessionStore,
         router: AppRouter
     ) async {
+        let startedAt = Date()
         defer {
             isSending = false
             sendTask = nil
@@ -363,15 +412,53 @@ final class ChatViewModel {
             let mapped = ChatUIMapping.message(from: dto, currentProfileID: profileID)
             appendOrReplace(mapped)
             messageCache.upsertMessage(mapped, conversationID: conversation.id)
+            MessengerDiagnostics.event(
+                .sendSucceeded,
+                conversationID: conversation.id,
+                messageID: mapped.id,
+                clientMessageID: clientMessageID,
+                metadata: [
+                    "durationMs": "\(durationMilliseconds(since: startedAt))",
+                    "isEditing": "\(activeEditingMessage != nil)"
+                ]
+            )
         } catch let error as NetworkError {
-            restoreDraftAfterFailedSend(originalDraftText, replyTarget: activeReplyTarget, editingMessage: activeEditingMessage)
+            restoreDraftAfterFailedSend(
+                originalDraftText,
+                replyTarget: activeReplyTarget,
+                editingMessage: activeEditingMessage,
+                clientMessageID: clientMessageID
+            )
+            MessengerDiagnostics.event(
+                .sendFailed,
+                conversationID: conversation.id,
+                clientMessageID: clientMessageID,
+                metadata: [
+                    "durationMs": "\(durationMilliseconds(since: startedAt))",
+                    "errorCategory": MessengerDiagnostics.sanitizeError(error)
+                ]
+            )
             if error.isUserBlocked {
                 errorMessage = String(localized: "chats.error.user_blocked")
             } else if let message = MessengerSessionSupport.handleNetworkError(error, session: session, router: router) {
                 errorMessage = message
             }
         } catch {
-            restoreDraftAfterFailedSend(originalDraftText, replyTarget: activeReplyTarget, editingMessage: activeEditingMessage)
+            restoreDraftAfterFailedSend(
+                originalDraftText,
+                replyTarget: activeReplyTarget,
+                editingMessage: activeEditingMessage,
+                clientMessageID: clientMessageID
+            )
+            MessengerDiagnostics.event(
+                MessengerDiagnostics.sanitizeError(error) == "cancelled" ? .sendCancelled : .sendFailed,
+                conversationID: conversation.id,
+                clientMessageID: clientMessageID,
+                metadata: [
+                    "durationMs": "\(durationMilliseconds(since: startedAt))",
+                    "errorCategory": MessengerDiagnostics.sanitizeError(error)
+                ]
+            )
             errorMessage = error.localizedDescription
         }
     }
@@ -469,10 +556,22 @@ final class ChatViewModel {
     private func restoreDraftAfterFailedSend(
         _ originalDraftText: String,
         replyTarget activeReplyTarget: ChatMessage?,
-        editingMessage activeEditingMessage: ChatMessage?
+        editingMessage activeEditingMessage: ChatMessage?,
+        clientMessageID: String
     ) {
         if draftText.isEmpty {
             draftText = originalDraftText
+            MessengerDiagnostics.event(
+                .draftRestoredAfterFailure,
+                conversationID: conversation.id,
+                clientMessageID: clientMessageID
+            )
+        } else {
+            MessengerDiagnostics.event(
+                .draftRestoreSkippedUserTypedNewText,
+                conversationID: conversation.id,
+                clientMessageID: clientMessageID
+            )
         }
         if replyTarget == nil {
             replyTarget = activeReplyTarget
@@ -487,6 +586,17 @@ final class ChatViewModel {
         router: AppRouter,
         generation: Int
     ) async {
+        let startedAt = Date()
+        let cachedCountBefore = messageCache.messages(for: conversation.id)?.count ?? 0
+        MessengerDiagnostics.event(
+            .loadMessagesStarted,
+            conversationID: conversation.id,
+            metadata: [
+                "generation": "\(generation)",
+                "cachedCountBefore": "\(cachedCountBefore)",
+                "isOpen": "\(isOpen)"
+            ]
+        )
         defer {
             if generation == lifecycleGeneration {
                 isLoading = false
@@ -503,7 +613,18 @@ final class ChatViewModel {
 
         do {
             let profileID = try await MessengerSessionSupport.resolveCurrentProfileID(session: session)
-            guard generation == lifecycleGeneration, isOpen else { return }
+            guard generation == lifecycleGeneration, isOpen else {
+                MessengerDiagnostics.event(
+                    .loadMessagesIgnoredStaleGeneration,
+                    conversationID: conversation.id,
+                    metadata: [
+                        "generation": "\(generation)",
+                        "currentGeneration": "\(lifecycleGeneration)",
+                        "isOpen": "\(isOpen)"
+                    ]
+                )
+                return
+            }
             currentProfileID = profileID
 
             if loadTask == nil {
@@ -517,23 +638,73 @@ final class ChatViewModel {
                         force: true
                     )
                 }
+            } else {
+                MessengerDiagnostics.event(
+                    .loadSkippedInFlight,
+                    conversationID: conversation.id,
+                    metadata: [
+                        "generation": "\(generation)",
+                        "cachedCountBefore": "\(cachedCountBefore)"
+                    ]
+                )
             }
 
             await loadTask?.value
             if generation == lifecycleGeneration {
                 loadTask = nil
             }
-            guard generation == lifecycleGeneration, isOpen else { return }
+            guard generation == lifecycleGeneration, isOpen else {
+                MessengerDiagnostics.event(
+                    .loadMessagesIgnoredStaleGeneration,
+                    conversationID: conversation.id,
+                    metadata: [
+                        "generation": "\(generation)",
+                        "currentGeneration": "\(lifecycleGeneration)",
+                        "isOpen": "\(isOpen)"
+                    ]
+                )
+                return
+            }
             let loaded = messageCache.messages(for: conversation.id) ?? []
             messages = loaded
             if let cacheError = messageCache.entry(for: conversation.id)?.errorMessage {
                 errorMessage = cacheError
             }
+            MessengerDiagnostics.event(
+                .loadMessagesSucceeded,
+                conversationID: conversation.id,
+                metadata: [
+                    "generation": "\(generation)",
+                    "durationMs": "\(durationMilliseconds(since: startedAt))",
+                    "resultCount": "\(loaded.count)",
+                    "cachedCountBefore": "\(cachedCountBefore)",
+                    "cachedCountAfter": "\(messageCache.messages(for: conversation.id)?.count ?? 0)"
+                ]
+            )
         } catch let error as NetworkError {
+            let errorCategory = MessengerDiagnostics.sanitizeError(error)
+            MessengerDiagnostics.event(
+                errorCategory == "cancelled" ? .loadMessagesCancelled : .loadMessagesFailed,
+                conversationID: conversation.id,
+                metadata: [
+                    "generation": "\(generation)",
+                    "durationMs": "\(durationMilliseconds(since: startedAt))",
+                    "errorCategory": errorCategory
+                ]
+            )
             if let message = MessengerSessionSupport.handleNetworkError(error, session: session, router: router) {
                 errorMessage = message
             }
         } catch {
+            MessengerDiagnostics.event(
+                MessengerDiagnostics.sanitizeError(error) == "cancelled" ? .loadMessagesCancelled : .loadMessagesFailed,
+                conversationID: conversation.id,
+                metadata: [
+                    "generation": "\(generation)",
+                    "durationMs": "\(durationMilliseconds(since: startedAt))",
+                    "errorCategory": MessengerDiagnostics.sanitizeError(error)
+                ]
+            )
             errorMessage = error.localizedDescription
         }
     }
@@ -541,10 +712,24 @@ final class ChatViewModel {
     private func markRead(session: SessionStore, router: AppRouter) async {
         guard didOpen, isOpen, MessengerSessionSupport.isAppForegroundActive else {
             NetworkDebug.log("Messenger read ack skipped: inactive chat or background")
+            MessengerDiagnostics.event(
+                .readAckSkipped,
+                conversationID: conversation.id,
+                metadata: [
+                    "reason": didOpen && isOpen ? "background" : "inactiveConversation",
+                    "isAppForeground": "\(MessengerSessionSupport.isAppForegroundActive)",
+                    "isActiveConversation": "\(isOpen)"
+                ]
+            )
             return
         }
         guard let messageID = latestInboundMessageID() else {
             NetworkDebug.log("Messenger read ack skipped: no inbound message")
+            MessengerDiagnostics.event(
+                .readAckSkipped,
+                conversationID: conversation.id,
+                metadata: ["reason": "noInboundMessage"]
+            )
             return
         }
         guard deliveryAckCoordinator.shouldSendRead(
@@ -552,6 +737,12 @@ final class ChatViewModel {
             messageID: messageID
         ) else {
             NetworkDebug.log("Messenger read ack skipped: duplicate \(conversation.id)")
+            MessengerDiagnostics.event(
+                .readAckSkipped,
+                conversationID: conversation.id,
+                messageID: messageID,
+                metadata: ["reason": "duplicate"]
+            )
             return
         }
 
@@ -563,9 +754,30 @@ final class ChatViewModel {
             deliveryAckCoordinator.markReadAcked(conversationID: conversation.id, messageID: messageID)
             MessengerRealtimeCoordinator.shared.markActiveConversationReadLocally(conversationID: conversation.id)
             NetworkDebug.log("Messenger read ack sent: \(conversation.id)")
+            MessengerDiagnostics.event(
+                .readAckSent,
+                conversationID: conversation.id,
+                messageID: messageID,
+                metadata: [
+                    "isActiveConversation": "\(isOpen)",
+                    "isAppForeground": "\(MessengerSessionSupport.isAppForegroundActive)"
+                ]
+            )
         } catch let error as NetworkError {
+            MessengerDiagnostics.event(
+                .readAckFailed,
+                conversationID: conversation.id,
+                messageID: messageID,
+                metadata: ["errorCategory": MessengerDiagnostics.sanitizeError(error)]
+            )
             _ = MessengerSessionSupport.handleNetworkError(error, session: session, router: router)
         } catch {
+            MessengerDiagnostics.event(
+                .readAckFailed,
+                conversationID: conversation.id,
+                messageID: messageID,
+                metadata: ["errorCategory": MessengerDiagnostics.sanitizeError(error)]
+            )
             // Non-blocking: read receipt failure should not block chat UI.
         }
     }
@@ -573,14 +785,32 @@ final class ChatViewModel {
     private func markDelivered(session: SessionStore, router: AppRouter) async {
         guard isOpen else {
             NetworkDebug.log("Messenger delivered ack skipped: inactive chat")
+            MessengerDiagnostics.event(
+                .deliveredAckSkipped,
+                conversationID: conversation.id,
+                metadata: ["reason": "inactiveConversation"]
+            )
             return
         }
         guard MessengerSessionSupport.isAppForegroundActive else {
             NetworkDebug.log("Messenger delivered ack skipped: background")
+            MessengerDiagnostics.event(
+                .deliveredAckSkipped,
+                conversationID: conversation.id,
+                metadata: [
+                    "reason": "background",
+                    "isAppForeground": "false"
+                ]
+            )
             return
         }
         guard let messageID = latestInboundMessageID() else {
             NetworkDebug.log("Messenger delivered ack skipped: no inbound message")
+            MessengerDiagnostics.event(
+                .deliveredAckSkipped,
+                conversationID: conversation.id,
+                metadata: ["reason": "noInboundMessage"]
+            )
             return
         }
         guard deliveryAckCoordinator.shouldSendDelivered(
@@ -588,6 +818,12 @@ final class ChatViewModel {
             messageID: messageID
         ) else {
             NetworkDebug.log("Messenger delivered ack skipped: duplicate \(conversation.id)")
+            MessengerDiagnostics.event(
+                .deliveredAckSkipped,
+                conversationID: conversation.id,
+                messageID: messageID,
+                metadata: ["reason": "duplicate"]
+            )
             return
         }
 
@@ -598,9 +834,30 @@ final class ChatViewModel {
             )
             deliveryAckCoordinator.markDeliveredAcked(conversationID: conversation.id, messageID: messageID)
             NetworkDebug.log("Messenger delivered ack sent from active chat: \(conversation.id)")
+            MessengerDiagnostics.event(
+                .deliveredAckSent,
+                conversationID: conversation.id,
+                messageID: messageID,
+                metadata: [
+                    "isActiveConversation": "\(isOpen)",
+                    "isAppForeground": "\(MessengerSessionSupport.isAppForegroundActive)"
+                ]
+            )
         } catch let error as NetworkError {
+            MessengerDiagnostics.event(
+                .deliveredAckFailed,
+                conversationID: conversation.id,
+                messageID: messageID,
+                metadata: ["errorCategory": MessengerDiagnostics.sanitizeError(error)]
+            )
             _ = MessengerSessionSupport.handleNetworkError(error, session: session, router: router)
         } catch {
+            MessengerDiagnostics.event(
+                .deliveredAckFailed,
+                conversationID: conversation.id,
+                messageID: messageID,
+                metadata: ["errorCategory": MessengerDiagnostics.sanitizeError(error)]
+            )
             // Non-blocking: delivery receipt failure should not block chat UI.
         }
     }
@@ -773,5 +1030,18 @@ final class ChatViewModel {
             return message.id == messageID
         }
         return false
+    }
+
+    private func lifecycleMetadata(generation: Int) -> [String: String] {
+        [
+            "lifecycleGeneration": "\(generation)",
+            "messageCount": "\(messages.count)",
+            "didOpen": "\(didOpen)",
+            "isOpen": "\(isOpen)"
+        ]
+    }
+
+    private func durationMilliseconds(since startDate: Date) -> Int {
+        max(0, Int(Date().timeIntervalSince(startDate) * 1_000))
     }
 }

@@ -47,6 +47,14 @@ final class MessageCacheStore {
         }
 
         if let existingTask = loadTasks[conversationID] {
+            MessengerDiagnostics.event(
+                .loadSkippedInFlight,
+                conversationID: conversationID,
+                metadata: [
+                    "source": "messageCache",
+                    "cachedCountBefore": "\(entries[conversationID]?.messages.count ?? 0)"
+                ]
+            )
             await existingTask.value
             return entries[conversationID]?.messages ?? []
         }
@@ -129,14 +137,40 @@ final class MessageCacheStore {
     }
 
     func mergeLoadedMessages(_ loadedMessages: [ChatMessage], for conversationID: UUID) {
+        let existingMessages = entries[conversationID]?.messages ?? []
+        var preservedDeleteCount = 0
+        var preservedEditCount = 0
+        var preservedReceiptCount = 0
+
+        MessengerDiagnostics.event(
+            .cacheMergeStarted,
+            conversationID: conversationID,
+            metadata: [
+                "incomingCount": "\(loadedMessages.count)",
+                "existingCount": "\(existingMessages.count)"
+            ]
+        )
+
         var mergedByID: [UUID: ChatMessage] = [:]
 
-        for message in entries[conversationID]?.messages ?? [] {
+        for message in existingMessages {
             mergedByID[message.id] = message
         }
         for message in loadedMessages {
             if let existing = mergedByID[message.id] {
-                mergedByID[message.id] = mergeLoadedMessage(message, withExisting: existing)
+                let merged = mergeLoadedMessage(message, withExisting: existing)
+                if existing.isDeleted, !message.isDeleted, merged.isDeleted {
+                    preservedDeleteCount += 1
+                }
+                if existing.isEdited, !message.isEdited, !message.isDeleted, merged.isEdited {
+                    preservedEditCount += 1
+                }
+                if let existingStatus = existing.deliveryStatus,
+                   existingStatus.rank > (message.deliveryStatus?.rank ?? -1),
+                   merged.deliveryStatus == existingStatus {
+                    preservedReceiptCount += 1
+                }
+                mergedByID[message.id] = merged
             } else {
                 mergedByID[message.id] = message
             }
@@ -150,6 +184,29 @@ final class MessageCacheStore {
         }
 
         entries[conversationID] = Entry(messages: merged, loadedAt: .now)
+        if preservedDeleteCount > 0 || preservedEditCount > 0 || preservedReceiptCount > 0 {
+            MessengerDiagnostics.event(
+                .cacheMergePreservedRealtimeState,
+                conversationID: conversationID,
+                metadata: [
+                    "preservedDeleteCount": "\(preservedDeleteCount)",
+                    "preservedEditCount": "\(preservedEditCount)",
+                    "preservedReceiptCount": "\(preservedReceiptCount)"
+                ]
+            )
+        }
+        MessengerDiagnostics.event(
+            .cacheMergeCompleted,
+            conversationID: conversationID,
+            metadata: [
+                "incomingCount": "\(loadedMessages.count)",
+                "existingCount": "\(existingMessages.count)",
+                "resultCount": "\(merged.count)",
+                "preservedDeleteCount": "\(preservedDeleteCount)",
+                "preservedEditCount": "\(preservedEditCount)",
+                "preservedReceiptCount": "\(preservedReceiptCount)"
+            ]
+        )
     }
 
     private func mergeLoadedMessage(_ loaded: ChatMessage, withExisting existing: ChatMessage) -> ChatMessage {
