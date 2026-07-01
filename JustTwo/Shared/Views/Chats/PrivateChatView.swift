@@ -626,21 +626,25 @@ struct PrivateChatView: View {
                 .lineLimit(1)
 
             if viewModel.isOtherParticipantTyping {
-                Text("chats.typing")
-                    .font(Font.App.caption())
-                    .foregroundStyle(Color.secondaryText)
-                    .italic()
+                HStack(spacing: 4) {
+                    Text("chats.typing")
+                        .font(Font.App.caption(weight: .semibold))
+                        .foregroundStyle(Color.discoverViolet)
+                    TypingDotsView(color: .discoverViolet)
+                }
+                .transition(.opacity)
             } else if presenceStore.isOnline(profileID: viewModel.conversation.otherParticipantProfileID) {
                 Text("chats.online")
-                    .font(Font.App.caption())
-                    .foregroundStyle(Color.secondaryText)
+                    .font(Font.App.caption(weight: .semibold))
+                    .foregroundStyle(Color.discoverOnline)
             } else {
                 Text("chats.personal")
                     .font(Font.App.caption())
                     .foregroundStyle(Color.secondaryText)
             }
         }
-        .padding(.horizontal, 14)
+        .animation(.easeInOut(duration: 0.2), value: viewModel.isOtherParticipantTyping)
+        .padding(.horizontal, 20)
         .padding(.vertical, 6)
         .frame(maxWidth: 210)
         .background(

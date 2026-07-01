@@ -162,7 +162,7 @@ struct ChatBubbleView: View {
 
     private var bubbleBackground: some View {
         ChatBubbleShape(isMine: isMine)
-            .fill(isMine ? Color.chatBubbleMine : Color.chatBubbleOther)
+            .fill(isMine ? AnyShapeStyle(Color.chatBubbleMineGradient) : AnyShapeStyle(Color.chatBubbleOther))
             .overlay(
                 ChatBubbleShape(isMine: isMine)
                     .stroke(

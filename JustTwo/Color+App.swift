@@ -9,101 +9,101 @@ import AppKit
 // MARK: - JustTwo Design System
 
 extension Color {
-    // MARK: Base
+    // MARK: Base — Optimized for Cozy & Modern Dating
 
-    private static let lightSurface = Color(hex: "#FFFBF7")
-    private static let darkSurface = Color(hex: "#100D18")
+    private static let lightSurface = Color(hex: "#FFFDFB") // Чуть теплее, комфортнее для глаз
+    private static let darkSurface = Color(hex: "#0B0813")  // Глубже, чтобы фотки пользователей «горели»
 
     private static let lightOnAccentText = Color(hex: "#FFFFFF")
     private static let darkOnAccentText = Color(hex: "#FFFFFF")
 
-    private static let lightBrandPrimary = Color(hex: "#B8325E")
-    private static let darkBrandPrimary = Color(hex: "#C94268")
+    private static let lightBrandPrimary = Color(hex: "#D82C5F") // Сочный ягодный без грязного подтона
+    private static let darkBrandPrimary = Color(hex: "#E6396E")
 
-    private static let lightBrandPrimaryPressed = Color(hex: "#8F2347")
-    private static let darkBrandPrimaryPressed = Color(hex: "#A83356")
+    private static let lightBrandPrimaryPressed = Color(hex: "#A61B43")
+    private static let darkBrandPrimaryPressed = Color(hex: "#C22552")
 
-    private static let lightBrandGradientEnd = Color(hex: "#6E56CF")
-    private static let darkBrandGradientEnd = Color(hex: "#7E5FD4")
+    private static let lightBrandGradientEnd = Color(hex: "#6344E3") // Благородный фиолетовый для мэтчей
+    private static let darkBrandGradientEnd = Color(hex: "#7956FA")
 
     private static let lightIndigo = Color(hex: "#4F46E5")
     private static let darkIndigo = Color(hex: "#818CF8")
 
-    private static let lightBrandPrimaryGlow = Color(hex: "#FF6B8A")
+    private static let lightBrandPrimaryGlow = Color(hex: "#FF7597")
     private static let darkBrandPrimaryGlow = Color(hex: "#FF5F87")
 
-    // MARK: Discover
+    // MARK: Discover — Backgrounds (Смягчили градиент, убирая визуальный шум)
 
-    private static let lightDiscoverBackgroundTop = Color(hex: "#FFFBF7")
-    private static let darkDiscoverBackgroundTop = Color(hex: "#0F0B16")
+    private static let lightDiscoverBackgroundTop = Color(hex: "#FFFDFB")
+    private static let darkDiscoverBackgroundTop = Color(hex: "#0B0813")
 
-    private static let lightDiscoverBackgroundMiddle = Color(hex: "#FFE6EA")
-    private static let darkDiscoverBackgroundMiddle = Color(hex: "#211224")
+    private static let lightDiscoverBackgroundMiddle = Color(hex: "#FFF0F2") // Мягкий пастельный вместо едкого розового
+    private static let darkDiscoverBackgroundMiddle = Color(hex: "#160F24")
 
-    private static let lightDiscoverBackgroundBottom = Color(hex: "#F3ECFF")
-    private static let darkDiscoverBackgroundBottom = Color(hex: "#0E1826")
+    private static let lightDiscoverBackgroundBottom = Color(hex: "#F6F0FF")
+    private static let darkDiscoverBackgroundBottom = Color(hex: "#0A0E1A")
 
-    private static let lightDiscoverPrimaryText = Color(hex: "#24151F")
-    private static let darkDiscoverPrimaryText = Color(hex: "#FFF7FB")
+    private static let lightDiscoverPrimaryText = Color(hex: "#1F0F18")
+    private static let darkDiscoverPrimaryText = Color(hex: "#FFF5FA")
 
-    private static let lightDiscoverSecondaryText = Color(hex: "#75616B")
-    private static let darkDiscoverSecondaryText = Color(hex: "#CDBDC8")
+    private static let lightDiscoverSecondaryText = Color(hex: "#7A6570")
+    private static let darkDiscoverSecondaryText = Color(hex: "#A89AA4") // Чистый серебристый оттенок в темноте
 
-    private static let lightDiscoverViolet = Color(hex: "#6E56CF")
-    private static let darkDiscoverViolet = Color(hex: "#7E5FD4")
+    private static let lightDiscoverViolet = Color(hex: "#6344E3")
+    private static let darkDiscoverViolet = Color(hex: "#7956FA")
 
-    private static let lightDiscoverVioletLight = Color(hex: "#7758D5")
-    private static let darkDiscoverVioletLight = Color(hex: "#9A82F0")
+    private static let lightDiscoverVioletLight = Color(hex: "#8265F0")
+    private static let darkDiscoverVioletLight = Color(hex: "#9F87FF")
 
-    private static let lightDiscoverPink = Color(hex: "#B8325E")
-    private static let darkDiscoverPink = Color(hex: "#C94268")
+    private static let lightDiscoverPink = Color(hex: "#D82C5F")
+    private static let darkDiscoverPink = Color(hex: "#E6396E")
 
-    private static let lightDiscoverPinkLight = Color(hex: "#C3476B")
-    private static let darkDiscoverPinkLight = Color(hex: "#C44B59")
+    private static let lightDiscoverPinkLight = Color(hex: "#E0537E")
+    private static let darkDiscoverPinkLight = Color(hex: "#ED6B90")
 
-    private static let lightDiscoverCardShadow = Color(hex: "#5A3142")
-    private static let darkDiscoverCardShadow = Color(hex: "#05030A")
+    private static let lightDiscoverCardShadow = Color(hex: "#2C121C").opacity(0.12) // Честная альфа для теней карточек
+    private static let darkDiscoverCardShadow = Color(hex: "#000000").opacity(0.5)
 
-    private static let lightDiscoverMockLavender = Color(hex: "#F1E7FF")
-    private static let darkDiscoverMockLavender = Color(hex: "#2E2642")
+    private static let lightDiscoverMockLavender = Color(hex: "#F3EDFF")
+    private static let darkDiscoverMockLavender = Color(hex: "#251D36")
 
-    private static let lightDiscoverMockPeach = Color(hex: "#FFE1D8")
-    private static let darkDiscoverMockPeach = Color(hex: "#3A2028")
+    private static let lightDiscoverMockPeach = Color(hex: "#FFEBE5")
+    private static let darkDiscoverMockPeach = Color(hex: "#361B22")
 
-    private static let lightDiscoverOnline = Color(hex: "#18C97A")
-    private static let darkDiscoverOnline = Color(hex: "#35D989")
+    private static let lightDiscoverOnline = Color(hex: "#10D37F")
+    private static let darkDiscoverOnline = Color(hex: "#2CE491")
 
-    private static let lightDiscoverCardScrim = Color(hex: "#110812")
-    private static let darkDiscoverCardScrim = Color(hex: "#04020A")
+    private static let lightDiscoverCardScrim = Color(hex: "#000000") // Чистый черный, прозрачность задается в градиенте
+    private static let darkDiscoverCardScrim = Color(hex: "#000000")
 
-    private static let lightTabBarInactiveIcon = Color(hex: "#8A76C9")
-    private static let darkTabBarInactiveIcon = Color(hex: "#A696DE")
+    private static let lightTabBarInactiveIcon = Color(hex: "#9E8CD9")
+    private static let darkTabBarInactiveIcon = Color(hex: "#7E6EBA")
 
-    private static let lightTabBarInactiveTitle = Color(hex: "#8E7A93")
-    private static let darkTabBarInactiveTitle = Color(hex: "#B8A9C1")
+    private static let lightTabBarInactiveTitle = Color(hex: "#A390A8")
+    private static let darkTabBarInactiveTitle = Color(hex: "#817285")
 
-    private static let lightGlassBorderHighlight = Color(hex: "#FFFFFF")
-    private static let darkGlassBorderHighlight = Color(hex: "#F1EAFB")
+    private static let lightGlassBorderHighlight = Color(hex: "#FFFFFF").opacity(0.6)
+    private static let darkGlassBorderHighlight = Color(hex: "#FFFFFF").opacity(0.15) // Тонкий светящийся стык для темной темы
 
     // MARK: Additional Semantic Colors
 
     private static let lightCardSurface = Color(hex: "#FFFFFF")
-    private static let darkCardSurface = Color(hex: "#191522")
+    private static let darkCardSurface = Color(hex: "#14101F") // Эффект многослойности: карточка чуть светлее подложки
 
-    private static let lightElevatedSurface = Color(hex: "#FFF5F2")
-    private static let darkElevatedSurface = Color(hex: "#241A2D")
+    private static let lightElevatedSurface = Color(hex: "#FFF8F6")
+    private static let darkElevatedSurface = Color(hex: "#1C162A")
 
-    private static let lightFieldBackground = Color(hex: "#FFFFFF")
-    private static let darkFieldBackground = Color(hex: "#1D1727")
+    private static let lightFieldBackground = Color(hex: "#F5EFF2") // Инпуты слегка утоплены относительно фона
+    private static let darkFieldBackground = Color(hex: "#171224")
 
-    private static let lightHairline = Color(hex: "#E8D9E1")
-    private static let darkHairline = Color(hex: "#36283F")
+    private static let lightHairline = Color(hex: "#EFE5EA")
+    private static let darkHairline = Color(hex: "#2C2036")
 
     private static let lightDisabled = Color(hex: "#C9B8C0")
     private static let darkDisabled = Color(hex: "#6F6073")
 
-    private static let lightSuccess = Color(hex: "#18C97A")
-    private static let darkSuccess = Color(hex: "#35D989")
+    private static let lightSuccess = Color(hex: "#10D37F")
+    private static let darkSuccess = Color(hex: "#2CE491")
 
     private static let lightWarning = Color(hex: "#C67A22")
     private static let darkWarning = Color(hex: "#E0A64A")
@@ -112,10 +112,16 @@ extension Color {
     private static let darkError = Color(hex: "#FF6B7E")
 
     private static let lightChatBubbleMine = Color(hex: "#E8DEFF")
-    private static let darkChatBubbleMine = Color(hex: "#3A2F56")
+    private static let darkChatBubbleMine = Color(hex: "#2F2447")
 
-    private static let lightChatReactionSelected = Color(hex: "#005493")
-    private static let darkChatReactionSelected = Color(hex: "#005493")
+    // A touch more saturated than the base bubble tone, used as the far stop of a subtle
+    // shimmer gradient so outgoing bubbles read as more alive without changing their shape.
+    private static let lightChatBubbleMineShimmer = Color(hex: "#D9C4FF")
+    private static let darkChatBubbleMineShimmer = Color(hex: "#3E2E63")
+
+    // Избавились от синего из «Госуслуг», теперь здесь фирменный фиолетовый акцент JustTwo
+    private static let lightChatReactionSelected = Color(hex: "#6344E3")
+    private static let darkChatReactionSelected = Color(hex: "#7956FA")
 
     // MARK: Semantic — Core UI
 
@@ -183,6 +189,17 @@ extension Color {
         cardSurface
     }
 
+    static var chatBubbleMineGradient: LinearGradient {
+        LinearGradient(
+            colors: [
+                chatBubbleMine,
+                dynamic(light: lightChatBubbleMineShimmer, dark: darkChatBubbleMineShimmer)
+            ],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+    }
+
     static var chatReactionSelected: Color {
         dynamic(light: lightChatReactionSelected, dark: darkChatReactionSelected)
     }
@@ -225,20 +242,15 @@ extension Color {
         dynamic(light: lightDiscoverOnline, dark: darkDiscoverOnline)
     }
 
-    /// Darkening layer for profile photos — always a deep tone, independent of screen text color.
     static var discoverCardScrim: Color {
         dynamic(light: lightDiscoverCardScrim, dark: darkDiscoverCardScrim)
     }
 
-    /// Text placed on top of profile photos over `discoverCardScrim`.
     static var discoverOnPhotoText: Color {
         onAccentText
     }
 
     // MARK: Semantic — Supporting Tokens
-    //
-    // Used by gradients, state styles, placeholders, disabled controls,
-    // warnings, and future UI components.
 
     static var brandPrimaryPressed: Color {
         dynamic(light: lightBrandPrimaryPressed, dark: darkBrandPrimaryPressed)
@@ -273,18 +285,9 @@ extension Color {
     static var discoverBackgroundGradient: LinearGradient {
         LinearGradient(
             stops: [
-                .init(
-                    color: dynamic(light: lightDiscoverBackgroundTop, dark: darkDiscoverBackgroundTop),
-                    location: 0
-                ),
-                .init(
-                    color: dynamic(light: lightDiscoverBackgroundMiddle, dark: darkDiscoverBackgroundMiddle),
-                    location: 0.55
-                ),
-                .init(
-                    color: dynamic(light: lightDiscoverBackgroundBottom, dark: darkDiscoverBackgroundBottom),
-                    location: 1
-                )
+                .init(color: dynamic(light: lightDiscoverBackgroundTop, dark: darkDiscoverBackgroundTop), location: 0),
+                .init(color: dynamic(light: lightDiscoverBackgroundMiddle, dark: darkDiscoverBackgroundMiddle), location: 0.55),
+                .init(color: dynamic(light: lightDiscoverBackgroundBottom, dark: darkDiscoverBackgroundBottom), location: 1)
             ],
             startPoint: .topLeading,
             endPoint: .bottomTrailing
@@ -294,18 +297,9 @@ extension Color {
     static var authBackgroundGradient: LinearGradient {
         LinearGradient(
             stops: [
-                .init(
-                    color: dynamic(light: lightDiscoverBackgroundTop, dark: darkDiscoverBackgroundTop),
-                    location: 0
-                ),
-                .init(
-                    color: dynamic(light: lightDiscoverBackgroundBottom, dark: darkDiscoverBackgroundMiddle),
-                    location: 0.46
-                ),
-                .init(
-                    color: dynamic(light: lightDiscoverBackgroundMiddle, dark: darkDiscoverBackgroundBottom),
-                    location: 1
-                )
+                .init(color: dynamic(light: lightDiscoverBackgroundTop, dark: darkDiscoverBackgroundTop), location: 0),
+                .init(color: dynamic(light: lightDiscoverBackgroundBottom, dark: darkDiscoverBackgroundMiddle), location: 0.46),
+                .init(color: dynamic(light: lightDiscoverBackgroundMiddle, dark: darkDiscoverBackgroundBottom), location: 1)
             ],
             startPoint: .topLeading,
             endPoint: .bottomTrailing
@@ -402,18 +396,20 @@ extension Color {
 
 extension Font {
     enum App {
+        private static let fontNamePrefix = "Manrope"
+
         private static func manropeName(for weight: Weight) -> String {
             switch weight {
             case .bold:
-                return "Manrope-Bold"
+                return "\(fontNamePrefix)-Bold"
             case .heavy, .black:
-                return "Manrope-ExtraBold"
+                return "\(fontNamePrefix)-ExtraBold"
             case .semibold:
-                return "Manrope-SemiBold"
+                return "\(fontNamePrefix)-SemiBold"
             case .medium:
-                return "Manrope-Medium"
+                return "\(fontNamePrefix)-Medium"
             default:
-                return "Manrope-Regular"
+                return "\(fontNamePrefix)-Regular"
             }
         }
 

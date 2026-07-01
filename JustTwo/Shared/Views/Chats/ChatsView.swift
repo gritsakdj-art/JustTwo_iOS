@@ -117,31 +117,59 @@ struct ChatsView: View {
     }
 
     private var header: some View {
-        HStack {
-            Text("chats.header")
-                .font(Font.App.headline(size: 17, weight: .semibold))
-                .foregroundStyle(Color.primaryText)
+        HStack(alignment: .center) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("chats.header")
+                    .font(Font.App.manrope(size: 26, weight: .heavy))
+                    .foregroundStyle(Color.discoverSelectedGradient)
+                    .tracking(-0.5)
+
+                Text(unreadSummaryText)
+                    .font(Font.App.manrope(size: 13, weight: .medium))
+                    .foregroundStyle(Color.secondaryText)
+                    .contentTransition(.numericText())
+                    .animation(.easeInOut(duration: 0.2), value: listViewModel.totalUnreadCount)
+            }
 
             Spacer()
 
-            Button {
-                isInviteSheetPresented = true
-            } label: {
-                Image(systemName: "plus")
-                    .font(.system(size: 18, weight: .semibold))
-                    .foregroundStyle(Color.discoverViolet)
-                    .frame(width: 36, height: 36)
-            }
-            .accessibilityLabel(Text("accessibility.create_invite"))
+            inviteButton
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
+        .padding(.horizontal, 20)
+        .padding(.top, 8)
+        .padding(.bottom, 14)
         .background(
             Color.clear
                 .overlay(alignment: .bottom) {
                     Divider().overlay(Color.hairline)
                 }
         )
+    }
+
+    private var inviteButton: some View {
+        Button {
+            isInviteSheetPresented = true
+        } label: {
+            Image(systemName: "plus")
+                .font(.system(size: 17, weight: .semibold))
+                .foregroundStyle(Color.discoverViolet)
+                .frame(width: 42, height: 42)
+                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 14)
+                        .stroke(Color.hairline, lineWidth: 1)
+                )
+                .shadow(color: Color.brandPrimaryGlow.opacity(0.12), radius: 12, x: 0, y: 2)
+        }
+        .accessibilityLabel(Text("accessibility.create_invite"))
+    }
+
+    private var unreadSummaryText: String {
+        let count = listViewModel.totalUnreadCount
+        guard count > 0 else {
+            return String(localized: "chats.header.allRead")
+        }
+        return String(format: String(localized: "chats.header.unreadCount"), count)
     }
 
     @ViewBuilder
@@ -157,7 +185,7 @@ struct ChatsView: View {
 
     private var conversationsList: some View {
         ScrollView {
-            LazyVStack(spacing: 0) {
+            LazyVStack(spacing: 12) {
                 ForEach(listViewModel.conversations) { conversation in
                     ChatConversationRow(
                         conversation: conversation,
@@ -175,23 +203,46 @@ struct ChatsView: View {
                         )
                         presentPrivateChat(conversation: conversation)
                     }
-
-                    Divider()
-                        .overlay(Color.hairline)
                 }
 
                 if listViewModel.conversations.isEmpty {
-                    Text("chats.empty")
-                        .font(Font.App.subheadline())
-                        .foregroundStyle(Color.secondaryText)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, AppSpacing.xl)
+                    emptyState
                 }
             }
+            .padding(.horizontal, 16)
+            .padding(.top, 14)
+            .padding(.bottom, 24)
         }
         .scrollIndicators(.hidden)
         .scrollContentBackground(.hidden)
         .background(Color.clear)
+    }
+
+    private var emptyState: some View {
+        VStack(spacing: AppSpacing.lg) {
+            Image(systemName: "bubble.left.and.bubble.right")
+                .font(.system(size: 48, weight: .light))
+                .foregroundStyle(Color.discoverViolet.opacity(0.5))
+                .padding(.bottom, 8)
+
+            Text("chats.empty.title")
+                .font(Font.App.headline(size: 20, weight: .bold))
+                .foregroundStyle(Color.primaryText)
+
+            Text("chats.empty.subtitle")
+                .font(Font.App.subheadline())
+                .foregroundStyle(Color.secondaryText)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 32)
+
+            PrimaryButton("chats.empty.cta") {
+                router.selectedMainTab = .discover
+            }
+            .padding(.horizontal, AppSpacing.xl)
+            .padding(.top, 8)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.top, 80)
     }
 
     private var loadingView: some View {
