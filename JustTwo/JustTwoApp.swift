@@ -29,6 +29,7 @@ struct JustTwoApp: App {
         AppFontRegistrar.registerFonts()
         AppTabBarAppearance.configure()
         PushRegistrationService.shared.configure()
+        AppBuildEnvironment.beginTestFlightResolutionIfNeeded()
     }
 
     var body: some Scene {

@@ -15,7 +15,7 @@ protocol PushRegistrationServicing {
     func unregisterCurrentDevice(accessToken: String?) async
 }
 
-enum PushEnvironment: String {
+enum PushEnvironment: String, Codable {
     case sandbox
     case production
 
@@ -93,7 +93,9 @@ final class PushRegistrationService: NSObject, PushRegistrationServicing {
     func handleDidRegister(deviceToken: Data) {
         let token = deviceToken.lowercaseHexString
         currentToken = token
-        NetworkDebug.log("APNs token received: \(token.safeTokenDescription)")
+        NetworkDebug.log(
+            "APNs token received environment=\(PushEnvironment.current.rawValue) \(token.safeTokenDescription)"
+        )
 
         Task { @MainActor [weak self] in
             await self?.syncCurrentTokenIfPossible(userID: SessionStore.shared.currentUser?.id)
@@ -154,6 +156,10 @@ final class PushRegistrationService: NSObject, PushRegistrationServicing {
         inFlightSyncKey = syncKey
         defer { inFlightSyncKey = nil }
 
+        NetworkDebug.log(
+            "Push device sync started environment=\(syncKey.environment) token=\(token.safeTokenDescription)"
+        )
+
         let body = RegisterPushDeviceRequestBody(
             platform: "ios",
             token: token,
@@ -172,9 +178,14 @@ final class PushRegistrationService: NSObject, PushRegistrationServicing {
         do {
             _ = try await NetworkExecutor.shared.send(RegisterPushDeviceRequest(bodyValue: body))
             lastSuccessfulSyncKey = syncKey
-            NetworkDebug.log("Push device sync succeeded")
+            NetworkDebug.log(
+                "Push device sync succeeded environment=\(syncKey.environment) token=\(token.safeTokenDescription)"
+            )
         } catch {
-            NetworkDebug.logError(error, prefix: "Push device sync failed")
+            NetworkDebug.logError(
+                error,
+                prefix: "Push device sync failed environment=\(syncKey.environment) token=\(token.safeTokenDescription)"
+            )
         }
     }
 

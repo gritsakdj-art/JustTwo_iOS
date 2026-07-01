@@ -14,6 +14,7 @@ struct GeneralSettingsView: View {
     @State private var isRequestingPermission = false
     @State private var diagnosticsAlertMessage = ""
     @State private var isDiagnosticsAlertPresented = false
+    @State private var showsInternalDiagnostics = AppBuildEnvironment.showsInternalDiagnostics
 
     var body: some View {
         ScrollView(showsIndicators: false) {
@@ -21,7 +22,7 @@ struct GeneralSettingsView: View {
                 themePicker
                 languagePicker
                 notificationsSection
-                if AppBuildEnvironment.showsInternalDiagnostics {
+                if showsInternalDiagnostics {
                     diagnosticsSection
                 }
             }
@@ -36,6 +37,11 @@ struct GeneralSettingsView: View {
         .toolbarBackground(.hidden, for: .navigationBar)
         .task {
             authorizationStatus = await MessengerNotificationService.shared.authorizationStatus()
+            await AppBuildEnvironment.refreshTestFlightStatus()
+            showsInternalDiagnostics = AppBuildEnvironment.showsInternalDiagnostics
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .appBuildEnvironmentDidUpdate)) { _ in
+            showsInternalDiagnostics = AppBuildEnvironment.showsInternalDiagnostics
         }
         .alert(Text("settings.diagnostics.alert.title"), isPresented: $isDiagnosticsAlertPresented) {
             Button("common.done", role: .cancel) {}
