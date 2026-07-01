@@ -135,8 +135,8 @@ struct ConversationDeliveryAckTests {
         #expect(deliveredCalls.count == 1)
     }
 
-    @Test("initial scroll target prefers last read message when unread exists")
-    func initialScrollTargetUsesLastReadMessage() {
+    @Test("initial scroll target centers unread separator when unread exists")
+    func initialScrollTargetCentersUnreadSeparator() {
         let conversation = makeConversation(unreadCount: 2)
         let messages = [
             makeChatMessage(id: fixedMessageID(offset: 1), isMine: false, body: "older"),
@@ -146,7 +146,8 @@ struct ConversationDeliveryAckTests {
         ]
         let viewModel = ChatViewModel.preview(conversation: conversation, messages: messages)
 
-        #expect(viewModel.initialScrollTarget(pushTargetMessageID: nil) == .lastReadMessage(fixedMessageID(offset: 2)))
+        #expect(viewModel.initialScrollTarget(pushTargetMessageID: nil) == .unreadSeparator)
+        #expect(viewModel.firstUnreadMessageID == fixedMessageID(offset: 3))
     }
 
     @Test("initial scroll target uses last message when no unread exists")

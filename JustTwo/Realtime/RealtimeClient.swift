@@ -10,7 +10,7 @@ final class RealtimeClient {
     private(set) var state: RealtimeConnectionState = .disconnected
 
     private let configuration: APIConfiguration
-    private let session: URLSession
+    private let sessionProvider: @MainActor () -> URLSession
     private let router: RealtimeEventRouter
     private let reconnectPolicy: RealtimeReconnectPolicy
     private let tokenProvider: @MainActor () -> String?
@@ -29,18 +29,40 @@ final class RealtimeClient {
 
     private let backgroundKeepaliveInterval: TimeInterval = 20
 
+    private var sessionsResetObserver: NSObjectProtocol?
+
     init(
         configuration: APIConfiguration = .current,
-        session: URLSession = URLSessionProvider.session,
+        session: URLSession? = nil,
         router: RealtimeEventRouter,
         reconnectPolicy: RealtimeReconnectPolicy = .default,
         tokenProvider: @escaping @MainActor () -> String? = { APIAuth.accessToken }
     ) {
         self.configuration = configuration
-        self.session = session
+        if let session {
+            self.sessionProvider = { session }
+        } else {
+            self.sessionProvider = { URLSessionProvider.session }
+        }
         self.router = router
         self.reconnectPolicy = reconnectPolicy
         self.tokenProvider = tokenProvider
+
+        sessionsResetObserver = NotificationCenter.default.addObserver(
+            forName: .urlSessionsDidReset,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated {
+                self?.handleNetworkingSessionsReset()
+            }
+        }
+    }
+
+    deinit {
+        if let sessionsResetObserver {
+            NotificationCenter.default.removeObserver(sessionsResetObserver)
+        }
     }
 
     func connect(jwt: String) async {
@@ -65,7 +87,7 @@ final class RealtimeClient {
 
         NetworkDebug.log("Realtime connect start")
 
-        let socket = session.webSocketTask(with: request)
+        let socket = sessionProvider().webSocketTask(with: request)
         task = socket
         socket.resume()
 
@@ -268,6 +290,12 @@ final class RealtimeClient {
         scheduleReconnectIfNeeded(
             immediate: isTimeout && shouldMaintainBackgroundConnection
         )
+    }
+
+    private func handleNetworkingSessionsReset() {
+        guard task != nil || reconnectTask != nil else { return }
+        NetworkDebug.log("Realtime reconnecting after URL session reset")
+        disconnect(shouldReconnect: true)
     }
 
     private func disconnect(shouldReconnect: Bool) {

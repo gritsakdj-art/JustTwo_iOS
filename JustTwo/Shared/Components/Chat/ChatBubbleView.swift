@@ -22,6 +22,7 @@ struct ChatBubbleView: View {
         static let minWidth: CGFloat = 120
         static let minWidthEdited: CGFloat = 156
         static let timeClusterWidth: CGFloat = 54
+        static let dateTimeClusterWidth: CGFloat = 108
         static let editedLabelWidth: CGFloat = 52
         static let receiptWidth: CGFloat = 22
         static let reactionMetadataSpacing: CGFloat = 4
@@ -35,10 +36,14 @@ struct ChatBubbleView: View {
 
     private var bubbleMinWidth: CGFloat {
         let horizontalInsets = bottomLeadingInset + bottomTrailingInset
-        let metadataWidth = UI.timeClusterWidth
+        let metadataWidth = metadataClusterWidth
             + (isEdited ? UI.editedLabelWidth + 4 : 0)
             + (deliveryStatus == nil ? 0 : UI.receiptWidth)
         return max(isEdited ? UI.minWidthEdited : UI.minWidth, horizontalInsets + metadataWidth + 12)
+    }
+
+    private var metadataClusterWidth: CGFloat {
+        ChatMessageDateFormatting.isToday(createdAt) ? UI.timeClusterWidth : UI.dateTimeClusterWidth
     }
 
     var body: some View {
@@ -172,7 +177,7 @@ struct ChatBubbleView: View {
                     .lineLimit(1)
             }
 
-            Text(createdAt, style: .time)
+            Text(ChatMessageDateFormatting.metadataText(for: createdAt))
                 .font(Font.App.caption(size: 11))
                 .foregroundStyle(Color.secondaryText.opacity(0.75))
                 .monospacedDigit()
@@ -229,6 +234,13 @@ private struct MessageDeliveryReceiptView: View {
                 ChatMessageReaction(emoji: "😂", count: 1, reactedByMe: true)
             ],
             deliveryStatus: .read
+        )
+
+        ChatBubbleView(
+            text: "Message from yesterday",
+            senderName: "Emma",
+            createdAt: Calendar.current.date(byAdding: .day, value: -1, to: Date()) ?? Date(),
+            isMine: false
         )
 
         ChatBubbleView(

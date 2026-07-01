@@ -60,7 +60,6 @@ struct MessageInputView: View {
                 .foregroundStyle(Color.primaryText)
                 .lineLimit(1...4)
                 .focused($isInputFocused)
-                .disabled(isSending)
                 .onChange(of: text) { _, newValue in
                     if newValue.count > MessengerLimits.maxMessageLength {
                         text = String(newValue.prefix(MessengerLimits.maxMessageLength))

@@ -239,6 +239,32 @@ struct MessageCacheStoreTests {
     }
 
     @Test
+    func mergeLoadedMessagesPreservesOlderMessagesCursor() {
+        let store = MessageCacheStore.shared
+        store.reset()
+        let message = makeMessage(
+            id: UUID(),
+            createdAt: Date(timeIntervalSince1970: 1_000),
+            isMine: false,
+            status: nil
+        )
+
+        store.setMessages([message], for: conversationID)
+        store.setOlderMessagesCursorForTesting("older-cursor", for: conversationID)
+
+        store.mergeLoadedMessages([
+            makeMessage(
+                id: UUID(),
+                createdAt: Date(timeIntervalSince1970: 2_000),
+                isMine: false,
+                status: nil
+            )
+        ], for: conversationID)
+
+        #expect(store.entry(for: conversationID)?.olderMessagesCursor == "older-cursor")
+    }
+
+    @Test
     func resetClearsCache() {
         let store = MessageCacheStore.shared
         store.setMessages([], for: conversationID)

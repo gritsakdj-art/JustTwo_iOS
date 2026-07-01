@@ -109,7 +109,15 @@ enum URLSessionProvider: Sendable {
         let oldImageSession = imageSessionStore
         imageSessionStore = makeImageSession(label: "image")
         oldImageSession.invalidateAndCancel()
+
+        DispatchQueue.main.async {
+            NotificationCenter.default.post(name: .urlSessionsDidReset, object: nil)
+        }
     }
+}
+
+extension Notification.Name {
+    static let urlSessionsDidReset = Notification.Name("urlSessionsDidReset")
 }
 
 private extension URLSessionProvider {

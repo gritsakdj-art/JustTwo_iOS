@@ -27,6 +27,9 @@ enum AppBuildEnvironment {
     }
 
     static func refreshTestFlightStatus() async {
+        #if DEBUG
+        return
+        #else
         let detected = await detectTestFlightFromAppTransaction()
         let didChange = resolutionLock.withLock {
             let previous = resolvedIsTestFlight
@@ -36,9 +39,13 @@ enum AppBuildEnvironment {
         if didChange {
             NotificationCenter.default.post(name: .appBuildEnvironmentDidUpdate, object: nil)
         }
+        #endif
     }
 
     static func beginTestFlightResolutionIfNeeded() {
+        #if DEBUG
+        return
+        #else
         let shouldStart = resolutionLock.withLock { () -> Bool in
             guard resolvedIsTestFlight == nil else { return false }
             guard !testFlightResolutionStarted else { return false }
@@ -50,13 +57,16 @@ enum AppBuildEnvironment {
         Task {
             await refreshTestFlightStatus()
         }
+        #endif
     }
 
+    #if !DEBUG
     private static func detectTestFlightFromAppTransaction() async -> Bool {
         guard let result = try? await AppTransaction.shared else { return false }
         guard case .verified(let appTransaction) = result else { return false }
         return appTransaction.environment == .sandbox
     }
+    #endif
 }
 
 extension Notification.Name {

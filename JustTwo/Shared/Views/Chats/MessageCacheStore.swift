@@ -10,7 +10,9 @@ final class MessageCacheStore {
         var messages: [ChatMessage]
         var loadedAt: Date
         var isLoading = false
+        var isLoadingOlder = false
         var errorMessage: String?
+        var olderMessagesCursor: String?
     }
 
     private(set) var entries: [UUID: Entry] = [:]
@@ -32,7 +34,7 @@ final class MessageCacheStore {
     }
 
     func setMessages(_ messages: [ChatMessage], for conversationID: UUID) {
-        entries[conversationID] = Entry(messages: messages, loadedAt: .now)
+        entries[conversationID] = Entry(messages: messages, loadedAt: .now, olderMessagesCursor: nil)
     }
 
     func loadRecentMessagesIfNeeded(
@@ -43,6 +45,7 @@ final class MessageCacheStore {
         force: Bool = false
     ) async -> [ChatMessage] {
         if !force, let cached = entries[conversationID]?.messages, !cached.isEmpty {
+            ensurePaginationCursorIfNeeded(conversationID: conversationID, pageSize: limit)
             return cached
         }
 
@@ -52,11 +55,15 @@ final class MessageCacheStore {
                 conversationID: conversationID,
                 metadata: [
                     "source": "messageCache",
+                    "force": "\(force)",
                     "cachedCountBefore": "\(entries[conversationID]?.messages.count ?? 0)"
                 ]
             )
             await existingTask.value
-            return entries[conversationID]?.messages ?? []
+            if !force {
+                ensurePaginationCursorIfNeeded(conversationID: conversationID, pageSize: limit)
+                return entries[conversationID]?.messages ?? []
+            }
         }
 
         var entry = entries[conversationID] ?? Entry(messages: [], loadedAt: .distantPast)
@@ -80,6 +87,11 @@ final class MessageCacheStore {
                     ChatUIMapping.message(from: $0, currentProfileID: profileID)
                 }
                 mergeLoadedMessages(mapped, for: conversationID)
+                updateOlderMessagesCursor(
+                    conversationID: conversationID,
+                    response: response,
+                    fetchedMessages: mapped
+                )
             } catch let error as NetworkError {
                 if let message = MessengerSessionSupport.handleNetworkError(error, session: session, router: router) {
                     entries[conversationID]?.errorMessage = message
@@ -94,6 +106,107 @@ final class MessageCacheStore {
         loadTasks[conversationID] = task
         await task.value
         return entries[conversationID]?.messages ?? []
+    }
+
+    @discardableResult
+    func loadOlderMessages(
+        conversationID: UUID,
+        limit: Int = MessengerLimits.defaultMessagePageSize,
+        session: SessionStore,
+        router: AppRouter
+    ) async -> Bool {
+        guard var entry = entries[conversationID],
+              let before = entry.olderMessagesCursor,
+              !entry.isLoadingOlder else {
+            NetworkDebug.log("Older messages load skipped: cursor=\(entries[conversationID]?.olderMessagesCursor != nil) loading=\(entries[conversationID]?.isLoadingOlder == true)")
+            return false
+        }
+
+        NetworkDebug.log("Loading older messages conversation=\(conversationID.uuidString.prefix(8)) before=\(before.prefix(8)) count=\(entry.messages.count)")
+
+        entry.isLoadingOlder = true
+        entry.errorMessage = nil
+        entries[conversationID] = entry
+
+        defer {
+            entries[conversationID]?.isLoadingOlder = false
+        }
+
+        let previousCount = entries[conversationID]?.messages.count ?? 0
+
+        do {
+            let profileID = try await MessengerSessionSupport.resolveCurrentProfileID(session: session)
+            let response = try await MessageService.fetchMessages(
+                conversationID: conversationID,
+                limit: limit,
+                before: before
+            )
+            let mapped = response.messages.map {
+                ChatUIMapping.message(from: $0, currentProfileID: profileID)
+            }
+            mergeLoadedMessages(mapped, for: conversationID)
+            updateOlderMessagesCursor(
+                conversationID: conversationID,
+                response: response,
+                fetchedMessages: mapped
+            )
+            let nextCursorLabel = entries[conversationID]?.olderMessagesCursor.map { String($0.prefix(8)) } ?? "nil"
+            NetworkDebug.log("Older messages loaded incoming=\(mapped.count) total=\(entries[conversationID]?.messages.count ?? 0) nextCursor=\(nextCursorLabel)")
+        } catch let error as NetworkError {
+            if let message = MessengerSessionSupport.handleNetworkError(error, session: session, router: router) {
+                entries[conversationID]?.errorMessage = message
+            } else {
+                entries[conversationID]?.errorMessage = error.userMessage
+            }
+            return false
+        } catch {
+            entries[conversationID]?.errorMessage = error.localizedDescription
+            return false
+        }
+
+        let nextCount = entries[conversationID]?.messages.count ?? previousCount
+        return nextCount > previousCount
+    }
+
+    func hasMoreOlderMessages(for conversationID: UUID) -> Bool {
+        entries[conversationID]?.olderMessagesCursor != nil
+    }
+
+    func setOlderMessagesCursorForTesting(_ cursor: String?, for conversationID: UUID) {
+        guard var entry = entries[conversationID] else { return }
+        entry.olderMessagesCursor = cursor
+        entries[conversationID] = entry
+    }
+
+    private func updateOlderMessagesCursor(
+        conversationID: UUID,
+        response: MessagesResponseDTO,
+        fetchedMessages: [ChatMessage]
+    ) {
+        guard var entry = entries[conversationID] else { return }
+
+        if let nextCursor = response.nextCursor {
+            entry.olderMessagesCursor = nextCursor
+        } else if let oldestCached = entry.messages.first,
+                  let oldestFetched = fetchedMessages.first,
+                  oldestCached.createdAt < oldestFetched.createdAt {
+            entry.olderMessagesCursor = oldestCached.id.uuidString
+        } else {
+            entry.olderMessagesCursor = nil
+        }
+
+        entries[conversationID] = entry
+    }
+
+    private func ensurePaginationCursorIfNeeded(conversationID: UUID, pageSize: Int) {
+        guard var entry = entries[conversationID] else { return }
+        guard entry.olderMessagesCursor == nil else { return }
+        guard entry.messages.count >= pageSize,
+              let oldest = entry.messages.first else { return }
+
+        entry.olderMessagesCursor = oldest.id.uuidString
+        entries[conversationID] = entry
+        NetworkDebug.log("Pagination cursor inferred from cache conversation=\(conversationID.uuidString.prefix(8)) count=\(entry.messages.count)")
     }
 
     func preloadRecentMessages(
@@ -183,7 +296,7 @@ final class MessageCacheStore {
             return $0.createdAt < $1.createdAt
         }
 
-        entries[conversationID] = Entry(messages: merged, loadedAt: .now)
+        entries[conversationID] = Entry(messages: merged, loadedAt: .now, olderMessagesCursor: entries[conversationID]?.olderMessagesCursor)
         if preservedDeleteCount > 0 || preservedEditCount > 0 || preservedReceiptCount > 0 {
             MessengerDiagnostics.event(
                 .cacheMergePreservedRealtimeState,

@@ -18,6 +18,8 @@ final class ChatViewModel {
         }
     }
     private(set) var isLoading = false
+    private(set) var isLoadingOlderMessages = false
+    private(set) var hasMoreOlderMessages = false
     private(set) var isSending = false
     private(set) var typingProfileIDs: Set<UUID> = []
     var errorMessage: String?
@@ -120,6 +122,7 @@ final class ChatViewModel {
 
     enum InitialScrollTarget: Equatable {
         case targetMessage(UUID)
+        case unreadSeparator
         case lastReadMessage(UUID)
         case bottom
     }
@@ -129,8 +132,8 @@ final class ChatViewModel {
            messages.contains(where: { $0.id == pushTargetMessageID }) {
             return .targetMessage(pushTargetMessageID)
         }
-        if let lastReadMessageID = lastReadMessageIDForInitialScroll {
-            return .lastReadMessage(lastReadMessageID)
+        if firstUnreadMessageID != nil {
+            return .unreadSeparator
         }
         if let lastMessageID = messages.last?.id {
             return .lastReadMessage(lastMessageID)
@@ -169,6 +172,7 @@ final class ChatViewModel {
             didOpen = true
         } else if let cached = messageCache.messages(for: conversation.id), !cached.isEmpty {
             messages = cached
+            syncPaginationStateFromCache()
         }
 
         await markDelivered(session: session, router: router)
@@ -258,6 +262,22 @@ final class ChatViewModel {
         lifecycleGeneration += 1
         let generation = lifecycleGeneration
         await loadMessages(session: session, router: router, generation: generation)
+    }
+
+    func loadOlderMessages(session: SessionStore, router: AppRouter) async {
+        guard hasMoreOlderMessages, !isLoadingOlderMessages else { return }
+
+        isLoadingOlderMessages = true
+        defer { isLoadingOlderMessages = false }
+
+        let didLoad = await messageCache.loadOlderMessages(
+            conversationID: conversation.id,
+            session: session,
+            router: router
+        )
+        messages = messageCache.messages(for: conversation.id) ?? messages
+        syncPaginationStateFromCache()
+        NetworkDebug.log("Chat older messages load finished didLoad=\(didLoad) count=\(messages.count) hasMore=\(hasMoreOlderMessages)")
     }
 
     func refreshFromRealtime(session: SessionStore, router: AppRouter) async {
@@ -354,6 +374,8 @@ final class ChatViewModel {
             clientMessageID: clientMessageID,
             metadata: [
                 "isSendingBefore": "false",
+                "isSendingAfter": "true",
+                "draftCleared": "true",
                 "isEditing": "\(activeEditingMessage != nil)",
                 "hasReply": "\(activeReplyTarget != nil)"
             ]
@@ -385,6 +407,11 @@ final class ChatViewModel {
         defer {
             isSending = false
             sendTask = nil
+            MessengerDiagnostics.event(
+                .isSendingReset,
+                conversationID: conversation.id,
+                clientMessageID: clientMessageID
+            )
         }
 
         do {
@@ -411,7 +438,6 @@ final class ChatViewModel {
             }
             let mapped = ChatUIMapping.message(from: dto, currentProfileID: profileID)
             appendOrReplace(mapped)
-            messageCache.upsertMessage(mapped, conversationID: conversation.id)
             MessengerDiagnostics.event(
                 .sendSucceeded,
                 conversationID: conversation.id,
@@ -504,7 +530,6 @@ final class ChatViewModel {
 
             let mapped = ChatUIMapping.message(from: dto, currentProfileID: profileID)
             appendOrReplace(mapped)
-            messageCache.upsertMessage(mapped, conversationID: conversation.id)
         } catch let error as NetworkError {
             if let message = MessengerSessionSupport.handleNetworkError(error, session: session, router: router) {
                 errorMessage = message
@@ -535,7 +560,6 @@ final class ChatViewModel {
             let dto = try await MessageService.deleteMessage(messageID: message.id)
             let mapped = ChatUIMapping.message(from: dto, currentProfileID: profileID)
             appendOrReplace(mapped)
-            messageCache.upsertMessage(mapped, conversationID: conversation.id)
 
             if editingMessage?.id == message.id {
                 cancelCompose()
@@ -667,6 +691,7 @@ final class ChatViewModel {
             }
             let loaded = messageCache.messages(for: conversation.id) ?? []
             messages = loaded
+            syncPaginationStateFromCache()
             if let cacheError = messageCache.entry(for: conversation.id)?.errorMessage {
                 errorMessage = cacheError
             }
@@ -1039,6 +1064,10 @@ final class ChatViewModel {
             "didOpen": "\(didOpen)",
             "isOpen": "\(isOpen)"
         ]
+    }
+
+    private func syncPaginationStateFromCache() {
+        hasMoreOlderMessages = messageCache.hasMoreOlderMessages(for: conversation.id)
     }
 
     private func durationMilliseconds(since startDate: Date) -> Int {

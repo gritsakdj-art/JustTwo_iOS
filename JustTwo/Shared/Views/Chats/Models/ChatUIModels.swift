@@ -289,6 +289,59 @@ enum ChatUIMapping {
     }
 }
 
+enum ChatMessageDateFormatting {
+    static func metadataText(
+        for date: Date,
+        now: Date = .now,
+        calendar: Calendar = .current
+    ) -> String {
+        let time = date.formatted(date: .omitted, time: .shortened)
+
+        if calendar.isDateInToday(date) {
+            return time
+        }
+        if calendar.isDateInYesterday(date) {
+            return "\(String(localized: "chats.date.yesterday")), \(time)"
+        }
+        if calendar.isDate(date, equalTo: now, toGranularity: .year) {
+            let dayMonth = date.formatted(.dateTime.day().month(.abbreviated))
+            return "\(dayMonth), \(time)"
+        }
+
+        let fullDate = date.formatted(.dateTime.day().month(.abbreviated).year(.twoDigits))
+        return "\(fullDate), \(time)"
+    }
+
+    static func daySeparatorTitle(
+        for date: Date,
+        now: Date = .now,
+        calendar: Calendar = .current
+    ) -> String {
+        if calendar.isDateInToday(date) {
+            return String(localized: "chats.date.today")
+        }
+        if calendar.isDateInYesterday(date) {
+            return String(localized: "chats.date.yesterday")
+        }
+        if calendar.isDate(date, equalTo: now, toGranularity: .year) {
+            return date.formatted(.dateTime.day().month(.wide))
+        }
+        return date.formatted(.dateTime.day().month(.wide).year())
+    }
+
+    static func isToday(_ date: Date, calendar: Calendar = .current) -> Bool {
+        calendar.isDateInToday(date)
+    }
+
+    static func isDifferentDay(
+        _ lhs: Date,
+        from rhs: Date,
+        calendar: Calendar = .current
+    ) -> Bool {
+        !calendar.isDate(lhs, inSameDayAs: rhs)
+    }
+}
+
 enum ChatQuickReactions {
     static let rows: [[String]] = [
         ["👍", "❤️", "😂", "😮", "😢", "🙏"],
