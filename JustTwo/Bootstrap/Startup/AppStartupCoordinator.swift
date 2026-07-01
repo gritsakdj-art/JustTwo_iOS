@@ -110,6 +110,7 @@ final class AppStartupCoordinator {
         ConversationAvatarsStartupLoader.shared.reset()
         MessagesStartupLoader.shared.reset()
         MessageCacheStore.shared.reset()
+        MessengerOutbox.shared.clear()
         ConversationListViewModel.shared.reset()
     }
 }

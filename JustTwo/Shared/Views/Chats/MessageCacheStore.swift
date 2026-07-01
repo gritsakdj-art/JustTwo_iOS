@@ -4,6 +4,12 @@ import Foundation
 @Observable
 final class MessageCacheStore {
 
+    enum ReconciliationSource: String {
+        case rest
+        case realtime
+        case fetch
+    }
+
     static let shared = MessageCacheStore()
 
     struct Entry {
@@ -34,7 +40,100 @@ final class MessageCacheStore {
     }
 
     func setMessages(_ messages: [ChatMessage], for conversationID: UUID) {
-        entries[conversationID] = Entry(messages: messages, loadedAt: .now, olderMessagesCursor: nil)
+        entries[conversationID] = Entry(messages: sortedMessages(messages), loadedAt: .now, olderMessagesCursor: nil)
+    }
+
+    func insertOptimisticMessage(_ message: ChatMessage, for conversationID: UUID) {
+        guard message.localSendState != nil else { return }
+        var entry = entries[conversationID] ?? Entry(messages: [], loadedAt: .now)
+        guard !entry.messages.contains(where: { $0.clientMessageID == message.clientMessageID }) else { return }
+        entry.messages.append(message)
+        entry.messages = sortedMessages(entry.messages)
+        entry.loadedAt = .now
+        entries[conversationID] = entry
+
+        MessengerDiagnostics.event(
+            .optimisticMessageInserted,
+            conversationID: conversationID,
+            clientMessageID: message.clientMessageID,
+            metadata: ["state": message.localSendState == .failed ? "failed" : "sending"]
+        )
+    }
+
+    @discardableResult
+    func updateOptimisticMessageState(
+        clientMessageID: String,
+        conversationID: UUID,
+        state: MessageLocalSendState
+    ) -> Bool {
+        guard var entry = entries[conversationID],
+              let index = entry.messages.firstIndex(where: { $0.clientMessageID == clientMessageID && $0.localSendState != nil }) else {
+            return false
+        }
+
+        entry.messages[index] = entry.messages[index].replacingLocalSendState(state)
+        entry.loadedAt = .now
+        entries[conversationID] = entry
+        return true
+    }
+
+    @discardableResult
+    func replaceOptimisticMessage(
+        clientMessageID: String,
+        with serverMessage: ChatMessage,
+        conversationID: UUID,
+        source: ReconciliationSource
+    ) -> Bool {
+        guard var entry = entries[conversationID],
+              let index = entry.messages.firstIndex(where: { $0.clientMessageID == clientMessageID && $0.localSendState != nil }) else {
+            return false
+        }
+
+        entry.messages.remove(at: index)
+
+        if let serverIndex = entry.messages.firstIndex(where: { $0.id == serverMessage.id }) {
+            entry.messages[serverIndex] = mergeLoadedMessage(serverMessage, withExisting: entry.messages[serverIndex])
+        } else {
+            entry.messages.append(serverMessage)
+        }
+
+        entry.messages = sortedMessages(entry.messages)
+        entry.loadedAt = .now
+        entries[conversationID] = entry
+
+        let event: MessengerDiagnosticEvent = source == .realtime ? .outboxReconciledFromRealtime : .outboxReconciledFromREST
+        MessengerDiagnostics.event(
+            event,
+            conversationID: conversationID,
+            messageID: serverMessage.id,
+            clientMessageID: clientMessageID,
+            metadata: ["source": source.rawValue]
+        )
+
+        return true
+    }
+
+    func pendingOutgoingMessages(for conversationID: UUID) -> [ChatMessage] {
+        entries[conversationID]?.messages.filter { $0.localSendState != nil } ?? []
+    }
+
+    func outgoingPendingCount(for conversationID: UUID) -> Int {
+        pendingOutgoingMessages(for: conversationID).count
+    }
+
+    private enum OutgoingReconcileResult {
+        case reconciled(Bool)
+        case ambiguousPending
+        case noMatch
+    }
+
+    private func sortedMessages(_ messages: [ChatMessage]) -> [ChatMessage] {
+        messages.sorted {
+            if $0.createdAt == $1.createdAt {
+                return $0.listIdentity < $1.listIdentity
+            }
+            return $0.createdAt < $1.createdAt
+        }
     }
 
     func loadRecentMessagesIfNeeded(
@@ -235,18 +334,94 @@ final class MessageCacheStore {
 
     @discardableResult
     func upsertMessage(_ message: ChatMessage, conversationID: UUID) -> Bool {
+        if message.isMine {
+            switch reconcileOutgoingMessage(message, conversationID: conversationID, source: .realtime) {
+            case .reconciled(let applied):
+                return applied
+            case .ambiguousPending:
+                if entries[conversationID]?.messages.contains(where: { $0.id == message.id }) == true {
+                    break
+                }
+                MessengerDiagnostics.event(
+                    .realtimeEventSkipped,
+                    conversationID: conversationID,
+                    messageID: message.id,
+                    clientMessageID: message.clientMessageID,
+                    metadata: [
+                        "reason": "ambiguousPendingOutgoing",
+                        "pendingCount": "\(outgoingPendingCount(for: conversationID))"
+                    ]
+                )
+                return false
+            case .noMatch:
+                break
+            }
+        }
+
         var entry = entries[conversationID] ?? Entry(messages: [], loadedAt: .now)
 
         if let index = entry.messages.firstIndex(where: { $0.id == message.id }) {
             guard entry.messages[index] != message else { return false }
             entry.messages[index] = message
-        } else {
-            entry.messages.append(message)
+            entry.messages = sortedMessages(entry.messages)
+            entry.loadedAt = .now
+            entries[conversationID] = entry
+            return false
         }
 
+        entry.messages.append(message)
+        entry.messages = sortedMessages(entry.messages)
         entry.loadedAt = .now
         entries[conversationID] = entry
         return true
+    }
+
+    @discardableResult
+    private func reconcileOutgoingMessage(
+        _ message: ChatMessage,
+        conversationID: UUID,
+        source: ReconciliationSource
+    ) -> OutgoingReconcileResult {
+        guard message.isMine else { return .noMatch }
+
+        let pending = pendingOutgoingMessages(for: conversationID)
+
+        if let clientMessageID = message.clientMessageID,
+           pending.contains(where: { $0.clientMessageID == clientMessageID }) {
+            let applied = replaceOptimisticMessage(
+                clientMessageID: clientMessageID,
+                with: message,
+                conversationID: conversationID,
+                source: source
+            )
+            return .reconciled(applied)
+        }
+
+        guard pending.count == 1,
+              let clientMessageID = pending[0].clientMessageID else {
+            if pending.count > 1 {
+                return .ambiguousPending
+            }
+            return .noMatch
+        }
+
+        let applied = replaceOptimisticMessage(
+            clientMessageID: clientMessageID,
+            with: message,
+            conversationID: conversationID,
+            source: source
+        )
+        return .reconciled(applied)
+    }
+
+    @discardableResult
+    func applyRealtimeMessage(
+        _ dto: MessageDTO,
+        conversationID: UUID,
+        currentProfileID: UUID
+    ) -> Bool {
+        let message = ChatUIMapping.message(from: dto, currentProfileID: currentProfileID)
+        return upsertMessage(message, conversationID: conversationID)
     }
 
     func mergeLoadedMessages(_ loadedMessages: [ChatMessage], for conversationID: UUID) {
@@ -266,10 +441,24 @@ final class MessageCacheStore {
 
         var mergedByID: [UUID: ChatMessage] = [:]
 
-        for message in existingMessages {
+        for message in existingMessages where message.localSendState == nil {
             mergedByID[message.id] = message
         }
         for message in loadedMessages {
+            if let clientMessageID = message.clientMessageID,
+               let pending = existingMessages.first(where: {
+                   $0.clientMessageID == clientMessageID && $0.localSendState != nil
+               }) {
+                mergedByID.removeValue(forKey: pending.id)
+                let merged = mergeLoadedMessage(
+                    message,
+                    withExisting: pending.replacingLocalSendState(nil)
+                )
+                mergedByID[message.id] = merged
+                MessengerOutbox.shared.markSent(clientMessageID: clientMessageID, serverMessageID: message.id)
+                continue
+            }
+
             if let existing = mergedByID[message.id] {
                 let merged = mergeLoadedMessage(message, withExisting: existing)
                 if existing.isDeleted, !message.isDeleted, merged.isDeleted {
@@ -289,12 +478,28 @@ final class MessageCacheStore {
             }
         }
 
-        let merged = mergedByID.values.sorted {
-            if $0.createdAt == $1.createdAt {
-                return $0.id.uuidString < $1.id.uuidString
+        let preservedPending = existingMessages.filter { pending in
+            guard pending.localSendState != nil else { return false }
+            if let clientMessageID = pending.clientMessageID,
+               loadedMessages.contains(where: { $0.clientMessageID == clientMessageID || MessengerOutbox.shared.serverMessageID(for: clientMessageID) == $0.id }) {
+                return false
             }
-            return $0.createdAt < $1.createdAt
+            if loadedMessages.contains(where: { $0.id == pending.id }) {
+                return false
+            }
+            mergedByID[pending.id] = pending
+            return true
         }
+
+        if !preservedPending.isEmpty {
+            MessengerDiagnostics.event(
+                .outboxPreservedDuringFetch,
+                conversationID: conversationID,
+                metadata: ["preservedCount": "\(preservedPending.count)"]
+            )
+        }
+
+        let merged = sortedMessages(Array(mergedByID.values))
 
         entries[conversationID] = Entry(messages: merged, loadedAt: .now, olderMessagesCursor: entries[conversationID]?.olderMessagesCursor)
         if preservedDeleteCount > 0 || preservedEditCount > 0 || preservedReceiptCount > 0 {
@@ -351,16 +556,6 @@ final class MessageCacheStore {
         case (.some(let lhs), .some(let rhs)):
             return lhs.rank >= rhs.rank ? lhs : rhs
         }
-    }
-
-    @discardableResult
-    func applyRealtimeMessage(
-        _ dto: MessageDTO,
-        conversationID: UUID,
-        currentProfileID: UUID
-    ) -> Bool {
-        let message = ChatUIMapping.message(from: dto, currentProfileID: currentProfileID)
-        return upsertMessage(message, conversationID: conversationID)
     }
 
     @discardableResult
@@ -490,7 +685,7 @@ final class MessageCacheStore {
         messageID: UUID?,
         cutoffDate: Date?
     ) -> Bool {
-        guard message.isMine, !message.isDeleted else { return false }
+        guard message.isMine, !message.isDeleted, message.localSendState == nil else { return false }
         if let cutoffDate {
             return message.createdAt <= cutoffDate
         }

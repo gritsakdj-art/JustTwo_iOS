@@ -85,6 +85,7 @@ final class ChatViewModel {
         viewModel.messages = messages
         viewModel.typingProfileIDs = typingProfileIDs
         viewModel.didOpen = true
+        MessageCacheStore.shared.setMessages(messages, for: conversation.id)
         return viewModel
     }
 
@@ -348,66 +349,140 @@ final class ChatViewModel {
         }
     }
 
+    var blocksComposeSend: Bool {
+        isSending && editingMessage != nil
+    }
+
+    func syncMessagesFromCache() {
+        messages = messageCache.messages(for: conversation.id) ?? messages
+    }
+
+    func retryFailedMessage(_ message: ChatMessage, session: SessionStore, router: AppRouter) {
+        guard let clientMessageID = message.clientMessageID, message.canRetrySend else { return }
+        MessengerOutbox.shared.retry(
+            clientMessageID: clientMessageID,
+            session: session,
+            router: router
+        )
+        syncMessagesFromCache()
+    }
+
     func send(session: SessionStore, router: AppRouter) {
         let trimmed = draftText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
+        guard trimmed.count <= MessengerLimits.maxMessageLength else {
+            errorMessage = String(localized: "chats.error.message_too_long")
+            return
+        }
+
+        if let editingMessage {
+            sendEdit(
+                editingMessage,
+                body: trimmed,
+                session: session,
+                router: router
+            )
+            return
+        }
+
+        let activeReplyTarget = replyTarget
+        let clientMessageID = UUID().uuidString
+        let replyPreview: ChatReplyPreview?
+        if let activeReplyTarget {
+            if let preview = activeReplyTarget.replyPreview {
+                replyPreview = preview
+            } else {
+                replyPreview = ChatReplyPreview(
+                    id: activeReplyTarget.id,
+                    body: activeReplyTarget.rawBody ?? activeReplyTarget.displayText,
+                    isDeleted: activeReplyTarget.isDeleted
+                )
+            }
+        } else {
+            replyPreview = nil
+        }
+
+        let optimistic = ChatMessage.optimisticOutgoing(
+            clientMessageID: clientMessageID,
+            body: trimmed,
+            replyPreview: replyPreview
+        )
+
+        messageCache.insertOptimisticMessage(optimistic, for: conversation.id)
+        syncMessagesFromCache()
+
+        draftText = ""
+        replyTarget = nil
+        errorMessage = nil
+        typingEmitter.messageSent()
+
+        MessengerDiagnostics.event(
+            .sendStarted,
+            conversationID: conversation.id,
+            clientMessageID: clientMessageID,
+            metadata: [
+                "draftCleared": "true",
+                "hasReply": "\(activeReplyTarget != nil)",
+                "optimistic": "true"
+            ]
+        )
+
+        ConversationListViewModel.shared.applyOptimisticOutgoing(
+            conversationID: conversation.id,
+            previewText: trimmed,
+            sentAt: optimistic.createdAt
+        )
+
+        MessengerOutbox.shared.enqueue(
+            conversationID: conversation.id,
+            body: trimmed,
+            replyToID: activeReplyTarget?.id,
+            clientMessageID: clientMessageID,
+            localMessageID: optimistic.id,
+            session: session,
+            router: router
+        )
+    }
+
+    private func sendEdit(
+        _ editingMessage: ChatMessage,
+        body trimmed: String,
+        session: SessionStore,
+        router: AppRouter
+    ) {
         guard !isSending, sendTask == nil else {
             MessengerDiagnostics.event(
                 .sendSkippedAlreadySending,
                 conversationID: conversation.id,
                 metadata: [
                     "isSendingBefore": "\(isSending)",
-                    "hasSendTask": "\(sendTask != nil)"
+                    "hasSendTask": "\(sendTask != nil)",
+                    "isEditing": "true"
                 ]
             )
             return
         }
-        guard trimmed.count <= MessengerLimits.maxMessageLength else {
-            errorMessage = String(localized: "chats.error.message_too_long")
-            return
-        }
 
         let originalDraftText = draftText
-        let activeReplyTarget = replyTarget
-        let activeEditingMessage = editingMessage
-        let clientMessageID = UUID().uuidString
-
         isSending = true
         errorMessage = nil
         draftText = ""
-        typingEmitter.messageSent()
-        MessengerDiagnostics.event(
-            .sendStarted,
-            conversationID: conversation.id,
-            clientMessageID: clientMessageID,
-            metadata: [
-                "isSendingBefore": "false",
-                "isSendingAfter": "true",
-                "draftCleared": "true",
-                "isEditing": "\(activeEditingMessage != nil)",
-                "hasReply": "\(activeReplyTarget != nil)"
-            ]
-        )
 
         sendTask = Task { @MainActor [weak self] in
-            await self?.performSend(
+            await self?.performEditSend(
+                editingMessage: editingMessage,
                 body: trimmed,
                 originalDraftText: originalDraftText,
-                replyTarget: activeReplyTarget,
-                editingMessage: activeEditingMessage,
-                clientMessageID: clientMessageID,
                 session: session,
                 router: router
             )
         }
     }
 
-    private func performSend(
+    private func performEditSend(
+        editingMessage: ChatMessage,
         body trimmed: String,
         originalDraftText: String,
-        replyTarget activeReplyTarget: ChatMessage?,
-        editingMessage activeEditingMessage: ChatMessage?,
-        clientMessageID: String,
         session: SessionStore,
         router: AppRouter
     ) async {
@@ -417,8 +492,7 @@ final class ChatViewModel {
             sendTask = nil
             MessengerDiagnostics.event(
                 .isSendingReset,
-                conversationID: conversation.id,
-                clientMessageID: clientMessageID
+                conversationID: conversation.id
             )
         }
 
@@ -426,23 +500,9 @@ final class ChatViewModel {
             let profileID = try await MessengerSessionSupport.resolveCurrentProfileID(session: session)
             currentProfileID = profileID
 
-            let dto: MessageDTO
-            if let editing = activeEditingMessage {
-                dto = try await MessageService.editMessage(messageID: editing.id, body: trimmed)
-            } else {
-                dto = try await MessageService.sendMessage(
-                    conversationID: conversation.id,
-                    body: trimmed,
-                    replyToID: activeReplyTarget?.id,
-                    clientMessageID: clientMessageID
-                )
-            }
-
-            if editingMessage?.id == activeEditingMessage?.id {
-                editingMessage = nil
-            }
-            if replyTarget?.id == activeReplyTarget?.id {
-                replyTarget = nil
+            let dto = try await MessageService.editMessage(messageID: editingMessage.id, body: trimmed)
+            if self.editingMessage?.id == editingMessage.id {
+                self.editingMessage = nil
             }
             let mapped = ChatUIMapping.message(from: dto, currentProfileID: profileID)
             appendOrReplace(mapped)
@@ -450,26 +510,25 @@ final class ChatViewModel {
                 .sendSucceeded,
                 conversationID: conversation.id,
                 messageID: mapped.id,
-                clientMessageID: clientMessageID,
                 metadata: [
                     "durationMs": "\(durationMilliseconds(since: startedAt))",
-                    "isEditing": "\(activeEditingMessage != nil)"
+                    "isEditing": "true"
                 ]
             )
         } catch let error as NetworkError {
-            restoreDraftAfterFailedSend(
-                originalDraftText,
-                replyTarget: activeReplyTarget,
-                editingMessage: activeEditingMessage,
-                clientMessageID: clientMessageID
-            )
+            if draftText.isEmpty {
+                draftText = originalDraftText
+            }
+            if self.editingMessage == nil {
+                self.editingMessage = editingMessage
+            }
             MessengerDiagnostics.event(
                 .sendFailed,
                 conversationID: conversation.id,
-                clientMessageID: clientMessageID,
                 metadata: [
                     "durationMs": "\(durationMilliseconds(since: startedAt))",
-                    "errorCategory": MessengerDiagnostics.sanitizeError(error)
+                    "errorCategory": MessengerDiagnostics.sanitizeError(error),
+                    "isEditing": "true"
                 ]
             )
             if error.isUserBlocked {
@@ -478,19 +537,19 @@ final class ChatViewModel {
                 errorMessage = message
             }
         } catch {
-            restoreDraftAfterFailedSend(
-                originalDraftText,
-                replyTarget: activeReplyTarget,
-                editingMessage: activeEditingMessage,
-                clientMessageID: clientMessageID
-            )
+            if draftText.isEmpty {
+                draftText = originalDraftText
+            }
+            if self.editingMessage == nil {
+                self.editingMessage = editingMessage
+            }
             MessengerDiagnostics.event(
                 MessengerDiagnostics.sanitizeError(error) == "cancelled" ? .sendCancelled : .sendFailed,
                 conversationID: conversation.id,
-                clientMessageID: clientMessageID,
                 metadata: [
                     "durationMs": "\(durationMilliseconds(since: startedAt))",
-                    "errorCategory": MessengerDiagnostics.sanitizeError(error)
+                    "errorCategory": MessengerDiagnostics.sanitizeError(error),
+                    "isEditing": "true"
                 ]
             )
             errorMessage = error.localizedDescription
@@ -582,34 +641,6 @@ final class ChatViewModel {
             }
         } catch {
             errorMessage = error.localizedDescription
-        }
-    }
-
-    private func restoreDraftAfterFailedSend(
-        _ originalDraftText: String,
-        replyTarget activeReplyTarget: ChatMessage?,
-        editingMessage activeEditingMessage: ChatMessage?,
-        clientMessageID: String
-    ) {
-        if draftText.isEmpty {
-            draftText = originalDraftText
-            MessengerDiagnostics.event(
-                .draftRestoredAfterFailure,
-                conversationID: conversation.id,
-                clientMessageID: clientMessageID
-            )
-        } else {
-            MessengerDiagnostics.event(
-                .draftRestoreSkippedUserTypedNewText,
-                conversationID: conversation.id,
-                clientMessageID: clientMessageID
-            )
-        }
-        if replyTarget == nil {
-            replyTarget = activeReplyTarget
-        }
-        if editingMessage == nil {
-            editingMessage = activeEditingMessage
         }
     }
 
@@ -898,9 +929,13 @@ final class ChatViewModel {
     func applyRealtimeMessage(_ dto: MessageDTO, currentProfileID: UUID) -> Bool {
         self.currentProfileID = currentProfileID
         clearTyping(for: dto.senderProfileID)
-        let message = ChatUIMapping.message(from: dto, currentProfileID: currentProfileID)
-        messageCache.upsertMessage(message, conversationID: conversation.id)
-        return appendOrReplace(message)
+        let applied = messageCache.applyRealtimeMessage(
+            dto,
+            conversationID: conversation.id,
+            currentProfileID: currentProfileID
+        )
+        syncMessagesFromCache()
+        return applied
     }
 
     func acknowledgeVisibleMessages(session: SessionStore?, router: AppRouter?) {
@@ -1030,19 +1065,9 @@ final class ChatViewModel {
 
     @discardableResult
     private func appendOrReplace(_ message: ChatMessage) -> Bool {
-        if let index = messages.firstIndex(where: { $0.id == message.id }) {
-            guard messages[index] != message else {
-                NetworkDebug.log("Duplicate realtime message ignored: \(message.id)")
-                return false
-            }
-            messages[index] = message
-            messageCache.upsertMessage(message, conversationID: conversation.id)
-            return false
-        } else {
-            messages.append(message)
-            messageCache.upsertMessage(message, conversationID: conversation.id)
-            return true
-        }
+        let inserted = messageCache.upsertMessage(message, conversationID: conversation.id)
+        syncMessagesFromCache()
+        return inserted
     }
 
     private func latestInboundMessageID() -> UUID? {
@@ -1054,7 +1079,7 @@ final class ChatViewModel {
         messageID: UUID?,
         cutoffDate: Date?
     ) -> Bool {
-        guard message.isMine, !message.isDeleted else { return false }
+        guard message.isMine, !message.isDeleted, message.localSendState == nil else { return false }
         if let cutoffDate {
             return message.createdAt <= cutoffDate
         }

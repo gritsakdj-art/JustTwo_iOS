@@ -1,4 +1,26 @@
 import Foundation
+import CryptoKit
+
+enum MessageLocalSendState: Equatable, Hashable {
+    case sending
+    case failed
+}
+
+enum OptimisticMessageIdentity {
+    static func localMessageID(for clientMessageID: String) -> UUID {
+        let seed = "justtwo.outgoing.\(clientMessageID)"
+        let digest = SHA256.hash(data: Data(seed.utf8))
+        var bytes = Array(digest.prefix(16))
+        bytes[6] = (bytes[6] & 0x0F) | 0x40
+        bytes[8] = (bytes[8] & 0x3F) | 0x80
+        return UUID(uuid: (
+            bytes[0], bytes[1], bytes[2], bytes[3],
+            bytes[4], bytes[5], bytes[6], bytes[7],
+            bytes[8], bytes[9], bytes[10], bytes[11],
+            bytes[12], bytes[13], bytes[14], bytes[15]
+        ))
+    }
+}
 
 struct ChatMessageReaction: Identifiable, Equatable, Hashable {
     let emoji: String
@@ -28,6 +50,8 @@ struct ChatReplyPreview: Equatable, Hashable {
 
 struct ChatMessage: Identifiable, Equatable, Hashable {
     let id: UUID
+    let clientMessageID: String?
+    let localSendState: MessageLocalSendState?
     let displayText: String
     let rawBody: String?
     let createdAt: Date
@@ -38,8 +62,19 @@ struct ChatMessage: Identifiable, Equatable, Hashable {
     let reactions: [ChatMessageReaction]
     let deliveryStatus: MessageDeliveryStatus?
 
+    var listIdentity: String {
+        if let clientMessageID, localSendState != nil {
+            return "pending-\(clientMessageID)"
+        }
+        return id.uuidString
+    }
+
+    var isPendingOutgoing: Bool { localSendState != nil }
+
     init(
         id: UUID,
+        clientMessageID: String? = nil,
+        localSendState: MessageLocalSendState? = nil,
         displayText: String,
         rawBody: String?,
         createdAt: Date,
@@ -51,6 +86,8 @@ struct ChatMessage: Identifiable, Equatable, Hashable {
         deliveryStatus: MessageDeliveryStatus? = nil
     ) {
         self.id = id
+        self.clientMessageID = clientMessageID
+        self.localSendState = localSendState
         self.displayText = displayText
         self.rawBody = rawBody
         self.createdAt = createdAt
@@ -59,22 +96,70 @@ struct ChatMessage: Identifiable, Equatable, Hashable {
         self.isEdited = isEdited
         self.replyPreview = replyPreview
         self.reactions = reactions
-        self.deliveryStatus = deliveryStatus
+        self.deliveryStatus = localSendState == nil ? deliveryStatus : nil
     }
 
     var text: String { displayText }
 
-    var canReply: Bool { !isDeleted }
+    var canReply: Bool { !isDeleted && localSendState == nil }
     var canCopy: Bool { rawBody != nil && !(rawBody?.isEmpty ?? true) }
-    var canEdit: Bool { isMine && !isDeleted }
-    var canDelete: Bool { isMine && !isDeleted }
-    var canReact: Bool { !isDeleted }
+    var canEdit: Bool { isMine && !isDeleted && localSendState == nil }
+    var canDelete: Bool { isMine && !isDeleted && localSendState == nil }
+    var canReact: Bool { !isDeleted && localSendState == nil }
+    var canRetrySend: Bool { isMine && localSendState == .failed }
+}
+
+extension ChatMessage {
+    static func optimisticOutgoing(
+        clientMessageID: String,
+        body: String,
+        replyPreview: ChatReplyPreview?,
+        createdAt: Date = .now
+    ) -> ChatMessage {
+        ChatMessage(
+            id: OptimisticMessageIdentity.localMessageID(for: clientMessageID),
+            clientMessageID: clientMessageID,
+            localSendState: .sending,
+            displayText: body,
+            rawBody: body,
+            createdAt: createdAt,
+            isMine: true,
+            isDeleted: false,
+            isEdited: false,
+            replyPreview: replyPreview,
+            reactions: [],
+            deliveryStatus: nil
+        )
+    }
+
+    func serverConfirmed(from dto: MessageDTO, currentProfileID: UUID) -> ChatMessage {
+        ChatUIMapping.message(from: dto, currentProfileID: currentProfileID)
+    }
+
+    func replacingLocalSendState(_ state: MessageLocalSendState?) -> ChatMessage {
+        ChatMessage(
+            id: id,
+            clientMessageID: clientMessageID,
+            localSendState: state,
+            displayText: displayText,
+            rawBody: rawBody,
+            createdAt: createdAt,
+            isMine: isMine,
+            isDeleted: isDeleted,
+            isEdited: isEdited,
+            replyPreview: replyPreview,
+            reactions: reactions,
+            deliveryStatus: state == nil ? deliveryStatus : nil
+        )
+    }
 }
 
 extension ChatMessage {
     func markingDeleted(deletedAt: Date?) -> ChatMessage {
         ChatMessage(
             id: id,
+            clientMessageID: clientMessageID,
+            localSendState: nil,
             displayText: String(localized: "chats.messageDeleted"),
             rawBody: nil,
             createdAt: createdAt,
@@ -90,6 +175,8 @@ extension ChatMessage {
     func replacingReactions(_ reactions: [ChatMessageReaction]) -> ChatMessage {
         ChatMessage(
             id: id,
+            clientMessageID: clientMessageID,
+            localSendState: localSendState,
             displayText: displayText,
             rawBody: rawBody,
             createdAt: createdAt,
@@ -116,6 +203,8 @@ extension ChatMessage {
 
         return ChatMessage(
             id: id,
+            clientMessageID: clientMessageID,
+            localSendState: localSendState,
             displayText: displayText,
             rawBody: rawBody,
             createdAt: createdAt,
@@ -225,6 +314,8 @@ enum ChatUIMapping {
 
         return ChatMessage(
             id: dto.id,
+            clientMessageID: dto.clientMessageID,
+            localSendState: nil,
             displayText: displayText,
             rawBody: isDeleted ? nil : dto.body,
             createdAt: dto.createdAt ?? .distantPast,

@@ -63,6 +63,7 @@ struct MessageDTO: Decodable, Identifiable, Sendable {
     let replyTo: MessageReplyDTO?
     let reactions: [MessageReactionDTO]
     let deliveryStatus: MessageDeliveryStatus?
+    let clientMessageID: String?
     let createdAt: Date?
     let editedAt: Date?
     let deletedAt: Date?
@@ -76,6 +77,7 @@ struct MessageDTO: Decodable, Identifiable, Sendable {
         case replyTo
         case reactions
         case deliveryStatus
+        case clientMessageID
         case createdAt
         case editedAt
         case deletedAt
@@ -92,6 +94,7 @@ struct MessageDTO: Decodable, Identifiable, Sendable {
         replyTo = try container.decodeIfPresent(MessageReplyDTO.self, forKey: .replyTo)
         reactions = try container.decodeIfPresent([MessageReactionDTO].self, forKey: .reactions) ?? []
         deliveryStatus = try container.decodeIfPresent(MessageDeliveryStatus.self, forKey: .deliveryStatus)
+        clientMessageID = try container.decodeIfPresent(String.self, forKey: .clientMessageID)
         createdAt = try container.decodeIfPresent(Date.self, forKey: .createdAt)
         editedAt = try container.decodeIfPresent(Date.self, forKey: .editedAt)
         deletedAt = try container.decodeIfPresent(Date.self, forKey: .deletedAt)

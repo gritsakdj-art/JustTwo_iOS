@@ -10,6 +10,8 @@ struct ChatBubbleView: View {
     var isDeleted: Bool = false
     var reactions: [ChatMessageReaction] = []
     var deliveryStatus: MessageDeliveryStatus?
+    var localSendState: MessageLocalSendState?
+    var onRetry: (() -> Void)?
     var onReactionTap: ((ChatMessageReaction) -> Void)?
 
     private enum UI {
@@ -63,6 +65,10 @@ struct ChatBubbleView: View {
             }
 
             bubbleBody
+
+            if localSendState == .failed, let onRetry {
+                failedSendFooter(onRetry: onRetry)
+            }
         }
         .frame(maxWidth: UI.maxWidth, alignment: isMine ? .trailing : .leading)
         .padding(isMine ? .leading : .trailing, UI.sideInset)
@@ -185,10 +191,30 @@ struct ChatBubbleView: View {
 
             if let deliveryStatus {
                 MessageDeliveryReceiptView(status: deliveryStatus)
+            } else if localSendState == .sending {
+                ProgressView()
+                    .controlSize(.mini)
+                    .tint(Color.secondaryText.opacity(0.75))
+                    .frame(width: 12, height: 12)
             }
         }
         .fixedSize(horizontal: true, vertical: false)
         .allowsHitTesting(false)
+    }
+
+    private func failedSendFooter(onRetry: @escaping () -> Void) -> some View {
+        HStack(spacing: 8) {
+            Text("chats.message.sendFailed")
+                .font(Font.App.caption())
+                .foregroundStyle(Color.secondaryText)
+
+            Button(action: onRetry) {
+                Text("chats.message.retry")
+                    .font(Font.App.caption(weight: .semibold))
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(.horizontal, 4)
     }
 }
 

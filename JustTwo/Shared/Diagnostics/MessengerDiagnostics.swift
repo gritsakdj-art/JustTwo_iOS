@@ -119,6 +119,18 @@ enum MessengerDiagnosticEvent: String, Sendable {
     case runtimeAutoScrollRequested
     case runtimeAutoScrollSkipped
     case scrollPhase
+
+    case outboxEnqueued
+    case optimisticMessageInserted
+    case outboxSendStarted
+    case outboxSendSucceeded
+    case outboxSendFailed
+    case outboxRetryRequested
+    case outboxRetrySkippedAlreadySending
+    case outboxReconciledFromREST
+    case outboxReconciledFromRealtime
+    case outboxPreservedDuringFetch
+    case outboxClearedOnLogout
 }
 
 enum MessengerDiagnostics {

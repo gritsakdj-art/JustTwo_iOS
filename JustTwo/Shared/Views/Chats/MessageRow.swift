@@ -4,6 +4,7 @@ struct MessageRow: View {
     let message: ChatMessage
     let senderName: String?
     let onLongPress: (CGRect) -> Void
+    var onRetry: (() -> Void)?
     var onReactionTap: ((ChatMessageReaction) -> Void)?
 
     @State private var bubbleFrame: CGRect = .zero
@@ -22,6 +23,8 @@ struct MessageRow: View {
                 isDeleted: message.isDeleted,
                 reactions: message.reactions,
                 deliveryStatus: message.deliveryStatus,
+                localSendState: message.localSendState,
+                onRetry: onRetry,
                 onReactionTap: onReactionTap
             )
             .contentShape(Rectangle())

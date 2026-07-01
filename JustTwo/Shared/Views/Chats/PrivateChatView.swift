@@ -99,6 +99,14 @@ struct PrivateChatView: View {
                 )
                 viewModel.close()
             }
+            .onReceive(NotificationCenter.default.publisher(for: .messengerConversationMessagesDidChange)) { notification in
+                guard !usesPreviewData,
+                      let conversationID = notification.userInfo?[MessengerConversationNotification.conversationIDKey] as? UUID,
+                      conversationID == viewModel.conversation.id else {
+                    return
+                }
+                viewModel.syncMessagesFromCache()
+            }
             .overlay {
                 if let message = viewModel.actionMenuMessage, viewModel.actionMenuAnchor != .zero {
                     ChatMessageContextMenuOverlay(
@@ -179,7 +187,7 @@ struct PrivateChatView: View {
             onCancelCompose: {
                 viewModel.cancelCompose()
             },
-            isSending: viewModel.isSending
+            isSending: viewModel.blocksComposeSend
         )
         .padding(.bottom, keyboardHeight)
         .animation(.easeOut(duration: 0.25), value: keyboardHeight)
@@ -234,7 +242,7 @@ struct PrivateChatView: View {
                                 .id(Self.loadOlderHeaderID)
                         }
 
-                        ForEach(Array(viewModel.messages.enumerated()), id: \.element.id) { index, message in
+                        ForEach(Array(viewModel.messages.enumerated()), id: \.element.listIdentity) { index, message in
                             if shouldShowDaySeparator(at: index) {
                                 daySeparator(
                                     title: ChatMessageDateFormatting.daySeparatorTitle(for: message.createdAt)
@@ -405,7 +413,7 @@ struct PrivateChatView: View {
 
     @ViewBuilder
     private func messageRow(for message: ChatMessage) -> some View {
-        let isLastMessage = message.id == viewModel.messages.last?.id
+        let isLastMessage = message.listIdentity == viewModel.messages.last?.listIdentity
 
         let row = MessageRow(
             message: message,
@@ -413,6 +421,9 @@ struct PrivateChatView: View {
             onLongPress: { frame in
                 viewModel.openActionMenu(for: message, anchor: frame)
             },
+            onRetry: message.canRetrySend ? {
+                viewModel.retryFailedMessage(message, session: session, router: router)
+            } : nil,
             onReactionTap: { reaction in
                 Task {
                     await viewModel.toggleReaction(
@@ -436,7 +447,7 @@ struct PrivateChatView: View {
                 row
             }
         }
-        .id(message.id)
+        .id(message.listIdentity)
         .scaleEffect(viewModel.actionMenuMessage?.id == message.id ? 1.02 : 1)
         .zIndex(viewModel.actionMenuMessage?.id == message.id ? 2 : 0)
         .animation(.spring(response: 0.28, dampingFraction: 0.86), value: viewModel.actionMenuMessage?.id)

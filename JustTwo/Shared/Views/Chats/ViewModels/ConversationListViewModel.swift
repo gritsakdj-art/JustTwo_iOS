@@ -121,6 +121,56 @@ final class ConversationListViewModel {
     }
 
     @discardableResult
+    func applyOptimisticOutgoing(
+        conversationID: UUID,
+        previewText: String,
+        sentAt: Date
+    ) -> Bool {
+        guard let index = conversations.firstIndex(where: { $0.id == conversationID }) else {
+            return false
+        }
+
+        let current = conversations[index]
+        let updated = current.replacingActivity(
+            lastMessageText: previewText,
+            lastSenderName: String(localized: "chats.you"),
+            lastMessageAt: sentAt
+        )
+
+        conversations.remove(at: index)
+        conversations.insert(updated, at: 0)
+        sortConversations()
+        return true
+    }
+
+    @discardableResult
+    func applyOutgoingConfirmed(
+        conversationID: UUID,
+        message: MessageDTO,
+        currentProfileID: UUID
+    ) -> Bool {
+        guard let index = conversations.firstIndex(where: { $0.id == conversationID }) else {
+            return false
+        }
+
+        let current = conversations[index]
+        let updated = current.replacingActivity(
+            lastMessageText: ChatUIMapping.realtimeLastMessageText(from: message),
+            lastSenderName: ChatUIMapping.realtimeLastSenderName(
+                from: message,
+                currentProfileID: currentProfileID,
+                fallbackOtherName: current.title
+            ),
+            lastMessageAt: message.createdAt ?? current.lastMessageAt
+        )
+
+        conversations.remove(at: index)
+        conversations.insert(updated, at: 0)
+        sortConversations()
+        return true
+    }
+
+    @discardableResult
     func applyRealtimeMessage(
         _ dto: MessageDTO,
         currentProfileID: UUID,
