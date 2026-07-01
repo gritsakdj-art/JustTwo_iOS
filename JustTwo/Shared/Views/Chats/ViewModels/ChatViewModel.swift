@@ -38,6 +38,7 @@ final class ChatViewModel {
     private var loadTask: Task<Void, Never>?
     private var sendTask: Task<Void, Never>?
     private var typingTimeoutTasks: [UUID: Task<Void, Never>] = [:]
+    @ObservationIgnored private var cacheNotificationObserver: NSObjectProtocol?
     private let typingEmitter: ChatTypingEmitter
     private let typingTimeout: TimeInterval = 5
     private let deliveryAckCoordinator: ConversationDeliveryAckCoordinator
@@ -53,6 +54,13 @@ final class ChatViewModel {
         self.typingEmitter = ChatTypingEmitter(conversationID: conversation.id)
         self.deliveryAckCoordinator = deliveryAckCoordinator
         hydrateFromMessageCacheIfAvailable()
+        subscribeToCacheNotifications()
+    }
+
+    deinit {
+        if let cacheNotificationObserver {
+            NotificationCenter.default.removeObserver(cacheNotificationObserver)
+        }
     }
 
     /// `true` while the first message page is still incomplete and we should not reveal the list yet.
@@ -162,6 +170,11 @@ final class ChatViewModel {
     func open(session: SessionStore, router: AppRouter) async {
         isOpen = true
         let generation = lifecycleGeneration
+        // Re-subscribe defensively: `close()` tears the observer down, and the same
+        // ChatViewModel instance can be reopened (e.g. tab switch, backgrounded app) without
+        // being recreated, so `open()` must guarantee we're listening again before any load
+        // starts — otherwise a concurrently-completing fetch could finish without us noticing.
+        subscribeToCacheNotifications()
         MessengerDiagnostics.event(
             .chatOpenStarted,
             conversationID: conversation.id,
@@ -169,18 +182,18 @@ final class ChatViewModel {
         )
 
         if !didOpen {
-            await loadMessages(session: session, router: router, generation: generation)
+            await loadMessages(session: session, router: router, generation: generation, isInitialLoad: true)
             guard generation == lifecycleGeneration, isOpen else {
                 MessengerDiagnostics.event(
-                    .loadMessagesIgnoredStaleGeneration,
+                    .chatInitialLoadIgnoredStaleGeneration,
                     conversationID: conversation.id,
                     metadata: lifecycleMetadata(generation: generation)
                 )
                 return
             }
             didOpen = true
-        } else if let cached = messageCache.messages(for: conversation.id), !cached.isEmpty {
-            messages = cached
+        } else {
+            syncMessagesFromCache()
             syncPaginationStateFromCache()
         }
 
@@ -217,6 +230,7 @@ final class ChatViewModel {
         isLoading = false
         loadTask?.cancel()
         loadTask = nil
+        unsubscribeFromCacheNotifications()
         clearTypingState()
         deactivateRealtime()
         MessengerDiagnostics.event(
@@ -355,6 +369,52 @@ final class ChatViewModel {
 
     func syncMessagesFromCache() {
         messages = messageCache.messages(for: conversation.id) ?? messages
+    }
+
+    /// Listens for cache updates that this ChatViewModel didn't itself trigger (e.g. a load that
+    /// was already in-flight when `open()` ran, or a startup preload that finished afterward).
+    /// Without this, a currently active chat can be left showing an empty/stale list until an
+    /// unrelated action (like pull-to-refresh) happens to force a resync from cache.
+    private func subscribeToCacheNotifications() {
+        guard cacheNotificationObserver == nil else { return }
+        let conversationID = conversation.id
+        // `queue: nil` delivers synchronously on the posting thread. Every poster
+        // (MessageCacheStore, MessengerOutbox) is already MainActor-isolated, so this always
+        // runs on the main actor without an extra run-loop hop — no window where a completed
+        // load's result can be "missed" between posting and delivery.
+        cacheNotificationObserver = NotificationCenter.default.addObserver(
+            forName: .messengerConversationMessagesDidChange,
+            object: nil,
+            queue: nil
+        ) { [weak self] notification in
+            guard let notifiedConversationID = notification.userInfo?[MessengerConversationNotification.conversationIDKey] as? UUID,
+                  notifiedConversationID == conversationID else {
+                return
+            }
+            MainActor.assumeIsolated {
+                self?.handleCacheNotification()
+            }
+        }
+    }
+
+    private func unsubscribeFromCacheNotifications() {
+        guard let cacheNotificationObserver else { return }
+        NotificationCenter.default.removeObserver(cacheNotificationObserver)
+        self.cacheNotificationObserver = nil
+    }
+
+    private func handleCacheNotification() {
+        let countBefore = messages.count
+        syncMessagesFromCache()
+        syncPaginationStateFromCache()
+        MessengerDiagnostics.event(
+            .chatCacheNotificationReceived,
+            conversationID: conversation.id,
+            metadata: [
+                "messageCountBefore": "\(countBefore)",
+                "messageCountAfter": "\(messages.count)"
+            ]
+        )
     }
 
     func retryFailedMessage(_ message: ChatMessage, session: SessionStore, router: AppRouter) {
@@ -647,7 +707,8 @@ final class ChatViewModel {
     private func loadMessages(
         session: SessionStore,
         router: AppRouter,
-        generation: Int
+        generation: Int,
+        isInitialLoad: Bool = false
     ) async {
         let startedAt = Date()
         let cachedCountBefore = messageCache.messages(for: conversation.id)?.count ?? 0
@@ -660,6 +721,16 @@ final class ChatViewModel {
                 "isOpen": "\(isOpen)"
             ]
         )
+        if isInitialLoad {
+            MessengerDiagnostics.event(
+                .chatInitialLoadRequested,
+                conversationID: conversation.id,
+                metadata: [
+                    "generation": "\(generation)",
+                    "cachedCountBefore": "\(cachedCountBefore)"
+                ]
+            )
+        }
         defer {
             if generation == lifecycleGeneration {
                 isLoading = false
@@ -670,6 +741,13 @@ final class ChatViewModel {
         if let cached = messageCache.messages(for: conversation.id), !cached.isEmpty {
             messages = cached
             syncPaginationStateFromCache()
+            if isInitialLoad {
+                MessengerDiagnostics.event(
+                    .chatInitialCacheSync,
+                    conversationID: conversation.id,
+                    metadata: ["messageCount": "\(cached.count)"]
+                )
+            }
         }
         errorMessage = nil
 
@@ -709,6 +787,13 @@ final class ChatViewModel {
                         "cachedCountBefore": "\(cachedCountBefore)"
                     ]
                 )
+                if isInitialLoad {
+                    MessengerDiagnostics.event(
+                        .chatInitialLoadSkippedInFlight,
+                        conversationID: conversation.id,
+                        metadata: ["generation": "\(generation)"]
+                    )
+                }
             }
 
             await loadTask?.value
@@ -744,6 +829,16 @@ final class ChatViewModel {
                     "cachedCountAfter": "\(messageCache.messages(for: conversation.id)?.count ?? 0)"
                 ]
             )
+            if isInitialLoad {
+                MessengerDiagnostics.event(
+                    loaded.isEmpty ? .chatInitialLoadNoMessages : .chatInitialLoadApplied,
+                    conversationID: conversation.id,
+                    metadata: [
+                        "generation": "\(generation)",
+                        "resultCount": "\(loaded.count)"
+                    ]
+                )
+            }
         } catch let error as NetworkError {
             let errorCategory = MessengerDiagnostics.sanitizeError(error)
             MessengerDiagnostics.event(

@@ -149,6 +149,10 @@ final class MessageCacheStore {
         }
 
         if let existingTask = loadTasks[conversationID] {
+            // A fetch is already running for this conversation (e.g. startup preload or another
+            // ChatViewModel instance). Reuse its result instead of firing a second, redundant
+            // network request — the caller still gets fresh data without a duplicate round trip,
+            // and without racing two fetches against the same cache entry.
             MessengerDiagnostics.event(
                 .loadSkippedInFlight,
                 conversationID: conversationID,
@@ -159,10 +163,8 @@ final class MessageCacheStore {
                 ]
             )
             await existingTask.value
-            if !force {
-                ensurePaginationCursorIfNeeded(conversationID: conversationID, pageSize: limit)
-                return entries[conversationID]?.messages ?? []
-            }
+            ensurePaginationCursorIfNeeded(conversationID: conversationID, pageSize: limit)
+            return entries[conversationID]?.messages ?? []
         }
 
         var entry = entries[conversationID] ?? Entry(messages: [], loadedAt: .distantPast)
@@ -525,6 +527,12 @@ final class MessageCacheStore {
                 "preservedReceiptCount": "\(preservedReceiptCount)"
             ]
         )
+
+        // Any ChatViewModel currently open for this conversation (including one that didn't
+        // itself trigger this fetch, e.g. because it deduplicated against an in-flight load)
+        // must still learn about the new cache contents, otherwise it can be left showing an
+        // empty/stale list until an unrelated action forces a resync.
+        MessengerConversationNotification.postMessagesDidChange(conversationID: conversationID)
     }
 
     private func mergeLoadedMessage(_ loaded: ChatMessage, withExisting existing: ChatMessage) -> ChatMessage {

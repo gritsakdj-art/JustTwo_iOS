@@ -80,6 +80,14 @@ enum MessengerDiagnosticEvent: String, Sendable {
     case loadMessagesIgnoredStaleGeneration
     case loadSkippedInFlight
 
+    case chatInitialCacheSync
+    case chatInitialLoadRequested
+    case chatInitialLoadSkippedInFlight
+    case chatInitialLoadApplied
+    case chatInitialLoadNoMessages
+    case chatInitialLoadIgnoredStaleGeneration
+    case chatCacheNotificationReceived
+
     case sendStarted
     case sendSucceeded
     case sendFailed

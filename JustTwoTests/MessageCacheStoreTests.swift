@@ -265,6 +265,60 @@ struct MessageCacheStoreTests {
     }
 
     @Test
+    func mergeLoadedMessagesPostsCacheChangeNotification() {
+        let store = MessageCacheStore.shared
+        store.reset()
+
+        var receivedConversationID: UUID?
+        // `queue: nil` delivers synchronously on the posting thread so the assertion below can
+        // run immediately after `mergeLoadedMessages` without any test-only sleep/wait, and
+        // without a suspension point that could interleave with other concurrently running tests
+        // that touch the same shared `MessageCacheStore.shared` singleton.
+        let observer = NotificationCenter.default.addObserver(
+            forName: .messengerConversationMessagesDidChange,
+            object: nil,
+            queue: nil
+        ) { notification in
+            receivedConversationID = notification.userInfo?[MessengerConversationNotification.conversationIDKey] as? UUID
+        }
+        defer { NotificationCenter.default.removeObserver(observer) }
+
+        store.mergeLoadedMessages([
+            makeMessage(id: UUID(), createdAt: .now, isMine: false, status: nil)
+        ], for: conversationID)
+
+        #expect(receivedConversationID == conversationID)
+    }
+
+    @Test
+    func loadOlderMessagesMergeAlsoPostsCacheChangeNotification() {
+        let store = MessageCacheStore.shared
+        store.reset()
+        store.setMessages([
+            makeMessage(id: UUID(), createdAt: Date(timeIntervalSince1970: 2_000), isMine: false, status: nil)
+        ], for: conversationID)
+
+        var notificationCount = 0
+        let observer = NotificationCenter.default.addObserver(
+            forName: .messengerConversationMessagesDidChange,
+            object: nil,
+            queue: nil
+        ) { _ in
+            notificationCount += 1
+        }
+        defer { NotificationCenter.default.removeObserver(observer) }
+
+        // `loadOlderMessages` (pull-to-refresh / "load more history") shares the same
+        // `mergeLoadedMessages` path as the initial recent-messages load, so both should notify
+        // active subscribers identically.
+        store.mergeLoadedMessages([
+            makeMessage(id: UUID(), createdAt: Date(timeIntervalSince1970: 1_000), isMine: false, status: nil)
+        ], for: conversationID)
+
+        #expect(notificationCount == 1)
+    }
+
+    @Test
     func resetClearsCache() {
         let store = MessageCacheStore.shared
         store.setMessages([], for: conversationID)

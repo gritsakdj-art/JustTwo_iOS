@@ -27,6 +27,7 @@ struct PrivateChatView: View {
     @State private var keyboardHeight: CGFloat = 0
     @State private var didTriggerOlderLoadForCurrentTopReach = false
     @State private var initialPositioningTask: Task<Void, Never>?
+    @State private var initialPositioningGeneration = 0
     @State private var scrollTask: Task<Void, Never>?
     @State private var olderMessagesScrollAnchorID: UUID?
     @State private var isRestoringOlderMessagesScroll = false
@@ -376,6 +377,7 @@ struct PrivateChatView: View {
             .onDisappear {
                 initialPositioningTask?.cancel()
                 initialPositioningTask = nil
+                initialPositioningGeneration += 1
                 scrollTask?.cancel()
                 scrollTask = nil
             }
@@ -693,6 +695,18 @@ struct PrivateChatView: View {
         let target = viewModel.initialScrollTarget(pushTargetMessageID: targetMessageID)
         logInitialScrollTarget(target)
         isInitialPositioningInProgress = true
+        // Every task gets its own generation stamp. This is the only thing allowed to gate
+        // whether a given task may mutate the shared `@State` below. Without it: cancelling an
+        // in-flight task and immediately starting a replacement races against the cancelled
+        // task's own cleanup (its `defer` also resets `initialPositioningTask`/
+        // `isInitialPositioningInProgress`, and Swift gives no ordering guarantee between that
+        // resumption and the new task's first `await`). If the stale task's cleanup runs after
+        // the new task has stored itself, it wipes out the new task's tracking — a later trigger
+        // then sees "nothing in progress" and can spawn yet another concurrent task, and in the
+        // worst case none of them is left to ever flip `didCompleteInitialPositioning`. That is
+        // the exact "chat opens to background only, fixed by a light pull" bug this guards against.
+        initialPositioningGeneration += 1
+        let myGeneration = initialPositioningGeneration
 
         MessengerDiagnostics.event(
             .initialPositioningStarted,
@@ -705,8 +719,10 @@ struct PrivateChatView: View {
 
         initialPositioningTask = Task { @MainActor in
             defer {
-                initialPositioningTask = nil
-                isInitialPositioningInProgress = false
+                if myGeneration == initialPositioningGeneration {
+                    initialPositioningTask = nil
+                    isInitialPositioningInProgress = false
+                }
             }
 
             await Task.yield()
@@ -716,9 +732,13 @@ struct PrivateChatView: View {
                 if delay > 0 {
                     try? await Task.sleep(for: .milliseconds(delay))
                 }
-                guard !Task.isCancelled, !viewModel.messages.isEmpty else { return }
+                guard !Task.isCancelled,
+                      myGeneration == initialPositioningGeneration,
+                      !viewModel.messages.isEmpty else { return }
                 applyInitialScroll(proxy, target: target, animated: false)
             }
+
+            guard myGeneration == initialPositioningGeneration else { return }
 
             didCompleteInitialPositioning = true
             switch target {
