@@ -139,6 +139,22 @@ enum MessengerDiagnosticEvent: String, Sendable {
     case outboxReconciledFromRealtime
     case outboxPreservedDuringFetch
     case outboxClearedOnLogout
+
+    case imagePicked
+    case imagePrepareStarted
+    case imagePrepareSucceeded
+    case imagePrepareFailed
+    case imageUploadURLRequested
+    case imageUploadURLSucceeded
+    case imageUploadURLFailed
+    case imageUploadStarted
+    case imageUploadSucceeded
+    case imageUploadFailed
+    case imageMessageCreateStarted
+    case imageMessageCreateSucceeded
+    case imageMessageCreateFailed
+    case imageOutboxRetryRequested
+    case imageTempFileCleaned
 }
 
 enum MessengerDiagnostics {

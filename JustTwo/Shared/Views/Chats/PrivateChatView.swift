@@ -1,4 +1,7 @@
 import SwiftUI
+#if canImport(PhotosUI)
+import PhotosUI
+#endif
 #if canImport(UIKit)
 import UIKit
 #endif
@@ -31,6 +34,11 @@ struct PrivateChatView: View {
     @State private var scrollTask: Task<Void, Never>?
     @State private var olderMessagesScrollAnchorID: UUID?
     @State private var isRestoringOlderMessagesScroll = false
+    #if canImport(PhotosUI)
+    @State private var isPhotoPickerPresented = false
+    @State private var selectedPhotoItem: PhotosPickerItem?
+    #endif
+    @State private var photoViewerAttachment: ChatMessageAttachment?
 
     init(
         conversation: ChatConversationPreview,
@@ -163,6 +171,9 @@ struct PrivateChatView: View {
             } message: {
                 Text(viewModel.errorMessage ?? "")
             }
+            .fullScreenCover(item: $photoViewerAttachment) { attachment in
+                ChatPhotoViewerView(attachment: attachment)
+            }
     }
 
     private var deleteAlertPresented: Binding<Bool> {
@@ -188,8 +199,29 @@ struct PrivateChatView: View {
             onCancelCompose: {
                 viewModel.cancelCompose()
             },
-            isSending: viewModel.blocksComposeSend
+            onAttach: {
+                #if canImport(PhotosUI)
+                isPhotoPickerPresented = true
+                #endif
+            },
+            isSending: viewModel.blocksComposeSend,
+            isAttachmentDisabled: viewModel.isPreparingImage || viewModel.editingMessage != nil
         )
+        #if canImport(PhotosUI)
+        .photosPicker(
+            isPresented: $isPhotoPickerPresented,
+            selection: $selectedPhotoItem,
+            matching: .images,
+            photoLibrary: .shared()
+        )
+        .onChange(of: selectedPhotoItem) { _, item in
+            guard let item else { return }
+            selectedPhotoItem = nil
+            Task {
+                await viewModel.sendImage(from: item, session: session, router: router)
+            }
+        }
+        #endif
         .padding(.bottom, keyboardHeight)
         .animation(.easeOut(duration: 0.25), value: keyboardHeight)
         .background(Color.clear)
@@ -435,6 +467,9 @@ struct PrivateChatView: View {
                         router: router
                     )
                 }
+            },
+            onImageTap: { attachment in
+                photoViewerAttachment = attachment
             }
         )
 

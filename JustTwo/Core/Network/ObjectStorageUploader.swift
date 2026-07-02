@@ -60,6 +60,36 @@ enum ObjectStorageUploader {
         }
     }
 
+
+    static func upload(
+        fileURL: URL,
+        uploadURL: URL,
+        method: String,
+        headers: [String: String]
+    ) async throws {
+        var request = URLRequest(url: uploadURL)
+        request.httpMethod = method
+
+        for (key, value) in headers {
+            request.setValue(value, forHTTPHeaderField: key)
+        }
+
+        let byteCount = (try? FileManager.default.attributesOfItem(atPath: fileURL.path)[.size] as? NSNumber)?.intValue ?? 0
+        NetworkDebug.log("➡️ \(method) \(redactedObjectStorageURL(uploadURL.absoluteString)) bytes=\(byteCount)")
+
+        let (_, response) = try await uploadSession.upload(for: request, fromFile: fileURL)
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw NetworkError.invalidResponse
+        }
+
+        NetworkDebug.log("⬅️ object storage status=\(httpResponse.statusCode)")
+
+        guard (200...299).contains(httpResponse.statusCode) else {
+            throw UploadError.httpStatus(httpResponse.statusCode)
+        }
+    }
+
     private static func redactedObjectStorageURL(_ urlString: String) -> String {
         guard var components = URLComponents(string: urlString) else {
             return "<object-storage-url>"

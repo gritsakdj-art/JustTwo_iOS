@@ -54,12 +54,55 @@ struct MessageResponseDTO: Decodable, Sendable {
     let message: MessageDTO
 }
 
+enum MessageKind: Equatable, Hashable, Sendable, Codable {
+    case text
+    case image
+    case unknown(String)
+
+    var rawValue: String {
+        switch self {
+        case .text: return "text"
+        case .image: return "image"
+        case .unknown(let value): return value
+        }
+    }
+
+    init(rawValue: String) {
+        switch rawValue {
+        case "text": self = .text
+        case "image": self = .image
+        default: self = .unknown(rawValue)
+        }
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        self.init(rawValue: try container.decode(String.self))
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        try container.encode(rawValue)
+    }
+}
+
+struct MessageAttachmentDTO: Decodable, Equatable, Sendable {
+    let id: UUID
+    let contentType: String
+    let byteSize: Int
+    let width: Int
+    let height: Int
+    let downloadUrl: URL?
+    let downloadUrlExpiresAt: Date?
+}
+
 struct MessageDTO: Decodable, Identifiable, Sendable {
     let id: UUID
     let conversationID: UUID
     let senderProfileID: UUID
-    let kind: String
+    let kind: MessageKind
     let body: String?
+    let attachments: [MessageAttachmentDTO]
     let replyTo: MessageReplyDTO?
     let reactions: [MessageReactionDTO]
     let deliveryStatus: MessageDeliveryStatus?
@@ -74,6 +117,7 @@ struct MessageDTO: Decodable, Identifiable, Sendable {
         case senderProfileID
         case kind
         case body
+        case attachments
         case replyTo
         case reactions
         case deliveryStatus
@@ -89,8 +133,9 @@ struct MessageDTO: Decodable, Identifiable, Sendable {
         id = try container.decode(UUID.self, forKey: .id)
         conversationID = try container.decode(UUID.self, forKey: .conversationID)
         senderProfileID = try container.decode(UUID.self, forKey: .senderProfileID)
-        kind = try container.decode(String.self, forKey: .kind)
+        kind = try container.decodeIfPresent(MessageKind.self, forKey: .kind) ?? .text
         body = try container.decodeIfPresent(String.self, forKey: .body)
+        attachments = try container.decodeIfPresent([MessageAttachmentDTO].self, forKey: .attachments) ?? []
         replyTo = try container.decodeIfPresent(MessageReplyDTO.self, forKey: .replyTo)
         reactions = try container.decodeIfPresent([MessageReactionDTO].self, forKey: .reactions) ?? []
         deliveryStatus = try container.decodeIfPresent(MessageDeliveryStatus.self, forKey: .deliveryStatus)
@@ -159,9 +204,65 @@ enum ReactionEmoji {
 }
 
 struct SendMessageRequestBody: Encodable, Sendable {
-    let body: String
+    let kind: MessageKind?
+    let body: String?
     let replyToID: UUID?
     let clientMessageID: String
+    let attachmentUploadID: UUID?
+
+    enum CodingKeys: String, CodingKey {
+        case kind
+        case body
+        case replyToID
+        case clientMessageID
+        case attachmentUploadID
+    }
+
+    init(
+        kind: MessageKind? = nil,
+        body: String?,
+        replyToID: UUID?,
+        clientMessageID: String,
+        attachmentUploadID: UUID? = nil
+    ) {
+        self.kind = kind
+        self.body = body
+        self.replyToID = replyToID
+        self.clientMessageID = clientMessageID
+        self.attachmentUploadID = attachmentUploadID
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encodeIfPresent(kind, forKey: .kind)
+        if body == nil, kind == .image {
+            try container.encodeNil(forKey: .body)
+        } else {
+            try container.encodeIfPresent(body, forKey: .body)
+        }
+        try container.encodeIfPresent(replyToID, forKey: .replyToID)
+        try container.encode(clientMessageID, forKey: .clientMessageID)
+        try container.encodeIfPresent(attachmentUploadID, forKey: .attachmentUploadID)
+    }
+}
+
+struct CreateMessageAttachmentUploadRequestBody: Encodable, Sendable {
+    let contentType: String
+    let byteSize: Int
+    let width: Int
+    let height: Int
+}
+
+struct CreateMessageAttachmentUploadResponse: Decodable, Sendable {
+    let upload: MessageAttachmentUploadDTO
+}
+
+struct MessageAttachmentUploadDTO: Decodable, Sendable {
+    let id: UUID
+    let uploadUrl: URL
+    let method: String
+    let headers: [String: String]
+    let expiresAt: Date
 }
 
 struct EditMessageRequestBody: Encodable, Sendable {
@@ -230,6 +331,7 @@ struct CreateInviteRequestBody: Encodable, Sendable {
 
 enum MessengerLimits {
     nonisolated static let maxMessageLength = 4_000
+    nonisolated static let maxImageBytes = 10_485_760
     nonisolated static let defaultConversationPageSize = 30
     nonisolated static let defaultMessagePageSize = 50
 }

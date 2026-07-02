@@ -1,4 +1,7 @@
 import SwiftUI
+#if canImport(UIKit)
+import UIKit
+#endif
 
 struct ChatBubbleView: View {
     let text: String
@@ -6,6 +9,7 @@ struct ChatBubbleView: View {
     let createdAt: Date
     let isMine: Bool
     var replyPreview: String?
+    var imageAttachment: ChatMessageAttachment?
     var isEdited: Bool = false
     var isDeleted: Bool = false
     var reactions: [ChatMessageReaction] = []
@@ -13,6 +17,7 @@ struct ChatBubbleView: View {
     var localSendState: MessageLocalSendState?
     var onRetry: (() -> Void)?
     var onReactionTap: ((ChatMessageReaction) -> Void)?
+    var onImageTap: ((ChatMessageAttachment) -> Void)?
 
     private enum UI {
         static let tailWidth: CGFloat = 12
@@ -23,6 +28,9 @@ struct ChatBubbleView: View {
         static let sideInset: CGFloat = 48
         static let minWidth: CGFloat = 120
         static let minWidthEdited: CGFloat = 156
+        static let imageMinWidth: CGFloat = 180
+        static let imageMaxWidth: CGFloat = 236
+        static let imageMaxHeight: CGFloat = 280
         static let timeClusterWidth: CGFloat = 54
         static let dateTimeClusterWidth: CGFloat = 108
         static let editedLabelWidth: CGFloat = 52
@@ -152,12 +160,47 @@ struct ChatBubbleView: View {
                     )
             }
 
-            Text(text)
-                .font(Font.App.body())
-                .foregroundStyle(isDeleted ? Color.secondaryText : Color.primaryText)
-                .italic(isDeleted)
-                .multilineTextAlignment(.leading)
+            if let imageAttachment, !isDeleted {
+                ChatImageThumbnailView(attachment: imageAttachment)
+                    .frame(width: imageDisplaySize(for: imageAttachment).width, height: imageDisplaySize(for: imageAttachment).height)
+                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .stroke(Color.glassBorderHighlight.opacity(0.22), lineWidth: 1)
+                    )
+                    .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    .onTapGesture {
+                        onImageTap?(imageAttachment)
+                    }
+            }
+
+            if shouldShowText {
+                Text(text)
+                    .font(Font.App.body())
+                    .foregroundStyle(isDeleted ? Color.secondaryText : Color.primaryText)
+                    .italic(isDeleted)
+                    .multilineTextAlignment(.leading)
+            }
         }
+    }
+
+    private var shouldShowText: Bool {
+        isDeleted || imageAttachment == nil || !text.isEmpty && text != ChatUIMapping.imageMessagePreviewText
+    }
+
+    private func imageDisplaySize(for attachment: ChatMessageAttachment) -> CGSize {
+        let ratio = max(0.55, min(1.8, attachment.aspectRatio))
+        var width = UI.imageMaxWidth
+        var height = width / ratio
+
+        if height > UI.imageMaxHeight {
+            height = UI.imageMaxHeight
+            width = height * ratio
+        }
+
+        width = max(UI.imageMinWidth, min(UI.imageMaxWidth, width))
+        height = max(130, min(UI.imageMaxHeight, height))
+        return CGSize(width: width, height: height)
     }
 
     private var bubbleBackground: some View {
@@ -293,4 +336,57 @@ private struct MessageDeliveryReceiptView: View {
     }
     .padding()
     .background(Color.discoverBackgroundGradient)
+}
+
+
+private struct ChatImageThumbnailView: View {
+    let attachment: ChatMessageAttachment
+
+    var body: some View {
+        Group {
+            if let localFileURL = attachment.localFileURL,
+               let image = localImage(from: localFileURL) {
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFill()
+            } else if let downloadURL = attachment.downloadURL {
+                AsyncImage(url: downloadURL) { phase in
+                    switch phase {
+                    case .success(let image):
+                        image
+                            .resizable()
+                            .scaledToFill()
+                    case .failure:
+                        placeholder(systemImage: "photo")
+                    case .empty:
+                        placeholder(systemImage: "photo")
+                    @unknown default:
+                        placeholder(systemImage: "photo")
+                    }
+                }
+            } else {
+                placeholder(systemImage: "photo")
+            }
+        }
+        .clipped()
+        .accessibilityLabel(Text("chats.message.photo"))
+    }
+
+    @ViewBuilder
+    private func placeholder(systemImage: String) -> some View {
+        ZStack {
+            Color.fieldBackground.opacity(0.96)
+            Image(systemName: systemImage)
+                .font(.system(size: 28, weight: .semibold))
+                .foregroundStyle(Color.secondaryText.opacity(0.72))
+        }
+    }
+
+    #if canImport(UIKit)
+    private func localImage(from url: URL) -> UIImage? {
+        UIImage(contentsOfFile: url.path)
+    }
+    #else
+    private func localImage(from url: URL) -> UIImage? { nil }
+    #endif
 }

@@ -54,6 +54,27 @@ enum MessageService {
         )
     }
 
+    nonisolated static func createAttachmentUpload(
+        conversationID: UUID,
+        contentType: String,
+        byteSize: Int,
+        width: Int,
+        height: Int
+    ) async throws -> MessageAttachmentUploadDTO {
+        let response = try await NetworkExecutor.shared.send(
+            CreateMessageAttachmentUploadRequest(
+                conversationID: conversationID,
+                body: CreateMessageAttachmentUploadRequestBody(
+                    contentType: contentType,
+                    byteSize: byteSize,
+                    width: width,
+                    height: height
+                )
+            )
+        )
+        return response.upload
+    }
+
     nonisolated static func sendMessage(
         conversationID: UUID,
         body: String,
@@ -66,6 +87,25 @@ enum MessageService {
                 body: body,
                 replyToID: replyToID,
                 clientMessageID: clientMessageID
+            )
+        )
+        return response.message
+    }
+
+    nonisolated static func sendImageMessage(
+        conversationID: UUID,
+        attachmentUploadID: UUID,
+        body: String? = nil,
+        replyToID: UUID? = nil,
+        clientMessageID: String
+    ) async throws -> MessageDTO {
+        let response = try await NetworkExecutor.shared.send(
+            SendMessageRequest(
+                conversationID: conversationID,
+                imageBody: body,
+                replyToID: replyToID,
+                clientMessageID: clientMessageID,
+                attachmentUploadID: attachmentUploadID
             )
         )
         return response.message

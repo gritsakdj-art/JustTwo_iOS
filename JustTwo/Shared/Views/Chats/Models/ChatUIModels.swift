@@ -1,4 +1,5 @@
 import Foundation
+import CoreGraphics
 import CryptoKit
 
 enum MessageLocalSendState: Equatable, Hashable {
@@ -48,12 +49,59 @@ struct ChatReplyPreview: Equatable, Hashable {
     let isDeleted: Bool
 }
 
+struct ChatMessageAttachment: Identifiable, Equatable, Hashable {
+    let id: String
+    let contentType: String
+    let byteSize: Int
+    let width: Int
+    let height: Int
+    let localFileURL: URL?
+    let downloadURL: URL?
+    let downloadUrlExpiresAt: Date?
+
+    var aspectRatio: CGFloat {
+        guard width > 0, height > 0 else { return 1 }
+        return CGFloat(width) / CGFloat(height)
+    }
+
+    static func local(
+        clientMessageID: String,
+        prepared: PreparedChatImage
+    ) -> ChatMessageAttachment {
+        ChatMessageAttachment(
+            id: "local-\(clientMessageID)",
+            contentType: prepared.contentType,
+            byteSize: prepared.byteSize,
+            width: prepared.width,
+            height: prepared.height,
+            localFileURL: prepared.localFileURL,
+            downloadURL: nil,
+            downloadUrlExpiresAt: nil
+        )
+    }
+
+    static func remote(_ dto: MessageAttachmentDTO) -> ChatMessageAttachment {
+        ChatMessageAttachment(
+            id: dto.id.uuidString,
+            contentType: dto.contentType,
+            byteSize: dto.byteSize,
+            width: dto.width,
+            height: dto.height,
+            localFileURL: nil,
+            downloadURL: dto.downloadUrl,
+            downloadUrlExpiresAt: dto.downloadUrlExpiresAt
+        )
+    }
+}
+
 struct ChatMessage: Identifiable, Equatable, Hashable {
     let id: UUID
     let clientMessageID: String?
     let localSendState: MessageLocalSendState?
+    let kind: MessageKind
     let displayText: String
     let rawBody: String?
+    let imageAttachment: ChatMessageAttachment?
     let createdAt: Date
     let isMine: Bool
     let isDeleted: Bool
@@ -75,8 +123,10 @@ struct ChatMessage: Identifiable, Equatable, Hashable {
         id: UUID,
         clientMessageID: String? = nil,
         localSendState: MessageLocalSendState? = nil,
+        kind: MessageKind = .text,
         displayText: String,
         rawBody: String?,
+        imageAttachment: ChatMessageAttachment? = nil,
         createdAt: Date,
         isMine: Bool,
         isDeleted: Bool,
@@ -88,8 +138,10 @@ struct ChatMessage: Identifiable, Equatable, Hashable {
         self.id = id
         self.clientMessageID = clientMessageID
         self.localSendState = localSendState
+        self.kind = kind
         self.displayText = displayText
         self.rawBody = rawBody
+        self.imageAttachment = imageAttachment
         self.createdAt = createdAt
         self.isMine = isMine
         self.isDeleted = isDeleted
@@ -103,7 +155,7 @@ struct ChatMessage: Identifiable, Equatable, Hashable {
 
     var canReply: Bool { !isDeleted && localSendState == nil }
     var canCopy: Bool { rawBody != nil && !(rawBody?.isEmpty ?? true) }
-    var canEdit: Bool { isMine && !isDeleted && localSendState == nil }
+    var canEdit: Bool { isMine && kind == .text && !isDeleted && localSendState == nil }
     var canDelete: Bool { isMine && !isDeleted && localSendState == nil }
     var canReact: Bool { !isDeleted && localSendState == nil }
     var canRetrySend: Bool { isMine && localSendState == .failed }
@@ -120,8 +172,34 @@ extension ChatMessage {
             id: OptimisticMessageIdentity.localMessageID(for: clientMessageID),
             clientMessageID: clientMessageID,
             localSendState: .sending,
+            kind: .text,
             displayText: body,
             rawBody: body,
+            imageAttachment: nil,
+            createdAt: createdAt,
+            isMine: true,
+            isDeleted: false,
+            isEdited: false,
+            replyPreview: replyPreview,
+            reactions: [],
+            deliveryStatus: nil
+        )
+    }
+
+    static func optimisticOutgoingImage(
+        clientMessageID: String,
+        prepared: PreparedChatImage,
+        replyPreview: ChatReplyPreview?,
+        createdAt: Date = .now
+    ) -> ChatMessage {
+        ChatMessage(
+            id: OptimisticMessageIdentity.localMessageID(for: clientMessageID),
+            clientMessageID: clientMessageID,
+            localSendState: .sending,
+            kind: .image,
+            displayText: ChatUIMapping.imageMessagePreviewText,
+            rawBody: nil,
+            imageAttachment: .local(clientMessageID: clientMessageID, prepared: prepared),
             createdAt: createdAt,
             isMine: true,
             isDeleted: false,
@@ -141,8 +219,10 @@ extension ChatMessage {
             id: id,
             clientMessageID: clientMessageID,
             localSendState: state,
+            kind: kind,
             displayText: displayText,
             rawBody: rawBody,
+            imageAttachment: imageAttachment,
             createdAt: createdAt,
             isMine: isMine,
             isDeleted: isDeleted,
@@ -160,8 +240,10 @@ extension ChatMessage {
             id: id,
             clientMessageID: clientMessageID,
             localSendState: nil,
+            kind: kind,
             displayText: String(localized: "chats.messageDeleted"),
             rawBody: nil,
+            imageAttachment: nil,
             createdAt: createdAt,
             isMine: isMine,
             isDeleted: true,
@@ -177,8 +259,10 @@ extension ChatMessage {
             id: id,
             clientMessageID: clientMessageID,
             localSendState: localSendState,
+            kind: kind,
             displayText: displayText,
             rawBody: rawBody,
+            imageAttachment: imageAttachment,
             createdAt: createdAt,
             isMine: isMine,
             isDeleted: isDeleted,
@@ -205,8 +289,10 @@ extension ChatMessage {
             id: id,
             clientMessageID: clientMessageID,
             localSendState: localSendState,
+            kind: kind,
             displayText: displayText,
             rawBody: rawBody,
+            imageAttachment: imageAttachment,
             createdAt: createdAt,
             isMine: isMine,
             isDeleted: isDeleted,
@@ -281,14 +367,19 @@ enum ChatUIMapping {
         )
     }
 
+    static let imageMessagePreviewText = String(localized: "chats.message.photo", defaultValue: "Photo")
+
     static func message(
         from dto: MessageDTO,
         currentProfileID: UUID
     ) -> ChatMessage {
         let isDeleted = dto.deletedAt != nil
+        let imageAttachment = isDeleted ? nil : dto.attachments.first.map(ChatMessageAttachment.remote)
         let displayText: String
         if isDeleted {
             displayText = String(localized: "chats.messageDeleted")
+        } else if dto.kind == .image, (dto.body?.isEmpty ?? true) {
+            displayText = imageMessagePreviewText
         } else {
             displayText = dto.body ?? ""
         }
@@ -316,8 +407,10 @@ enum ChatUIMapping {
             id: dto.id,
             clientMessageID: dto.clientMessageID,
             localSendState: nil,
+            kind: dto.kind,
             displayText: displayText,
             rawBody: isDeleted ? nil : dto.body,
+            imageAttachment: imageAttachment,
             createdAt: dto.createdAt ?? .distantPast,
             isMine: isMine,
             isDeleted: isDeleted,
@@ -342,6 +435,9 @@ enum ChatUIMapping {
         if message.deletedAt != nil {
             return String(localized: "chats.messageDeleted")
         }
+        if message.kind == .image {
+            return imageMessagePreviewText
+        }
         return message.body
     }
 
@@ -365,6 +461,9 @@ enum ChatUIMapping {
     static func realtimeLastMessageText(from dto: MessageDTO) -> String? {
         if dto.deletedAt != nil {
             return String(localized: "chats.messageDeleted")
+        }
+        if dto.kind == .image {
+            return imageMessagePreviewText
         }
         return dto.body
     }

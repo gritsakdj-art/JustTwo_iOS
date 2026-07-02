@@ -8,8 +8,7 @@ final class MessengerOutbox {
     struct Entry: Equatable, Identifiable {
         let clientMessageID: String
         let conversationID: UUID
-        let body: String
-        let replyToID: UUID?
+        let payload: Payload
         let localMessageID: UUID
         let createdAt: Date
         var state: State
@@ -17,6 +16,43 @@ final class MessengerOutbox {
         var serverMessageID: UUID?
 
         var id: String { clientMessageID }
+    }
+
+    enum Payload: Equatable {
+        case text(TextPayload)
+        case image(ImagePayload)
+
+        var replyToID: UUID? {
+            switch self {
+            case .text(let payload): return payload.replyToID
+            case .image(let payload): return payload.replyToID
+            }
+        }
+
+        var kindName: String {
+            switch self {
+            case .text: return "text"
+            case .image: return "image"
+            }
+        }
+
+        var localFileURL: URL? {
+            switch self {
+            case .text: return nil
+            case .image(let payload): return payload.prepared.localFileURL
+            }
+        }
+    }
+
+    struct TextPayload: Equatable {
+        let body: String
+        let replyToID: UUID?
+    }
+
+    struct ImagePayload: Equatable {
+        let prepared: PreparedChatImage
+        let replyToID: UUID?
+        let caption: String?
     }
 
     enum State: Equatable {
@@ -59,13 +95,50 @@ final class MessengerOutbox {
         session: SessionStore,
         router: AppRouter
     ) {
+        enqueueEntry(
+            conversationID: conversationID,
+            payload: .text(TextPayload(body: body, replyToID: replyToID)),
+            clientMessageID: clientMessageID,
+            localMessageID: localMessageID,
+            session: session,
+            router: router
+        )
+    }
+
+    func enqueueImage(
+        conversationID: UUID,
+        prepared: PreparedChatImage,
+        replyToID: UUID?,
+        caption: String? = nil,
+        clientMessageID: String,
+        localMessageID: UUID,
+        session: SessionStore,
+        router: AppRouter
+    ) {
+        enqueueEntry(
+            conversationID: conversationID,
+            payload: .image(ImagePayload(prepared: prepared, replyToID: replyToID, caption: caption)),
+            clientMessageID: clientMessageID,
+            localMessageID: localMessageID,
+            session: session,
+            router: router
+        )
+    }
+
+    private func enqueueEntry(
+        conversationID: UUID,
+        payload: Payload,
+        clientMessageID: String,
+        localMessageID: UUID,
+        session: SessionStore,
+        router: AppRouter
+    ) {
         guard entries[clientMessageID] == nil else { return }
 
         let entry = Entry(
             clientMessageID: clientMessageID,
             conversationID: conversationID,
-            body: body,
-            replyToID: replyToID,
+            payload: payload,
             localMessageID: localMessageID,
             createdAt: .now,
             state: .queued,
@@ -81,7 +154,8 @@ final class MessengerOutbox {
             clientMessageID: clientMessageID,
             metadata: [
                 "pendingCount": "\(pendingCount(for: conversationID))",
-                "state": "queued"
+                "state": "queued",
+                "kind": payload.kindName
             ]
         )
 
@@ -114,9 +188,10 @@ final class MessengerOutbox {
         MessengerConversationNotification.postMessagesDidChange(conversationID: entry.conversationID)
 
         MessengerDiagnostics.event(
-            .outboxRetryRequested,
+            entry.payload.kindName == "image" ? .imageOutboxRetryRequested : .outboxRetryRequested,
             conversationID: entry.conversationID,
-            clientMessageID: clientMessageID
+            clientMessageID: clientMessageID,
+            metadata: ["kind": entry.payload.kindName]
         )
 
         pumpConversationQueue(conversationID: entry.conversationID, session: session, router: router)
@@ -143,6 +218,12 @@ final class MessengerOutbox {
             task.cancel()
         }
         sendTasks.removeAll()
+        for entry in entries.values {
+            if let fileURL = entry.payload.localFileURL {
+                ChatImagePreparer.removeTemporaryFile(fileURL)
+            }
+        }
+        ChatImagePreparer.cleanupTemporaryDirectory()
         entries.removeAll()
         conversationQueues.removeAll()
 
@@ -192,7 +273,10 @@ final class MessengerOutbox {
             .outboxSendStarted,
             conversationID: entry.conversationID,
             clientMessageID: clientMessageID,
-            metadata: ["pendingCount": "\(pendingCount(for: entry.conversationID))"]
+            metadata: [
+                "pendingCount": "\(pendingCount(for: entry.conversationID))",
+                "kind": entry.payload.kindName
+            ]
         )
 
         let startedAt = Date()
@@ -205,12 +289,7 @@ final class MessengerOutbox {
 
             do {
                 let profileID = try await MessengerSessionSupport.resolveCurrentProfileID(session: session)
-                let dto = try await MessageService.sendMessage(
-                    conversationID: currentEntry.conversationID,
-                    body: currentEntry.body,
-                    replyToID: currentEntry.replyToID,
-                    clientMessageID: clientMessageID
-                )
+                let dto = try await self.send(entry: currentEntry, clientMessageID: clientMessageID)
 
                 guard !Task.isCancelled else { return }
 
@@ -229,6 +308,15 @@ final class MessengerOutbox {
                     currentProfileID: profileID
                 )
 
+                if case .image(let payload) = currentEntry.payload {
+                    ChatImagePreparer.removeTemporaryFile(payload.prepared.localFileURL)
+                    MessengerDiagnostics.event(
+                        .imageTempFileCleaned,
+                        conversationID: currentEntry.conversationID,
+                        clientMessageID: clientMessageID
+                    )
+                }
+
                 MessengerDiagnostics.event(
                     .outboxSendSucceeded,
                     conversationID: currentEntry.conversationID,
@@ -236,7 +324,8 @@ final class MessengerOutbox {
                     clientMessageID: clientMessageID,
                     metadata: [
                         "durationMs": "\(max(0, Int(Date().timeIntervalSince(startedAt) * 1_000)))",
-                        "reconciled": "\(reconciled)"
+                        "reconciled": "\(reconciled)",
+                        "kind": currentEntry.payload.kindName
                     ]
                 )
 
@@ -278,6 +367,116 @@ final class MessengerOutbox {
         }
     }
 
+    private func send(entry: Entry, clientMessageID: String) async throws -> MessageDTO {
+        switch entry.payload {
+        case .text(let payload):
+            return try await MessageService.sendMessage(
+                conversationID: entry.conversationID,
+                body: payload.body,
+                replyToID: payload.replyToID,
+                clientMessageID: clientMessageID
+            )
+        case .image(let payload):
+            MessengerDiagnostics.event(
+                .imageUploadURLRequested,
+                conversationID: entry.conversationID,
+                clientMessageID: clientMessageID,
+                metadata: imageMetadata(payload.prepared)
+            )
+            let upload: MessageAttachmentUploadDTO
+            do {
+                upload = try await MessageService.createAttachmentUpload(
+                    conversationID: entry.conversationID,
+                    contentType: payload.prepared.contentType,
+                    byteSize: payload.prepared.byteSize,
+                    width: payload.prepared.width,
+                    height: payload.prepared.height
+                )
+                MessengerDiagnostics.event(
+                    .imageUploadURLSucceeded,
+                    conversationID: entry.conversationID,
+                    clientMessageID: clientMessageID,
+                    metadata: ["method": upload.method]
+                )
+            } catch {
+                MessengerDiagnostics.event(
+                    .imageUploadURLFailed,
+                    conversationID: entry.conversationID,
+                    clientMessageID: clientMessageID,
+                    metadata: ["errorCategory": MessengerDiagnostics.sanitizeError(error)]
+                )
+                throw error
+            }
+
+            MessengerDiagnostics.event(
+                .imageUploadStarted,
+                conversationID: entry.conversationID,
+                clientMessageID: clientMessageID,
+                metadata: imageMetadata(payload.prepared)
+            )
+            do {
+                try await ObjectStorageUploader.upload(
+                    fileURL: payload.prepared.localFileURL,
+                    uploadURL: upload.uploadUrl,
+                    method: upload.method,
+                    headers: upload.headers
+                )
+                MessengerDiagnostics.event(
+                    .imageUploadSucceeded,
+                    conversationID: entry.conversationID,
+                    clientMessageID: clientMessageID
+                )
+            } catch {
+                MessengerDiagnostics.event(
+                    .imageUploadFailed,
+                    conversationID: entry.conversationID,
+                    clientMessageID: clientMessageID,
+                    metadata: ["errorCategory": MessengerDiagnostics.sanitizeError(error)]
+                )
+                throw error
+            }
+
+            MessengerDiagnostics.event(
+                .imageMessageCreateStarted,
+                conversationID: entry.conversationID,
+                clientMessageID: clientMessageID
+            )
+            do {
+                let dto = try await MessageService.sendImageMessage(
+                    conversationID: entry.conversationID,
+                    attachmentUploadID: upload.id,
+                    body: payload.caption,
+                    replyToID: payload.replyToID,
+                    clientMessageID: clientMessageID
+                )
+                MessengerDiagnostics.event(
+                    .imageMessageCreateSucceeded,
+                    conversationID: entry.conversationID,
+                    messageID: dto.id,
+                    clientMessageID: clientMessageID
+                )
+                return dto
+            } catch {
+                MessengerDiagnostics.event(
+                    .imageMessageCreateFailed,
+                    conversationID: entry.conversationID,
+                    clientMessageID: clientMessageID,
+                    metadata: ["errorCategory": MessengerDiagnostics.sanitizeError(error)]
+                )
+                throw error
+            }
+        }
+    }
+
+    private func imageMetadata(_ prepared: PreparedChatImage) -> [String: String] {
+        [
+            "contentType": prepared.contentType,
+            "byteSize": "\(prepared.byteSize)",
+            "width": "\(prepared.width)",
+            "height": "\(prepared.height)"
+        ]
+    }
+
     private func handleSendFailure(
         clientMessageID: String,
         error: Error,
@@ -303,7 +502,8 @@ final class MessengerOutbox {
             clientMessageID: clientMessageID,
             metadata: [
                 "durationMs": "\(max(0, Int(Date().timeIntervalSince(startedAt) * 1_000)))",
-                "errorCategory": MessengerDiagnostics.sanitizeError(error)
+                "errorCategory": MessengerDiagnostics.sanitizeError(error),
+                "kind": entry.payload.kindName
             ]
         )
 

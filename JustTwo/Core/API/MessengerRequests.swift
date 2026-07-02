@@ -112,6 +112,40 @@ struct SendMessageRequest: EncodableAPIRequest {
             clientMessageID: clientMessageID
         )
     }
+
+    init(
+        conversationID: UUID,
+        imageBody: String? = nil,
+        replyToID: UUID? = nil,
+        clientMessageID: String,
+        attachmentUploadID: UUID
+    ) {
+        self.conversationID = conversationID
+        bodyValue = SendMessageRequestBody(
+            kind: .image,
+            body: imageBody,
+            replyToID: replyToID,
+            clientMessageID: clientMessageID,
+            attachmentUploadID: attachmentUploadID
+        )
+    }
+}
+
+struct CreateMessageAttachmentUploadRequest: EncodableAPIRequest {
+    typealias Response = CreateMessageAttachmentUploadResponse
+    typealias Body = CreateMessageAttachmentUploadRequestBody
+
+    let conversationID: UUID
+    let bodyValue: CreateMessageAttachmentUploadRequestBody?
+
+    var path: String { "conversations/\(conversationID.uuidString)/attachments/upload-url" }
+    var method: HTTPMethod { .post }
+    var requiresAuth: Bool { true }
+
+    init(conversationID: UUID, body: CreateMessageAttachmentUploadRequestBody) {
+        self.conversationID = conversationID
+        bodyValue = body
+    }
 }
 
 struct EditMessageRequest: EncodableAPIRequest {

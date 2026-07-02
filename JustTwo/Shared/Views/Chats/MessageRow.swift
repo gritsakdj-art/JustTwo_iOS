@@ -6,6 +6,7 @@ struct MessageRow: View {
     let onLongPress: (CGRect) -> Void
     var onRetry: (() -> Void)?
     var onReactionTap: ((ChatMessageReaction) -> Void)?
+    var onImageTap: ((ChatMessageAttachment) -> Void)?
 
     @State private var bubbleFrame: CGRect = .zero
 
@@ -19,13 +20,15 @@ struct MessageRow: View {
                 createdAt: message.createdAt,
                 isMine: message.isMine,
                 replyPreview: message.replyPreview?.body,
+                imageAttachment: message.imageAttachment,
                 isEdited: message.isEdited,
                 isDeleted: message.isDeleted,
                 reactions: message.reactions,
                 deliveryStatus: message.deliveryStatus,
                 localSendState: message.localSendState,
                 onRetry: onRetry,
-                onReactionTap: onReactionTap
+                onReactionTap: onReactionTap,
+                onImageTap: onImageTap
             )
             .contentShape(Rectangle())
             .onGeometryChange(for: CGRect.self, of: { $0.frame(in: .global) }) { _, frame in

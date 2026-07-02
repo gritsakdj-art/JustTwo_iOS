@@ -1,4 +1,6 @@
 import Foundation
+import PhotosUI
+import SwiftUI
 #if canImport(UIKit)
 import UIKit
 #endif
@@ -21,6 +23,7 @@ final class ChatViewModel {
     private(set) var isLoadingOlderMessages = false
     private(set) var hasMoreOlderMessages = false
     private(set) var isSending = false
+    private(set) var isPreparingImage = false
     private(set) var typingProfileIDs: Set<UUID> = []
     var errorMessage: String?
 
@@ -347,6 +350,18 @@ final class ChatViewModel {
         }
     }
 
+    private func currentReplyPreview() -> ChatReplyPreview? {
+        guard let activeReplyTarget = replyTarget else { return nil }
+        if let preview = activeReplyTarget.replyPreview {
+            return preview
+        }
+        return ChatReplyPreview(
+            id: activeReplyTarget.id,
+            body: activeReplyTarget.rawBody ?? activeReplyTarget.displayText,
+            isDeleted: activeReplyTarget.isDeleted
+        )
+    }
+
     func copyMessage(_ message: ChatMessage) {
         #if canImport(UIKit)
         UIPasteboard.general.string = message.rawBody
@@ -447,20 +462,7 @@ final class ChatViewModel {
 
         let activeReplyTarget = replyTarget
         let clientMessageID = UUID().uuidString
-        let replyPreview: ChatReplyPreview?
-        if let activeReplyTarget {
-            if let preview = activeReplyTarget.replyPreview {
-                replyPreview = preview
-            } else {
-                replyPreview = ChatReplyPreview(
-                    id: activeReplyTarget.id,
-                    body: activeReplyTarget.rawBody ?? activeReplyTarget.displayText,
-                    isDeleted: activeReplyTarget.isDeleted
-                )
-            }
-        } else {
-            replyPreview = nil
-        }
+        let replyPreview = currentReplyPreview()
 
         let optimistic = ChatMessage.optimisticOutgoing(
             clientMessageID: clientMessageID,
@@ -502,6 +504,96 @@ final class ChatViewModel {
             session: session,
             router: router
         )
+    }
+
+
+    func sendImage(from item: PhotosPickerItem, session: SessionStore, router: AppRouter) async {
+        guard editingMessage == nil else {
+            MessengerDiagnostics.event(
+                .imagePrepareFailed,
+                conversationID: conversation.id,
+                metadata: ["reason": "editingActive"]
+            )
+            return
+        }
+        guard !isPreparingImage else {
+            MessengerDiagnostics.event(
+                .imagePrepareFailed,
+                conversationID: conversation.id,
+                metadata: ["reason": "alreadyPreparing"]
+            )
+            return
+        }
+
+        let clientMessageID = UUID().uuidString
+        let activeReplyTarget = replyTarget
+        let replyPreview = currentReplyPreview()
+
+        MessengerDiagnostics.event(
+            .imagePicked,
+            conversationID: conversation.id,
+            clientMessageID: clientMessageID,
+            metadata: ["hasReply": "\(activeReplyTarget != nil)"]
+        )
+        MessengerDiagnostics.event(
+            .imagePrepareStarted,
+            conversationID: conversation.id,
+            clientMessageID: clientMessageID
+        )
+
+        isPreparingImage = true
+        defer { isPreparingImage = false }
+
+        do {
+            let prepared = try await ChatImagePreparer.prepare(item, clientMessageID: clientMessageID)
+            MessengerDiagnostics.event(
+                .imagePrepareSucceeded,
+                conversationID: conversation.id,
+                clientMessageID: clientMessageID,
+                metadata: [
+                    "contentType": prepared.contentType,
+                    "byteSize": "\(prepared.byteSize)",
+                    "width": "\(prepared.width)",
+                    "height": "\(prepared.height)"
+                ]
+            )
+
+            let optimistic = ChatMessage.optimisticOutgoingImage(
+                clientMessageID: clientMessageID,
+                prepared: prepared,
+                replyPreview: replyPreview
+            )
+            messageCache.insertOptimisticMessage(optimistic, for: conversation.id)
+            syncMessagesFromCache()
+
+            replyTarget = nil
+            errorMessage = nil
+            typingEmitter.messageSent()
+
+            ConversationListViewModel.shared.applyOptimisticOutgoing(
+                conversationID: conversation.id,
+                previewText: ChatUIMapping.imageMessagePreviewText,
+                sentAt: optimistic.createdAt
+            )
+
+            MessengerOutbox.shared.enqueueImage(
+                conversationID: conversation.id,
+                prepared: prepared,
+                replyToID: activeReplyTarget?.id,
+                clientMessageID: clientMessageID,
+                localMessageID: optimistic.id,
+                session: session,
+                router: router
+            )
+        } catch {
+            MessengerDiagnostics.event(
+                .imagePrepareFailed,
+                conversationID: conversation.id,
+                clientMessageID: clientMessageID,
+                metadata: ["errorCategory": MessengerDiagnostics.sanitizeError(error)]
+            )
+            errorMessage = (error as? LocalizedError)?.errorDescription ?? String(localized: "chats.image.error.prepare_failed")
+        }
     }
 
     private func sendEdit(

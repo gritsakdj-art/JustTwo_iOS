@@ -12,6 +12,7 @@ struct MessageInputView: View {
     var onCancelCompose: (() -> Void)? = nil
     var onAttach: (() -> Void)? = nil
     var isSending: Bool = false
+    var isAttachmentDisabled: Bool = false
 
     @FocusState private var isInputFocused: Bool
     @State private var textSelection: TextSelection?
@@ -160,7 +161,7 @@ struct MessageInputView: View {
                 )
         }
         .buttonStyle(.spring(pressedScale: 0.92))
-        .disabled(isSending)
+        .disabled(isSending || isAttachmentDisabled || onAttach == nil)
         .accessibilityLabel("chats.attach")
     }
 
