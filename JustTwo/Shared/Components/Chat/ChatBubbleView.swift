@@ -9,6 +9,8 @@ struct ChatBubbleView: View {
     let createdAt: Date
     let isMine: Bool
     var replyPreview: String?
+    var replyImageAttachment: ChatMessageAttachment?
+    var onReplyTap: (() -> Void)?
     var imageAttachment: ChatMessageAttachment?
     var isEdited: Bool = false
     var isDeleted: Bool = false
@@ -28,9 +30,6 @@ struct ChatBubbleView: View {
         static let sideInset: CGFloat = 48
         static let minWidth: CGFloat = 120
         static let minWidthEdited: CGFloat = 156
-        static let imageMinWidth: CGFloat = 180
-        static let imageMaxWidth: CGFloat = 236
-        static let imageMaxHeight: CGFloat = 280
         static let timeClusterWidth: CGFloat = 54
         static let dateTimeClusterWidth: CGFloat = 108
         static let editedLabelWidth: CGFloat = 52
@@ -63,12 +62,8 @@ struct ChatBubbleView: View {
         ) {
             if let senderName {
                 Text(senderName)
-                    .font(Font.App.caption(weight: .semibold))
-                    .foregroundStyle(
-                        isMine
-                            ? Color.discoverViolet.opacity(0.9)
-                            : Color.discoverVioletLight.opacity(0.9)
-                    )
+                    .font(Font.App.caption(size: 14, weight: .semibold))
+                    .foregroundStyle(Color.chatSenderNameGradient)
                     .padding(.horizontal, 4)
             }
 
@@ -147,31 +142,51 @@ struct ChatBubbleView: View {
     private var messageContent: some View {
         VStack(alignment: .leading, spacing: 6) {
             if let replyPreview {
-                Text(replyPreview)
-                    .font(Font.App.caption())
-                    .foregroundStyle(Color.secondaryText)
-                    .lineLimit(2)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(
-                        RoundedRectangle(cornerRadius: 10, style: .continuous)
-                            .fill(Color.discoverViolet.opacity(0.08))
-                    )
+                HStack(spacing: 8) {
+                    if let replyImageAttachment {
+                        ChatImageBubbleView(
+                            attachment: replyImageAttachment,
+                            size: ChatImageBubbleLayout.thumbnailSize(for: replyImageAttachment),
+                            cornerRadius: 8,
+                            onTap: onReplyTap
+                        )
+                    }
+
+                    Text(replyPreview)
+                        .font(Font.App.caption())
+                        .foregroundStyle(Color.secondaryText)
+                        .lineLimit(2)
+                }
+                .padding(.vertical, 6)
+                .padding(.leading, 17)
+                .padding(.trailing, 10)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .fill(Color.discoverViolet.opacity(0.08))
+                )
+                .overlay(alignment: .leading) {
+                    // Telegram-style accent bar, stretched to the preview height.
+                    RoundedRectangle(cornerRadius: 1.5, style: .continuous)
+                        .fill(Color.chatSenderNameGradient)
+                        .frame(width: 3)
+                        .padding(.vertical, 5)
+                        .padding(.leading, 6)
+                }
+                .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                .onTapGesture {
+                    onReplyTap?()
+                }
             }
 
             if let imageAttachment, !isDeleted {
-                ChatImageThumbnailView(attachment: imageAttachment)
-                    .frame(width: imageDisplaySize(for: imageAttachment).width, height: imageDisplaySize(for: imageAttachment).height)
-                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 14, style: .continuous)
-                            .stroke(Color.glassBorderHighlight.opacity(0.22), lineWidth: 1)
-                    )
-                    .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-                    .onTapGesture {
-                        onImageTap?(imageAttachment)
-                    }
+                ChatImageBubbleView(
+                    attachment: imageAttachment,
+                    size: imageBubbleSize(for: imageAttachment),
+                    showsSendProgress: localSendState == .sending,
+                    isMine: isMine,
+                    onTap: { onImageTap?(imageAttachment) }
+                )
             }
 
             if shouldShowText {
@@ -188,24 +203,29 @@ struct ChatBubbleView: View {
         isDeleted || imageAttachment == nil || !text.isEmpty && text != ChatUIMapping.imageMessagePreviewText
     }
 
-    private func imageDisplaySize(for attachment: ChatMessageAttachment) -> CGSize {
-        let ratio = max(0.55, min(1.8, attachment.aspectRatio))
-        var width = UI.imageMaxWidth
-        var height = width / ratio
-
-        if height > UI.imageMaxHeight {
-            height = UI.imageMaxHeight
-            width = height * ratio
-        }
-
-        width = max(UI.imageMinWidth, min(UI.imageMaxWidth, width))
-        height = max(130, min(UI.imageMaxHeight, height))
-        return CGSize(width: width, height: height)
+    private func imageBubbleSize(for attachment: ChatMessageAttachment) -> CGSize {
+        #if canImport(UIKit)
+        let screenWidth = UIScreen.main.bounds.width
+        #else
+        let screenWidth: CGFloat = 390
+        #endif
+        // The photo lives inside the bubble's content paddings, next to the side inset and
+        // the message row's horizontal padding. Subtract all of that chrome so a landscape
+        // photo at max width still fits inside the bubble instead of poking past its edge.
+        let bubbleChrome = bottomLeadingInset + bottomTrailingInset + UI.sideInset + 24
+        let availableWidth = max(ChatImageBubbleLayout.minWidth, screenWidth - bubbleChrome)
+        return ChatImageBubbleLayout.displaySize(
+            for: attachment,
+            maxBubbleWidth: min(
+                ChatImageBubbleLayout.maxBubbleWidth(screenWidth: screenWidth),
+                availableWidth
+            )
+        )
     }
 
     private var bubbleBackground: some View {
         ChatBubbleShape(isMine: isMine)
-            .fill(isMine ? AnyShapeStyle(Color.chatBubbleMineGradient) : AnyShapeStyle(Color.chatBubbleOther))
+            .fill(isMine ? Color.chatBubbleMineGradient : Color.chatBubbleOtherGradient)
             .overlay(
                 ChatBubbleShape(isMine: isMine)
                     .stroke(
@@ -213,8 +233,8 @@ struct ChatBubbleView: View {
                         lineWidth: 1
                     )
             )
-            .shadow(color: Color.discoverCardShadow.opacity(0.08), radius: 3, x: 0, y: 1)
-            .shadow(color: Color.discoverCardShadow.opacity(0.12), radius: 10, x: 0, y: 6)
+            .shadow(color: Color.chatBubbleShadow.opacity(0.10), radius: 3, x: 0, y: 1)
+            .shadow(color: Color.chatBubbleShadow.opacity(0.14), radius: 10, x: 0, y: 6)
     }
 
     private var metadataCluster: some View {
@@ -234,7 +254,7 @@ struct ChatBubbleView: View {
 
             if let deliveryStatus {
                 MessageDeliveryReceiptView(status: deliveryStatus)
-            } else if localSendState == .sending {
+            } else if localSendState == .sending, imageAttachment == nil {
                 ProgressView()
                     .controlSize(.mini)
                     .tint(Color.secondaryText.opacity(0.75))
@@ -336,57 +356,4 @@ private struct MessageDeliveryReceiptView: View {
     }
     .padding()
     .background(Color.discoverBackgroundGradient)
-}
-
-
-private struct ChatImageThumbnailView: View {
-    let attachment: ChatMessageAttachment
-
-    var body: some View {
-        Group {
-            if let localFileURL = attachment.localFileURL,
-               let image = localImage(from: localFileURL) {
-                Image(uiImage: image)
-                    .resizable()
-                    .scaledToFill()
-            } else if let downloadURL = attachment.downloadURL {
-                AsyncImage(url: downloadURL) { phase in
-                    switch phase {
-                    case .success(let image):
-                        image
-                            .resizable()
-                            .scaledToFill()
-                    case .failure:
-                        placeholder(systemImage: "photo")
-                    case .empty:
-                        placeholder(systemImage: "photo")
-                    @unknown default:
-                        placeholder(systemImage: "photo")
-                    }
-                }
-            } else {
-                placeholder(systemImage: "photo")
-            }
-        }
-        .clipped()
-        .accessibilityLabel(Text("chats.message.photo"))
-    }
-
-    @ViewBuilder
-    private func placeholder(systemImage: String) -> some View {
-        ZStack {
-            Color.fieldBackground.opacity(0.96)
-            Image(systemName: systemImage)
-                .font(.system(size: 28, weight: .semibold))
-                .foregroundStyle(Color.secondaryText.opacity(0.72))
-        }
-    }
-
-    #if canImport(UIKit)
-    private func localImage(from url: URL) -> UIImage? {
-        UIImage(contentsOfFile: url.path)
-    }
-    #else
-    private func localImage(from url: URL) -> UIImage? { nil }
-    #endif
 }

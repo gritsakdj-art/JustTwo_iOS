@@ -60,11 +60,10 @@ struct ChatMessageAttachment: Identifiable, Equatable, Hashable {
     let downloadUrlExpiresAt: Date?
 
     var aspectRatio: CGFloat {
-        guard width > 0, height > 0 else { return 1 }
-        return CGFloat(width) / CGFloat(height)
+        ChatImageBubbleLayout.aspectRatio(width: width, height: height)
     }
 
-    static func local(
+    nonisolated static func local(
         clientMessageID: String,
         prepared: PreparedChatImage
     ) -> ChatMessageAttachment {
@@ -80,7 +79,7 @@ struct ChatMessageAttachment: Identifiable, Equatable, Hashable {
         )
     }
 
-    static func remote(_ dto: MessageAttachmentDTO) -> ChatMessageAttachment {
+    nonisolated static func remote(_ dto: MessageAttachmentDTO) -> ChatMessageAttachment {
         ChatMessageAttachment(
             id: dto.id.uuidString,
             contentType: dto.contentType,
@@ -159,6 +158,27 @@ struct ChatMessage: Identifiable, Equatable, Hashable {
     var canDelete: Bool { isMine && !isDeleted && localSendState == nil }
     var canReact: Bool { !isDeleted && localSendState == nil }
     var canRetrySend: Bool { isMine && localSendState == .failed }
+}
+
+enum ChatImageRenderSource: Equatable {
+    case localFile
+    case remote(attachmentID: String)
+}
+
+extension ChatMessage {
+    /// Describes whether an image bubble should render and which source it uses.
+    var imageRenderSource: ChatImageRenderSource? {
+        guard !isDeleted, imageAttachment != nil else { return nil }
+        guard let attachment = imageAttachment else { return nil }
+
+        if attachment.localFileURL != nil {
+            return .localFile
+        }
+        if attachment.downloadURL != nil {
+            return .remote(attachmentID: attachment.id)
+        }
+        return nil
+    }
 }
 
 extension ChatMessage {
@@ -387,6 +407,7 @@ enum ChatUIMapping {
         let replyPreview: ChatReplyPreview?
         if let reply = dto.replyTo {
             if reply.body == nil {
+                // Backend nils out the body only for deleted originals.
                 replyPreview = ChatReplyPreview(
                     id: reply.id,
                     body: String(localized: "chats.messageDeleted"),
@@ -395,7 +416,14 @@ enum ChatUIMapping {
             } else if let body = reply.body, !body.isEmpty {
                 replyPreview = ChatReplyPreview(id: reply.id, body: body, isDeleted: false)
             } else {
-                replyPreview = nil
+                // Empty (non-nil) body means the original is an image message without
+                // a caption — backend stores "" for those. Keep the quote alive so the
+                // reply bubble can show the photo thumbnail and placeholder text.
+                replyPreview = ChatReplyPreview(
+                    id: reply.id,
+                    body: imageMessagePreviewText,
+                    isDeleted: false
+                )
             }
         } else {
             replyPreview = nil

@@ -7,8 +7,21 @@ struct MessageRow: View {
     var onRetry: (() -> Void)?
     var onReactionTap: ((ChatMessageReaction) -> Void)?
     var onImageTap: ((ChatMessageAttachment) -> Void)?
+    var replyImageAttachment: ChatMessageAttachment?
+    var onReplyTap: (() -> Void)?
 
     @State private var bubbleFrame: CGRect = .zero
+
+    /// The reply DTO carries no attachment info, so a quoted photo message arrives with
+    /// a nil body and would read as "deleted". When the original resolves to an image,
+    /// show the photo placeholder text instead.
+    private var replyPreviewText: String? {
+        guard let preview = message.replyPreview else { return nil }
+        if replyImageAttachment != nil, preview.isDeleted {
+            return ChatUIMapping.imageMessagePreviewText
+        }
+        return preview.body
+    }
 
     var body: some View {
         HStack {
@@ -19,7 +32,9 @@ struct MessageRow: View {
                 senderName: senderName,
                 createdAt: message.createdAt,
                 isMine: message.isMine,
-                replyPreview: message.replyPreview?.body,
+                replyPreview: replyPreviewText,
+                replyImageAttachment: replyImageAttachment,
+                onReplyTap: onReplyTap,
                 imageAttachment: message.imageAttachment,
                 isEdited: message.isEdited,
                 isDeleted: message.isDeleted,

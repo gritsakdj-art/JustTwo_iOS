@@ -155,6 +155,14 @@ enum MessengerDiagnosticEvent: String, Sendable {
     case imageMessageCreateFailed
     case imageOutboxRetryRequested
     case imageTempFileCleaned
+
+    case imageBubbleRenderStarted
+    case imageBubbleRenderSucceeded
+    case imageBubbleRenderFailed
+    case imageBubbleUsedLocalFile
+    case imageBubbleUsedRemoteURL
+    case imageCacheHit
+    case imageCacheMiss
 }
 
 enum MessengerDiagnostics {

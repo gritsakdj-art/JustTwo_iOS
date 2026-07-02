@@ -352,9 +352,8 @@ final class ChatViewModel {
 
     private func currentReplyPreview() -> ChatReplyPreview? {
         guard let activeReplyTarget = replyTarget else { return nil }
-        if let preview = activeReplyTarget.replyPreview {
-            return preview
-        }
+        // Always quote the target itself. Reusing the target's own replyPreview here
+        // would point the quote at the target's original instead of the target.
         return ChatReplyPreview(
             id: activeReplyTarget.id,
             body: activeReplyTarget.rawBody ?? activeReplyTarget.displayText,

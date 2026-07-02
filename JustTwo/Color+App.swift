@@ -114,10 +114,21 @@ extension Color {
     private static let lightChatBubbleMine = Color(hex: "#E8DEFF")
     private static let darkChatBubbleMine = Color(hex: "#2F2447")
 
-    // A touch more saturated than the base bubble tone, used as the far stop of a subtle
-    // shimmer gradient so outgoing bubbles read as more alive without changing their shape.
-    private static let lightChatBubbleMineShimmer = Color(hex: "#D9C4FF")
-    private static let darkChatBubbleMineShimmer = Color(hex: "#3E2E63")
+    // Warm far stop of the outgoing bubble gradient: lavender melts into a rose blush,
+    // so my messages feel affectionate instead of office-lilac. Dark theme gets a wine tint.
+    private static let lightChatBubbleMineBlush = Color(hex: "#FBD5E4")
+    private static let darkChatBubbleMineBlush = Color(hex: "#46283F")
+
+    // Incoming bubbles: a whisper of warmth (ivory -> soft peach) instead of flat card white.
+    private static let lightChatBubbleOtherTop = Color(hex: "#FFFFFF")
+    private static let darkChatBubbleOtherTop = Color(hex: "#171123")
+
+    private static let lightChatBubbleOtherWarm = Color(hex: "#FFF2EA")
+    private static let darkChatBubbleOtherWarm = Color(hex: "#221527")
+
+    // Bubble shadows carry a violet-pink tint instead of neutral gray to keep the chat warm.
+    private static let lightChatBubbleShadow = Color(hex: "#B04A80")
+    private static let darkChatBubbleShadow = Color(hex: "#000000")
 
     // Избавились от синего из «Госуслуг», теперь здесь фирменный фиолетовый акцент JustTwo
     private static let lightChatReactionSelected = Color(hex: "#6344E3")
@@ -193,10 +204,33 @@ extension Color {
         LinearGradient(
             colors: [
                 chatBubbleMine,
-                dynamic(light: lightChatBubbleMineShimmer, dark: darkChatBubbleMineShimmer)
+                dynamic(light: lightChatBubbleMineBlush, dark: darkChatBubbleMineBlush)
             ],
             startPoint: .topLeading,
             endPoint: .bottomTrailing
+        )
+    }
+
+    static var chatBubbleOtherGradient: LinearGradient {
+        LinearGradient(
+            colors: [
+                dynamic(light: lightChatBubbleOtherTop, dark: darkChatBubbleOtherTop),
+                dynamic(light: lightChatBubbleOtherWarm, dark: darkChatBubbleOtherWarm)
+            ],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+    }
+
+    static var chatBubbleShadow: Color {
+        dynamic(light: lightChatBubbleShadow, dark: darkChatBubbleShadow)
+    }
+
+    static var chatSenderNameGradient: LinearGradient {
+        LinearGradient(
+            colors: [.discoverViolet, .discoverPinkLight],
+            startPoint: .leading,
+            endPoint: .trailing
         )
     }
 

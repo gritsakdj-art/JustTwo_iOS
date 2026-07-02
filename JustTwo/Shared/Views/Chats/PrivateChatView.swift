@@ -39,6 +39,8 @@ struct PrivateChatView: View {
     @State private var selectedPhotoItem: PhotosPickerItem?
     #endif
     @State private var photoViewerAttachment: ChatMessageAttachment?
+    @State private var highlightedReplyTargetID: String?
+    @State private var replyHighlightTask: Task<Void, Never>?
 
     init(
         conversation: ChatConversationPreview,
@@ -288,7 +290,7 @@ struct PrivateChatView: View {
                                     .id(Self.unreadSeparatorID)
                             }
 
-                            messageRow(for: message)
+                            messageRow(for: message, proxy: proxy)
                         }
 
                         Color.clear
@@ -412,6 +414,9 @@ struct PrivateChatView: View {
                 initialPositioningGeneration += 1
                 scrollTask?.cancel()
                 scrollTask = nil
+                replyHighlightTask?.cancel()
+                replyHighlightTask = nil
+                highlightedReplyTargetID = nil
             }
         }
     }
@@ -446,7 +451,7 @@ struct PrivateChatView: View {
     }
 
     @ViewBuilder
-    private func messageRow(for message: ChatMessage) -> some View {
+    private func messageRow(for message: ChatMessage, proxy: ScrollViewProxy) -> some View {
         let isLastMessage = message.listIdentity == viewModel.messages.last?.listIdentity
 
         let row = MessageRow(
@@ -470,6 +475,10 @@ struct PrivateChatView: View {
             },
             onImageTap: { attachment in
                 photoViewerAttachment = attachment
+            },
+            replyImageAttachment: replyImageAttachment(for: message),
+            onReplyTap: message.replyPreview.map { preview in
+                { revealRepliedMessage(preview, proxy: proxy) }
             }
         )
 
@@ -485,9 +494,43 @@ struct PrivateChatView: View {
             }
         }
         .id(message.listIdentity)
+        .background {
+            if highlightedReplyTargetID == message.listIdentity {
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .fill(Color.discoverViolet.opacity(0.14))
+                    .padding(.horizontal, -6)
+                    .transition(.opacity)
+            }
+        }
         .scaleEffect(viewModel.actionMenuMessage?.id == message.id ? 1.02 : 1)
         .zIndex(viewModel.actionMenuMessage?.id == message.id ? 2 : 0)
         .animation(.spring(response: 0.28, dampingFraction: 0.86), value: viewModel.actionMenuMessage?.id)
+    }
+
+    /// The reply DTO has no attachment metadata, so resolve the quoted message's photo
+    /// from the already-loaded message list. Returns nil when the original isn't loaded.
+    private func replyImageAttachment(for message: ChatMessage) -> ChatMessageAttachment? {
+        guard let preview = message.replyPreview else { return nil }
+        return viewModel.messages.first { $0.id == preview.id }?.imageAttachment
+    }
+
+    private func revealRepliedMessage(_ preview: ChatReplyPreview, proxy: ScrollViewProxy) {
+        guard let target = viewModel.messages.first(where: { $0.id == preview.id }) else { return }
+        let targetID = target.listIdentity
+
+        scrollTo(targetID, proxy: proxy, anchor: .center, animated: true)
+
+        replyHighlightTask?.cancel()
+        withAnimation(.easeInOut(duration: 0.3).delay(0.2)) {
+            highlightedReplyTargetID = targetID
+        }
+        replyHighlightTask = Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 2_000_000_000)
+            guard !Task.isCancelled else { return }
+            withAnimation(.easeOut(duration: 0.6)) {
+                highlightedReplyTargetID = nil
+            }
+        }
     }
 
     private var unreadSeparator: some View {
