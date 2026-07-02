@@ -40,6 +40,13 @@ final class AppStartupCoordinator {
 
         NetworkDebug.log("Startup critical warmup started user=\(userID)")
 
+        var baselineRevision: Int64?
+        do {
+            baselineRevision = try await MessengerDeltaSyncService.shared.prepareBaselineRevision()
+        } catch {
+            NetworkDebug.logError(error, prefix: "Startup sync baseline failed")
+        }
+
         let task = Task { @MainActor in
             await withTaskGroup(of: Void.self) { group in
                 group.addTask {
@@ -55,10 +62,22 @@ final class AppStartupCoordinator {
                 await group.waitForAll()
             }
 
+            if let baselineRevision {
+                MessengerDeltaSyncService.shared.finishBaseline(revision: baselineRevision)
+            }
+
             ConversationsStartupLoader.shared.activateRealtime(session: session, router: router)
 
             let conversations = ConversationListViewModel.shared.conversations
             await ConversationAvatarsStartupLoader.shared.preloadCritical(for: conversations)
+
+            Task {
+                await MessengerDeltaSyncService.shared.syncDeltas(
+                    reason: .bootstrap,
+                    session: session,
+                    router: router
+                )
+            }
 
             NetworkDebug.log("Startup critical warmup finished user=\(userID)")
         }
@@ -111,6 +130,7 @@ final class AppStartupCoordinator {
         MessagesStartupLoader.shared.reset()
         MessageCacheStore.shared.reset()
         MessengerOutbox.shared.clear()
+        MessengerDeltaSyncService.shared.reset()
         ConversationListViewModel.shared.reset()
     }
 }

@@ -117,6 +117,14 @@ final class SessionStore {
 
         realtimeClient.applicationDidBecomeActive()
         syncPushRegistrationIfEligible()
+
+        Task { @MainActor in
+            await MessengerDeltaSyncService.shared.syncDeltas(
+                reason: .appForeground,
+                session: self,
+                router: AppRouter.shared
+            )
+        }
     }
 
     func applicationDidEnterBackground() {

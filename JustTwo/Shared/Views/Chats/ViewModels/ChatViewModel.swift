@@ -202,6 +202,15 @@ final class ChatViewModel {
 
         await markDelivered(session: session, router: router)
         await markRead(session: session, router: router)
+
+        Task {
+            await MessengerDeltaSyncService.shared.syncDeltas(
+                reason: .chatOpened,
+                session: session,
+                router: router
+            )
+        }
+
         MessengerDiagnostics.event(
             .chatOpenCompleted,
             conversationID: conversation.id,

@@ -163,6 +163,41 @@ enum MessengerDiagnosticEvent: String, Sendable {
     case imageBubbleUsedRemoteURL
     case imageCacheHit
     case imageCacheMiss
+
+    case deltaSyncBootstrapStateStarted
+    case deltaSyncBootstrapStateSucceeded
+    case deltaSyncBootstrapStateFailed
+    case deltaSyncStarted
+    case deltaSyncPageFetched
+    case deltaSyncPageApplyStarted
+    case deltaSyncPageApplySucceeded
+    case deltaSyncPageApplyFailed
+    case deltaSyncCursorAdvanced
+    case deltaSyncSkippedAlreadyInFlight
+    case deltaSyncFailed
+    case deltaSyncFullRefreshFallback
+
+    case deltaEventReceived
+    case deltaEventApplied
+    case deltaEventSkippedDuplicateRevision
+    case deltaMessageMerged
+    case deltaConversationMerged
+    case deltaReceiptApplied
+    case deltaReactionApplied
+    case deltaDeleteApplied
+
+    case deltaImageMessageReceived
+    case deltaImageAttachmentDecoded
+    case deltaImageMessageMerged
+    case deltaImageMessageDeduped
+    case deltaImageDeletedClearedAttachments
+    case deltaImageDownloadURLPresent
+    case deltaImageDownloadURLMissing
+    case deltaImageBubbleSourceSelected
+    case deltaImageCacheHit
+    case deltaImageCacheMiss
+    case deltaImageRenderFailed
+    case deltaOptimisticImageReconciled
 }
 
 enum MessengerDiagnostics {
@@ -290,6 +325,15 @@ enum MessengerDiagnostics {
 
     nonisolated private static func isSensitiveMetadataKey(_ key: String) -> Bool {
         let lowercased = key.lowercased()
+        let allowedKeys: Set<String> = [
+            "downloadpresent",
+            "hasdownloadurl",
+            "hasuploadurl"
+        ]
+        if allowedKeys.contains(lowercased) {
+            return false
+        }
+
         let sensitiveFragments = [
             "authorization",
             "jwt",
@@ -302,7 +346,10 @@ enum MessengerDiagnostics {
             "text",
             "payload",
             "raw",
-            "url"
+            "url",
+            "storagekey",
+            "localpath",
+            "filepath"
         ]
 
         return sensitiveFragments.contains { lowercased.contains($0) }

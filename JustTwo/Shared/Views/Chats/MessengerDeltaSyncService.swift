@@ -1,0 +1,707 @@
+import Foundation
+
+@MainActor
+final class MessengerDeltaSyncService {
+
+    static let shared = MessengerDeltaSyncService()
+
+    private let syncState: MessengerSyncStateStore
+    private let messageCache: MessageCacheStore
+    private let conversationList: ConversationListViewModel
+    private let realtimeCoordinator: MessengerRealtimeCoordinator
+
+    private var isInFlight = false
+    private var lastSyncStartedAt: Date?
+    private var pendingBaselineRevision: Int64?
+    private var sessionGeneration = 0
+
+    private let minimumInterval: TimeInterval = 3
+
+    init(
+        syncState: MessengerSyncStateStore? = nil,
+        messageCache: MessageCacheStore? = nil,
+        conversationList: ConversationListViewModel? = nil,
+        realtimeCoordinator: MessengerRealtimeCoordinator? = nil
+    ) {
+        self.syncState = syncState ?? .shared
+        self.messageCache = messageCache ?? .shared
+        self.conversationList = conversationList ?? .shared
+        self.realtimeCoordinator = realtimeCoordinator ?? .shared
+    }
+
+    func prepareBaselineRevision() async throws -> Int64 {
+        MessengerDiagnostics.event(.deltaSyncBootstrapStateStarted)
+        do {
+            let state = try await MessengerSyncService.fetchSyncState()
+            pendingBaselineRevision = state.revision
+            MessengerDiagnostics.event(
+                .deltaSyncBootstrapStateSucceeded,
+                metadata: [
+                    "revision": "\(state.revision)",
+                    "source": "delta"
+                ]
+            )
+            return state.revision
+        } catch {
+            MessengerDiagnostics.event(
+                .deltaSyncBootstrapStateFailed,
+                metadata: [
+                    "errorCategory": MessengerDiagnostics.sanitizeError(error),
+                    "source": "delta"
+                ]
+            )
+            throw error
+        }
+    }
+
+    func finishBaseline(revision: Int64) {
+        let baseline = pendingBaselineRevision ?? revision
+        syncState.setRevision(baseline)
+        pendingBaselineRevision = nil
+        MessengerDiagnostics.event(
+            .deltaSyncCursorAdvanced,
+            metadata: [
+                "revision": "\(baseline)",
+                "reason": MessengerDeltaSyncReason.bootstrap.rawValue
+            ]
+        )
+    }
+
+    func syncDeltas(
+        reason: MessengerDeltaSyncReason,
+        session: SessionStore,
+        router: AppRouter
+    ) async {
+        guard !isInFlight else {
+            MessengerDiagnostics.event(
+                .deltaSyncSkippedAlreadyInFlight,
+                metadata: ["reason": reason.rawValue]
+            )
+            return
+        }
+
+        if shouldThrottle(reason: reason) {
+            return
+        }
+
+        guard let afterRevision = syncState.currentRevision else {
+            await fullRefreshAndBootstrap(reason: reason, session: session, router: router)
+            return
+        }
+
+        let generation = sessionGeneration
+        isInFlight = true
+        lastSyncStartedAt = Date()
+        defer {
+            if generation == sessionGeneration {
+                isInFlight = false
+            }
+        }
+
+        guard generation == sessionGeneration else { return }
+
+        MessengerDiagnostics.event(
+            .deltaSyncStarted,
+            metadata: [
+                "reason": reason.rawValue,
+                "afterRevision": "\(afterRevision)"
+            ]
+        )
+
+        do {
+            let profileID = try await MessengerSessionSupport.resolveCurrentProfileID(session: session)
+            var cursor = afterRevision
+
+            while true {
+                guard generation == sessionGeneration else { return }
+
+                let page = try await MessengerSyncService.fetchSyncEvents(afterRevision: cursor)
+                MessengerDiagnostics.event(
+                    .deltaSyncPageFetched,
+                    metadata: [
+                        "reason": reason.rawValue,
+                        "afterRevision": "\(cursor)",
+                        "eventCount": "\(page.events.count)",
+                        "nextRevision": "\(page.nextRevision)",
+                        "hasMore": page.hasMore ? "true" : "false"
+                    ]
+                )
+
+                try await apply(
+                    events: page.events,
+                    profileID: profileID,
+                    session: session,
+                    router: router,
+                    sessionGeneration: generation
+                )
+
+                guard generation == sessionGeneration else { return }
+
+                cursor = page.nextRevision
+                syncState.advance(to: cursor)
+                MessengerDiagnostics.event(
+                    .deltaSyncCursorAdvanced,
+                    metadata: [
+                        "revision": "\(cursor)",
+                        "reason": reason.rawValue
+                    ]
+                )
+
+                if !page.hasMore {
+                    break
+                }
+            }
+        } catch {
+            MessengerDiagnostics.event(
+                .deltaSyncFailed,
+                metadata: [
+                    "reason": reason.rawValue,
+                    "errorCategory": MessengerDiagnostics.sanitizeError(error)
+                ]
+            )
+
+            if reason != .fullRefreshFallback {
+                await fullRefreshAndBootstrap(reason: .fullRefreshFallback, session: session, router: router)
+            }
+        }
+    }
+
+    func reset() {
+        sessionGeneration += 1
+        isInFlight = false
+        lastSyncStartedAt = nil
+        pendingBaselineRevision = nil
+        syncState.reset()
+    }
+
+    internal var sessionGenerationForTests: Int {
+        sessionGeneration
+    }
+
+    internal var pendingBaselineRevisionForTests: Int64? {
+        pendingBaselineRevision
+    }
+
+    internal func setPendingBaselineRevisionForTesting(_ revision: Int64) {
+        pendingBaselineRevision = revision
+    }
+
+    internal func applyEventsForTesting(
+        _ events: [MessengerSyncEventDTO],
+        profileID: UUID,
+        session: SessionStore,
+        router: AppRouter,
+        sessionGeneration: Int? = nil
+    ) async throws {
+        try await apply(
+            events: events,
+            profileID: profileID,
+            session: session,
+            router: router,
+            sessionGeneration: sessionGeneration ?? self.sessionGeneration
+        )
+    }
+
+    internal func markSyncStartedForTesting() {
+        lastSyncStartedAt = Date()
+    }
+
+    internal func wouldThrottleForTests(reason: MessengerDeltaSyncReason) -> Bool {
+        shouldThrottle(reason: reason)
+    }
+
+    private func shouldThrottle(reason: MessengerDeltaSyncReason) -> Bool {
+        switch reason {
+        case .realtimeReconnect, .bootstrap, .fullRefreshFallback:
+            return false
+        case .appForeground, .chatOpened:
+            guard let lastSyncStartedAt else { return false }
+            return Date().timeIntervalSince(lastSyncStartedAt) < minimumInterval
+        }
+    }
+
+    private func fullRefreshAndBootstrap(
+        reason: MessengerDeltaSyncReason,
+        session: SessionStore,
+        router: AppRouter
+    ) async {
+        MessengerDiagnostics.event(
+            .deltaSyncFullRefreshFallback,
+            metadata: ["reason": reason.rawValue]
+        )
+
+        var baselineRevision: Int64?
+        do {
+            baselineRevision = try await prepareBaselineRevision()
+        } catch {
+            MessengerDiagnostics.event(
+                .deltaSyncBootstrapStateFailed,
+                metadata: [
+                    "reason": reason.rawValue,
+                    "errorCategory": MessengerDiagnostics.sanitizeError(error),
+                    "phase": "fullRefreshFallbackBeforeRefresh"
+                ]
+            )
+        }
+
+        await conversationList.refreshFromRealtime(session: session, router: router)
+        if let activeChat = activeChatViewModel() {
+            await activeChat.refreshFromRealtime(session: session, router: router)
+        }
+
+        if let baselineRevision {
+            finishBaseline(revision: baselineRevision)
+            await syncDeltas(reason: .fullRefreshFallback, session: session, router: router)
+        }
+    }
+
+    private func apply(
+        events: [MessengerSyncEventDTO],
+        profileID: UUID,
+        session: SessionStore,
+        router: AppRouter,
+        sessionGeneration: Int
+    ) async throws {
+        guard !events.isEmpty else { return }
+        guard sessionGeneration == self.sessionGeneration else { return }
+
+        MessengerDiagnostics.event(
+            .deltaSyncPageApplyStarted,
+            metadata: ["eventCount": "\(events.count)"]
+        )
+
+        let sorted = events.sorted { $0.revision < $1.revision }
+        let activeConversationID = activeChatViewModel()?.conversation.id
+
+        for event in sorted {
+            guard sessionGeneration == self.sessionGeneration else {
+                MessengerDiagnostics.event(
+                    .deltaSyncFailed,
+                    metadata: ["reason": "sessionResetDuringApply"]
+                )
+                return
+            }
+
+            if syncState.hasAppliedRevision(event.revision) {
+                MessengerDiagnostics.event(
+                    .deltaEventSkippedDuplicateRevision,
+                    conversationID: event.conversationID,
+                    messageID: event.messageID,
+                    metadata: [
+                        "revision": "\(event.revision)",
+                        "type": event.type.rawValue
+                    ]
+                )
+                continue
+            }
+
+            MessengerDiagnostics.event(
+                .deltaEventReceived,
+                conversationID: event.conversationID,
+                messageID: event.messageID,
+                clientMessageID: event.message?.clientMessageID,
+                metadata: [
+                    "revision": "\(event.revision)",
+                    "type": event.type.rawValue,
+                    "source": "delta"
+                ]
+            )
+
+            applyEvent(
+                event,
+                profileID: profileID,
+                activeConversationID: activeConversationID,
+                session: session,
+                router: router
+            )
+            syncState.markRevisionApplied(event.revision)
+
+            MessengerDiagnostics.event(
+                .deltaEventApplied,
+                conversationID: event.conversationID,
+                messageID: event.messageID,
+                clientMessageID: event.message?.clientMessageID,
+                metadata: [
+                    "revision": "\(event.revision)",
+                    "type": event.type.rawValue
+                ]
+            )
+        }
+
+        guard sessionGeneration == self.sessionGeneration else { return }
+
+        MessengerDiagnostics.event(
+            .deltaSyncPageApplySucceeded,
+            metadata: ["eventCount": "\(sorted.count)"]
+        )
+
+        for conversationID in Set(sorted.map(\.conversationID)) {
+            guard sessionGeneration == self.sessionGeneration else { return }
+            MessengerConversationNotification.postMessagesDidChange(conversationID: conversationID)
+        }
+    }
+
+    private func applyEvent(
+        _ event: MessengerSyncEventDTO,
+        profileID: UUID,
+        activeConversationID: UUID?,
+        session: SessionStore,
+        router: AppRouter
+    ) {
+        switch event.type {
+        case .messageCreated, .messageEdited:
+            guard let message = event.message else { return }
+            logImageDeltaIfNeeded(event: event, message: message, phase: "received")
+            applyMessageSnapshot(
+                message,
+                conversationID: event.conversationID,
+                profileID: profileID,
+                activeConversationID: activeConversationID,
+                session: session,
+                router: router,
+                eventType: event.type
+            )
+            if let conversation = event.conversation {
+                _ = conversationList.applyDeltaConversation(
+                    conversation,
+                    currentProfileID: profileID,
+                    activeConversationID: activeConversationID
+                )
+                MessengerDiagnostics.event(
+                    .deltaConversationMerged,
+                    conversationID: conversation.id,
+                    metadata: ["type": event.type.rawValue]
+                )
+            }
+
+        case .messageDeleted:
+            if let message = event.message {
+                logImageDeltaIfNeeded(event: event, message: message, phase: "deleted")
+                applyMessageSnapshot(
+                    message,
+                    conversationID: event.conversationID,
+                    profileID: profileID,
+                    activeConversationID: activeConversationID,
+                    session: session,
+                    router: router,
+                    eventType: event.type
+                )
+            } else if let messageID = event.messageID {
+                applyDeletedMessage(
+                    messageID: messageID,
+                    conversationID: event.conversationID,
+                    deletedAt: event.occurredAt,
+                    activeConversationID: activeConversationID
+                )
+            }
+            if let conversation = event.conversation {
+                _ = conversationList.applyDeltaConversation(
+                    conversation,
+                    currentProfileID: profileID,
+                    activeConversationID: activeConversationID
+                )
+            }
+
+        case .reactionAdded, .reactionRemoved:
+            guard let message = event.message else { return }
+            applyMessageSnapshot(
+                message,
+                conversationID: event.conversationID,
+                profileID: profileID,
+                activeConversationID: activeConversationID,
+                session: session,
+                router: router,
+                eventType: event.type
+            )
+            MessengerDiagnostics.event(
+                .deltaReactionApplied,
+                conversationID: event.conversationID,
+                messageID: message.id,
+                metadata: ["type": event.type.rawValue]
+            )
+
+        case .conversationRead:
+            applyReceiptEvent(
+                event,
+                status: .read,
+                profileID: profileID,
+                activeConversationID: activeConversationID
+            )
+            if let conversation = event.conversation {
+                _ = conversationList.applyDeltaConversation(
+                    conversation,
+                    currentProfileID: profileID,
+                    activeConversationID: activeConversationID
+                )
+            }
+
+        case .conversationDelivered:
+            applyReceiptEvent(
+                event,
+                status: .delivered,
+                profileID: profileID,
+                activeConversationID: activeConversationID
+            )
+            if let conversation = event.conversation {
+                _ = conversationList.applyDeltaConversation(
+                    conversation,
+                    currentProfileID: profileID,
+                    activeConversationID: activeConversationID
+                )
+            }
+
+        case .conversationUpdated:
+            if let conversation = event.conversation {
+                _ = conversationList.applyDeltaConversation(
+                    conversation,
+                    currentProfileID: profileID,
+                    activeConversationID: activeConversationID
+                )
+                MessengerDiagnostics.event(
+                    .deltaConversationMerged,
+                    conversationID: conversation.id,
+                    metadata: ["type": event.type.rawValue]
+                )
+            }
+        }
+    }
+
+    private func applyMessageSnapshot(
+        _ message: MessageDTO,
+        conversationID: UUID,
+        profileID: UUID,
+        activeConversationID: UUID?,
+        session: SessionStore,
+        router: AppRouter,
+        eventType: MessengerSyncEventType
+    ) {
+        if activeConversationID == conversationID,
+           let chat = activeChatViewModel() {
+            let inserted = chat.applyRealtimeMessage(message, currentProfileID: profileID)
+            if eventType == .messageCreated, message.senderProfileID == profileID {
+                _ = conversationList.applyOutgoingConfirmed(
+                    conversationID: conversationID,
+                    message: message,
+                    currentProfileID: profileID
+                )
+            } else {
+                _ = conversationList.applyRealtimeMessage(
+                    message,
+                    currentProfileID: profileID,
+                    activeConversationID: activeConversationID,
+                    router: router
+                )
+            }
+            if message.clientMessageID != nil, message.senderProfileID == profileID {
+                MessengerDiagnostics.event(
+                    .deltaOptimisticImageReconciled,
+                    conversationID: conversationID,
+                    messageID: message.id,
+                    clientMessageID: message.clientMessageID,
+                    metadata: [
+                        "reconciled": inserted ? "true" : "false",
+                        "kind": message.kind.rawValue
+                    ]
+                )
+            }
+            logImageDeltaIfNeeded(eventType: eventType, message: message, phase: "merged")
+            MessengerDiagnostics.event(
+                .deltaMessageMerged,
+                conversationID: conversationID,
+                messageID: message.id,
+                clientMessageID: message.clientMessageID,
+                metadata: [
+                    "type": eventType.rawValue,
+                    "kind": message.kind.rawValue,
+                    "target": "activeChat"
+                ]
+            )
+            return
+        }
+
+        let applied = messageCache.applyRealtimeMessage(
+            message,
+            conversationID: conversationID,
+            currentProfileID: profileID
+        )
+        _ = conversationList.applyRealtimeMessage(
+            message,
+            currentProfileID: profileID,
+            activeConversationID: activeConversationID,
+            router: router
+        )
+        if message.clientMessageID != nil, message.senderProfileID == profileID {
+            MessengerDiagnostics.event(
+                .deltaOptimisticImageReconciled,
+                conversationID: conversationID,
+                messageID: message.id,
+                clientMessageID: message.clientMessageID,
+                metadata: [
+                    "reconciled": applied ? "true" : "false",
+                    "kind": message.kind.rawValue
+                ]
+            )
+        }
+        logImageDeltaIfNeeded(eventType: eventType, message: message, phase: applied ? "merged" : "deduped")
+        MessengerDiagnostics.event(
+            applied ? .deltaMessageMerged : .deltaEventSkippedDuplicateRevision,
+            conversationID: conversationID,
+            messageID: message.id,
+            clientMessageID: message.clientMessageID,
+            metadata: [
+                "type": eventType.rawValue,
+                "kind": message.kind.rawValue,
+                "target": "cache"
+            ]
+        )
+    }
+
+    private func applyDeletedMessage(
+        messageID: UUID,
+        conversationID: UUID,
+        deletedAt: Date?,
+        activeConversationID: UUID?
+    ) {
+        let payload = MessageDeletedPayload(
+            messageID: messageID,
+            deletedAt: deletedAt,
+            isDeleted: true
+        )
+
+        if activeConversationID == conversationID,
+           let chat = activeChatViewModel() {
+            _ = chat.applyRealtimeDeletedMessage(payload)
+        } else {
+            _ = messageCache.markMessageDeleted(
+                conversationID: conversationID,
+                messageID: messageID,
+                deletedAt: deletedAt
+            )
+        }
+
+        MessengerDiagnostics.event(
+            .deltaDeleteApplied,
+            conversationID: conversationID,
+            messageID: messageID,
+            metadata: ["source": "delta"]
+        )
+        MessengerDiagnostics.event(
+            .deltaImageDeletedClearedAttachments,
+            conversationID: conversationID,
+            messageID: messageID,
+            metadata: ["source": "delta"]
+        )
+    }
+
+    private func applyReceiptEvent(
+        _ event: MessengerSyncEventDTO,
+        status: MessageDeliveryStatus,
+        profileID: UUID,
+        activeConversationID: UUID?
+    ) {
+        guard let receipt = event.receipt else { return }
+        guard receipt.profileID != profileID else {
+            _ = conversationList.applyRealtimeConversationRead(
+                conversationID: event.conversationID,
+                profileID: receipt.profileID,
+                currentProfileID: profileID
+            )
+            return
+        }
+
+        let cutoffDate = status == .read ? receipt.readAt : receipt.deliveredAt
+        let messageID = receipt.messageID ?? event.messageID
+
+        if activeConversationID == event.conversationID,
+           let chat = activeChatViewModel() {
+            _ = chat.applyDeliveryStatus(status, messageID: messageID, cutoffDate: cutoffDate)
+        } else {
+            _ = messageCache.applyDeliveryStatus(
+                conversationID: event.conversationID,
+                status: status,
+                messageID: messageID,
+                cutoffDate: cutoffDate
+            )
+        }
+
+        MessengerDiagnostics.event(
+            .deltaReceiptApplied,
+            conversationID: event.conversationID,
+            messageID: messageID,
+            metadata: [
+                "type": event.type.rawValue,
+                "status": status.rawValue
+            ]
+        )
+    }
+
+    private func logImageDeltaIfNeeded(
+        event: MessengerSyncEventDTO? = nil,
+        eventType: MessengerSyncEventType? = nil,
+        message: MessageDTO,
+        phase: String
+    ) {
+        guard message.kind == .image else { return }
+
+        let type = eventType ?? event?.type
+        MessengerDiagnostics.event(
+            .deltaImageMessageReceived,
+            conversationID: message.conversationID,
+            messageID: message.id,
+            clientMessageID: message.clientMessageID,
+            metadata: [
+                "phase": phase,
+                "type": type?.rawValue ?? "unknown"
+            ]
+        )
+
+        if message.deletedAt != nil || message.attachments.isEmpty {
+            MessengerDiagnostics.event(
+                .deltaImageDeletedClearedAttachments,
+                conversationID: message.conversationID,
+                messageID: message.id,
+                metadata: ["phase": phase]
+            )
+            return
+        }
+
+        guard let attachment = message.attachments.first else {
+            MessengerDiagnostics.event(
+                .deltaImageDownloadURLMissing,
+                conversationID: message.conversationID,
+                messageID: message.id,
+                metadata: ["phase": phase]
+            )
+            return
+        }
+
+        MessengerDiagnostics.event(
+            .deltaImageAttachmentDecoded,
+            conversationID: message.conversationID,
+            messageID: message.id,
+            metadata: [
+                "phase": phase,
+                "attachmentID": attachment.id.uuidString,
+                "contentType": attachment.contentType,
+                "byteSize": "\(attachment.byteSize)",
+                "width": "\(attachment.width)",
+                "height": "\(attachment.height)"
+            ]
+        )
+
+        MessengerDiagnostics.event(
+            attachment.downloadUrl == nil ? .deltaImageDownloadURLMissing : .deltaImageDownloadURLPresent,
+            conversationID: message.conversationID,
+            messageID: message.id,
+            metadata: [
+                "phase": phase,
+                "attachmentID": attachment.id.uuidString,
+                "downloadPresent": attachment.downloadUrl == nil ? "false" : "true"
+            ]
+        )
+    }
+
+    private func activeChatViewModel() -> ChatViewModel? {
+        realtimeCoordinator.activeChatForDeltaSync
+    }
+}

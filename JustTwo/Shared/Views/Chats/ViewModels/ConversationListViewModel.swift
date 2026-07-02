@@ -267,6 +267,34 @@ final class ConversationListViewModel {
         return true
     }
 
+    @discardableResult
+    func applyDeltaConversation(
+        _ dto: ConversationDTO,
+        currentProfileID: UUID,
+        activeConversationID: UUID?
+    ) -> Bool {
+        let incoming = ChatUIMapping.conversationPreview(from: dto, currentProfileID: currentProfileID)
+        let merged: ChatConversationPreview
+        if activeConversationID == dto.id {
+            merged = incoming.replacingActivity(unreadCount: 0)
+        } else if let index = conversations.firstIndex(where: { $0.id == dto.id }) {
+            let existing = conversations[index]
+            let unreadCount = max(existing.unreadCount, incoming.unreadCount)
+            merged = incoming.replacingActivity(unreadCount: unreadCount)
+        } else {
+            merged = incoming
+        }
+
+        if let index = conversations.firstIndex(where: { $0.id == dto.id }) {
+            conversations[index] = merged
+        } else {
+            conversations.insert(merged, at: 0)
+        }
+        sortConversations()
+        syncMessengerBadge()
+        return true
+    }
+
     private func sortConversations() {
         conversations.sort {
             ($0.lastMessageAt ?? .distantPast) > ($1.lastMessageAt ?? .distantPast)

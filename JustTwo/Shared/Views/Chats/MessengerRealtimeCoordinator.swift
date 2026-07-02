@@ -80,6 +80,10 @@ final class MessengerRealtimeCoordinator {
         _ = conversationListViewModel?.markConversationReadLocally(conversationID: conversationID)
     }
 
+    var activeChatForDeltaSync: ChatViewModel? {
+        activeChatViewModel
+    }
+
     func deactivateChat(_ viewModel: ChatViewModel) {
         guard activeChatViewModel === viewModel else { return }
 
@@ -524,8 +528,17 @@ final class MessengerRealtimeCoordinator {
         resetTrackedSubscriptions()
         presenceStore.clearAll()
 
-        await refreshConversations()
-        await refreshActiveChat()
+        if let session, let router {
+            await MessengerDeltaSyncService.shared.syncDeltas(
+                reason: .realtimeReconnect,
+                session: session,
+                router: router
+            )
+        } else {
+            await refreshConversations()
+            await refreshActiveChat()
+        }
+
         activeChatViewModel?.clearTypingState()
         await subscribeActiveConversationIfNeeded(force: true)
 
