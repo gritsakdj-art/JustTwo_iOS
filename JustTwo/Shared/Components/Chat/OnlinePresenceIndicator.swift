@@ -15,6 +15,8 @@ struct OnlinePresenceIndicator: View {
     var size: CGFloat = 12
     var borderWidth: CGFloat = 2
 
+    @State private var isPulsing = false
+
     var body: some View {
         Circle()
             .fill(Color.discoverOnline)
@@ -23,6 +25,14 @@ struct OnlinePresenceIndicator: View {
                 Circle()
                     .strokeBorder(Color.surface, lineWidth: borderWidth)
             )
+            .scaleEffect(isPulsing ? 1.15 : 1.0)
+            .opacity(isPulsing ? 0.7 : 1.0)
+            .animation(
+                .easeInOut(duration: 1.2).repeatForever(autoreverses: true),
+                value: isPulsing
+            )
+            .onAppear { isPulsing = true }
+            .onDisappear { isPulsing = false }
     }
 }
 

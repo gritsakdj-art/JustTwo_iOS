@@ -1570,6 +1570,23 @@
         }
       }
     },
+    "chats.delete" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Delete"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Удалить"
+          }
+        }
+      }
+    },
     "chats.empty.cta" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -2034,6 +2051,23 @@
         }
       }
     },
+    "chats.mute" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mute"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Без звука"
+          }
+        }
+      }
+    },
     "chats.noMessagesYet" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -2174,6 +2208,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Непрочитанные сообщения"
+          }
+        }
+      }
+    },
+    "chats.yesterday" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Yesterday"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Вчера"
           }
         }
       }

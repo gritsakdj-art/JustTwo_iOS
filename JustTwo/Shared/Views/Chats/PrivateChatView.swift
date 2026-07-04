@@ -503,7 +503,7 @@ struct PrivateChatView: View {
             }
         }
         .scaleEffect(viewModel.actionMenuMessage?.id == message.id ? 1.02 : 1)
-        .zIndex(viewModel.actionMenuMessage?.id == message.id ? 2 : 0)
+        .zIndex(viewModel.actionMenuMessage?.id == message.id ? 10 : 0)
         .animation(.spring(response: 0.28, dampingFraction: 0.86), value: viewModel.actionMenuMessage?.id)
     }
 

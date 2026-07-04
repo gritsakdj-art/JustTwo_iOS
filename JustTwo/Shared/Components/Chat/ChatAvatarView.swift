@@ -67,11 +67,38 @@ struct ChatAvatarView: View {
 
     private var initialsPlaceholder: some View {
         Circle()
-            .fill(Color.discoverVioletLight.opacity(0.28))
+            .fill(initialsGradient)
             .overlay(
                 Text(title.prefix(1).uppercased())
                     .font(Font.App.manrope(size: size * 0.36, weight: .bold))
-                    .foregroundStyle(Color.discoverViolet)
+                    .foregroundStyle(Color.onAccentText.opacity(0.92))
             )
+    }
+
+    private var initialsGradient: LinearGradient {
+        let palette = initialsGradientPalette
+        let index = stableTitleHash % palette.count
+        let colors = palette[index]
+        return LinearGradient(
+            colors: [colors.0, colors.1],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+    }
+
+    private var stableTitleHash: Int {
+        let value = title.unicodeScalars.reduce(0) { partial, scalar in
+            ((partial &* 31) &+ Int(scalar.value)) & 0x7fffffff
+        }
+        return max(0, value)
+    }
+
+    private var initialsGradientPalette: [(Color, Color)] {
+        [
+            (Color.discoverVioletLight, Color.discoverViolet),
+            (Color.brandPrimary.opacity(0.92), Color.discoverVioletLight),
+            (Color.discoverOnline.opacity(0.85), Color.brandPrimary.opacity(0.9)),
+            (Color.discoverViolet.opacity(0.88), Color.brandPrimaryGlow.opacity(0.92))
+        ]
     }
 }

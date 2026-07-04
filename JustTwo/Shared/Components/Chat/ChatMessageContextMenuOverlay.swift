@@ -1,4 +1,7 @@
 import SwiftUI
+#if canImport(UIKit)
+import UIKit
+#endif
 
 struct ChatMessageContextMenuOverlay: View {
     let message: ChatMessage
@@ -13,48 +16,50 @@ struct ChatMessageContextMenuOverlay: View {
     @Environment(\.colorScheme) private var colorScheme
     @State private var areReactionsExpanded = false
 
-    private let reactionColumns = Array(repeating: GridItem(.flexible(), spacing: 6), count: 6)
-    private let panelWidth: CGFloat = 312
-    private let panelGap: CGFloat = 10
+    private var reactionColumns: [GridItem] {
+        Array(repeating: GridItem(.flexible(), spacing: Metrics.reactionsGridSpacing), count: 6)
+    }
 
     var body: some View {
         GeometryReader { geometry in
             let localAnchor = anchorInLocalSpace(anchor, container: geometry)
-            let safeTop = geometry.safeAreaInsets.top + 8
-            let safeBottom = geometry.safeAreaInsets.bottom + 8
+            let contentTop = effectiveContentTop(in: geometry)
+            let contentBottom = effectiveContentBottom(in: geometry)
             let panelLeadingX = panelLeadingX(in: geometry, localAnchor: localAnchor)
             let placement = menuPlacement(
                 anchor: localAnchor,
-                safeTop: safeTop,
-                safeBottom: safeBottom,
+                contentTop: contentTop,
+                contentBottom: contentBottom,
                 containerHeight: geometry.size.height
             )
             let positions = panelPositions(
                 placement: placement,
                 anchor: localAnchor,
-                safeTop: safeTop,
-                safeBottom: safeBottom,
+                contentTop: contentTop,
+                contentBottom: contentBottom,
                 containerHeight: geometry.size.height
             )
+            let cutout = messageCutoutRect(for: localAnchor)
 
             ZStack(alignment: .topLeading) {
-                Color.black.opacity(colorScheme == .dark ? 0.44 : 0.28)
-                    .ignoresSafeArea()
+                dimmingBackground(cutout: cutout)
                     .onTapGesture(perform: onDismiss)
+
+                messageCutoutGlow(cutout: cutout)
 
                 if message.canReact, let reactionsY = positions.reactionsCenterY {
                     reactionsPanel
-                        .frame(width: panelWidth)
+                        .frame(width: Metrics.panelWidth)
                         .position(
-                            x: panelLeadingX + panelWidth / 2,
+                            x: panelLeadingX + Metrics.panelWidth / 2,
                             y: reactionsY
                         )
                 }
 
                 actionsPanel
-                    .frame(width: panelWidth)
+                    .frame(width: Metrics.panelWidth)
                     .position(
-                        x: panelLeadingX + panelWidth / 2,
+                        x: panelLeadingX + Metrics.panelWidth / 2,
                         y: positions.actionsCenterY
                     )
             }
@@ -66,66 +71,129 @@ struct ChatMessageContextMenuOverlay: View {
         .transition(.opacity)
     }
 
+    // MARK: - Background
+
+    private func dimmingBackground(cutout: CGRect) -> some View {
+        ZStack {
+            Rectangle()
+                .fill(.ultraThinMaterial)
+            Rectangle()
+                .fill(colorScheme == .dark
+                    ? Color.black.opacity(Metrics.dimmingTintDark)
+                    : Color.white.opacity(Metrics.dimmingTintLight))
+        }
+        .mask {
+            Rectangle()
+                .fill(Color.white)
+                .overlay {
+                    RoundedRectangle(cornerRadius: Metrics.messageCutoutCornerRadius, style: .continuous)
+                        .frame(width: cutout.width, height: cutout.height)
+                        .position(x: cutout.midX, y: cutout.midY)
+                        .blendMode(.destinationOut)
+                }
+                .compositingGroup()
+        }
+        .ignoresSafeArea()
+    }
+
+    private func messageCutoutGlow(cutout: CGRect) -> some View {
+        RoundedRectangle(cornerRadius: Metrics.messageCutoutCornerRadius, style: .continuous)
+            .strokeBorder(
+                Color.white.opacity(colorScheme == .dark
+                    ? Metrics.messageCutoutStrokeOpacityDark
+                    : Metrics.messageCutoutStrokeOpacityLight),
+                lineWidth: Metrics.messageCutoutStrokeWidth
+            )
+            .shadow(
+                color: Color.black.opacity(colorScheme == .dark
+                    ? Metrics.messageCutoutShadowOpacityDark
+                    : Metrics.messageCutoutShadowOpacityLight),
+                radius: Metrics.messageCutoutShadowRadius,
+                y: Metrics.messageCutoutShadowYOffset
+            )
+            .frame(width: cutout.width, height: cutout.height)
+            .position(x: cutout.midX, y: cutout.midY)
+            .allowsHitTesting(false)
+    }
+
+    private func messageCutoutRect(for anchor: CGRect) -> CGRect {
+        anchor.insetBy(
+            dx: -Metrics.messageCutoutPadding,
+            dy: -Metrics.messageCutoutPadding
+        )
+    }
+
+    // MARK: - Panels
+
     private var reactionsPanel: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: Metrics.reactionsVStackSpacing) {
             if areReactionsExpanded {
                 ForEach(Array(ChatQuickReactions.rows.enumerated()), id: \.offset) { _, row in
-                    LazyVGrid(columns: reactionColumns, spacing: 6) {
+                    LazyVGrid(columns: reactionColumns, spacing: Metrics.reactionsGridSpacing) {
                         ForEach(row, id: \.self) { emoji in
                             reactionButton(emoji)
                         }
                     }
+                    .transition(.opacity.combined(with: .scale(scale: 0.92)))
                 }
 
                 HStack {
                     Spacer(minLength: 0)
                     expandReactionsButton
-                        .frame(width: 46)
+                        .frame(width: Metrics.expandButtonWidth)
                     Spacer(minLength: 0)
                 }
+                .transition(.opacity)
             } else {
-                LazyVGrid(columns: reactionColumns, spacing: 6) {
+                LazyVGrid(columns: reactionColumns, spacing: Metrics.reactionsGridSpacing) {
                     ForEach(ChatQuickReactions.compactPreview, id: \.self) { emoji in
                         reactionButton(emoji)
                     }
                     expandReactionsButton
                 }
+                .transition(.opacity)
             }
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 12)
+        .padding(.horizontal, Metrics.reactionsPaddingHorizontal)
+        .padding(.vertical, Metrics.reactionsPaddingVertical)
         .background(panelBackground)
-        .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: Metrics.reactionsCornerRadius, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .strokeBorder(Color.glassBorderHighlight.opacity(0.28), lineWidth: 1)
+            RoundedRectangle(cornerRadius: Metrics.reactionsCornerRadius, style: .continuous)
+                .strokeBorder(Color.glassBorderHighlight.opacity(Metrics.panelBorderOpacity), lineWidth: 1)
         }
-        .shadow(color: Color.discoverCardShadow.opacity(0.18), radius: 18, x: 0, y: 8)
-        .animation(.spring(response: 0.34, dampingFraction: 0.82), value: areReactionsExpanded)
+        .shadow(
+            color: Color.discoverCardShadow.opacity(Metrics.shadowOpacity),
+            radius: Metrics.shadowRadius,
+            x: 0,
+            y: Metrics.shadowYOffset
+        )
+        .animation(Metrics.expansionAnimation, value: areReactionsExpanded)
     }
 
     private var expandReactionsButton: some View {
         Button {
-            #if canImport(UIKit)
-            HapticFeedback.impact(.light)
-            #endif
+            triggerHaptic()
             areReactionsExpanded.toggle()
         } label: {
             Image(systemName: areReactionsExpanded ? "chevron.up" : "chevron.down")
-                .font(.system(size: 14, weight: .semibold))
+                .font(.system(size: Metrics.expandButtonIconSize, weight: .semibold))
                 .foregroundStyle(Color.discoverViolet)
                 .frame(maxWidth: .infinity)
-                .frame(height: 40)
+                .frame(height: Metrics.reactionButtonSize)
                 .background(
                     Circle()
-                        .fill(Color.cardSurface.opacity(colorScheme == .dark ? 0.55 : 0.72))
+                        .fill(Color.cardSurface.opacity(Metrics.reactionIconFillOpacity))
                 )
                 .overlay {
                     Circle()
-                        .strokeBorder(Color.glassBorderHighlight.opacity(0.22), lineWidth: 1)
+                        .strokeBorder(
+                            Color.glassBorderHighlight.opacity(Metrics.reactionBorderOpacity),
+                            lineWidth: 1
+                        )
                 }
         }
-        .buttonStyle(.spring(pressedScale: 0.9))
+        .buttonStyle(.spring(pressedScale: Metrics.pressedScale))
         .accessibilityLabel(String(localized: "chats.action.react_more"))
     }
 
@@ -156,9 +224,14 @@ struct ChatMessageContextMenuOverlay: View {
         .clipShape(RoundedRectangle(cornerRadius: AppCornerRadius.card, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: AppCornerRadius.card, style: .continuous)
-                .strokeBorder(Color.glassBorderHighlight.opacity(0.28), lineWidth: 1)
+                .strokeBorder(Color.glassBorderHighlight.opacity(Metrics.panelBorderOpacity), lineWidth: 1)
         }
-        .shadow(color: Color.discoverCardShadow.opacity(0.18), radius: 18, x: 0, y: 8)
+        .shadow(
+            color: Color.discoverCardShadow.opacity(Metrics.shadowOpacity),
+            radius: Metrics.shadowRadius,
+            x: 0,
+            y: Metrics.shadowYOffset
+        )
     }
 
     private var panelBackground: some View {
@@ -166,14 +239,20 @@ struct ChatMessageContextMenuOverlay: View {
             Color.discoverBackgroundGradient
             LinearGradient(
                 colors: [
-                    Color.brandPrimaryGlow.opacity(colorScheme == .dark ? 0.10 : 0.14),
+                    Color.brandPrimaryGlow.opacity(colorScheme == .dark
+                        ? Metrics.panelGradientPrimaryDark
+                        : Metrics.panelGradientPrimaryLight),
                     Color.clear,
-                    Color.discoverViolet.opacity(colorScheme == .dark ? 0.08 : 0.10),
+                    Color.discoverViolet.opacity(colorScheme == .dark
+                        ? Metrics.panelGradientAccentDark
+                        : Metrics.panelGradientAccentLight),
                 ],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )
-            Color.cardSurface.opacity(colorScheme == .dark ? 0.20 : 0.30)
+            Color.cardSurface.opacity(colorScheme == .dark
+                ? Metrics.panelSurfaceOpacityDark
+                : Metrics.panelSurfaceOpacityLight)
         }
     }
 
@@ -182,19 +261,22 @@ struct ChatMessageContextMenuOverlay: View {
             performMenuAction(onReact, emoji)
         } label: {
             Text(emoji)
-                .font(.system(size: 24))
+                .font(.system(size: Metrics.reactionEmojiSize))
                 .frame(maxWidth: .infinity)
-                .frame(height: 40)
+                .frame(height: Metrics.reactionButtonSize)
                 .background(
                     Circle()
-                        .fill(Color.cardSurface.opacity(colorScheme == .dark ? 0.55 : 0.72))
+                        .fill(Color.cardSurface.opacity(Metrics.reactionIconFillOpacity))
                 )
                 .overlay {
                     Circle()
-                        .strokeBorder(Color.glassBorderHighlight.opacity(0.22), lineWidth: 1)
+                        .strokeBorder(
+                            Color.glassBorderHighlight.opacity(Metrics.reactionBorderOpacity),
+                            lineWidth: 1
+                        )
                 }
         }
-        .buttonStyle(.spring(pressedScale: 0.9))
+        .buttonStyle(.spring(pressedScale: Metrics.pressedScale))
     }
 
     private func actionRow(
@@ -206,40 +288,46 @@ struct ChatMessageContextMenuOverlay: View {
         Button {
             performMenuAction(action)
         } label: {
-            HStack(spacing: 12) {
+            HStack(spacing: Metrics.actionRowSpacing) {
                 Image(systemName: icon)
-                    .font(.system(size: 17, weight: .semibold))
+                    .font(.system(size: Metrics.actionIconSize, weight: .semibold))
                     .foregroundStyle(tint)
-                    .frame(width: 24)
+                    .frame(width: Metrics.actionIconFrame)
 
                 Text(title)
-                    .font(Font.App.manrope(size: 16, weight: .semibold))
+                    .font(Font.App.manrope(size: Metrics.actionTextSize, weight: .semibold))
                     .foregroundStyle(tint == Color.error ? Color.error : Color.primaryText)
 
                 Spacer(minLength: 0)
             }
             .padding(.horizontal, AppSpacing.lg)
-            .padding(.vertical, 13)
+            .padding(.vertical, Metrics.actionRowPaddingVertical)
             .contentShape(Rectangle())
         }
         .buttonStyle(ChatPressableRowStyle())
     }
 
     private var rowDivider: some View {
-        Divider().overlay(Color.hairline.opacity(0.85))
+        Rectangle()
+            .fill(Color.hairline.opacity(Metrics.hairlineOpacity))
+            .frame(height: Metrics.hairlineHeight)
     }
 
-    private func performMenuAction(_ action: () -> Void) {
+    // MARK: - Actions
+
+    private func triggerHaptic() {
         #if canImport(UIKit)
         HapticFeedback.impact(.light)
         #endif
+    }
+
+    private func performMenuAction(_ action: () -> Void) {
+        triggerHaptic()
         action()
     }
 
     private func performMenuAction<T>(_ action: (T) -> Void, _ value: T) {
-        #if canImport(UIKit)
-        HapticFeedback.impact(.light)
-        #endif
+        triggerHaptic()
         action(value)
     }
 
@@ -258,58 +346,79 @@ struct ChatMessageContextMenuOverlay: View {
 
     private func menuPlacement(
         anchor: CGRect,
-        safeTop: CGFloat,
-        safeBottom: CGFloat,
+        contentTop: CGFloat,
+        contentBottom: CGFloat,
         containerHeight: CGFloat
     ) -> MenuPlacement {
-        let usableHeight = max(containerHeight - safeTop - safeBottom, 1)
-        let relativeY = (anchor.midY - safeTop) / usableHeight
+        let expandedReactionsHeight = reactionsPanelHeight(expanded: true)
+        let actionsHeight = actionsPanelHeight
+        let spaceAbove = anchor.minY - contentTop
+        let spaceBelow = containerHeight - contentBottom - anchor.maxY
 
-        if relativeY < 0.33 {
+        if message.canReact, spaceAbove < expandedReactionsHeight + Metrics.panelGap {
             return .bothBelow
-        } else if relativeY > 0.66 {
-            return .bothAbove
-        } else {
+        }
+
+        let canFitSplit = message.canReact
+            ? spaceAbove >= expandedReactionsHeight + Metrics.panelGap
+                && spaceBelow >= actionsHeight + Metrics.panelGap
+            : spaceBelow >= actionsHeight + Metrics.panelGap
+
+        if canFitSplit {
             return .split
         }
+
+        let stackHeight = message.canReact
+            ? expandedReactionsHeight + Metrics.panelGap + actionsHeight
+            : actionsHeight
+
+        if spaceBelow >= stackHeight + Metrics.panelGap {
+            return .bothBelow
+        }
+
+        if spaceAbove >= stackHeight + Metrics.panelGap {
+            return .bothAbove
+        }
+
+        return spaceBelow >= spaceAbove ? .bothBelow : .bothAbove
     }
 
     private func panelPositions(
         placement: MenuPlacement,
         anchor: CGRect,
-        safeTop: CGFloat,
-        safeBottom: CGFloat,
+        contentTop: CGFloat,
+        contentBottom: CGFloat,
         containerHeight: CGFloat
     ) -> PanelPositions {
-        let reactionsH = reactionsPanelHeight
+        let reactionsH = reactionsPanelHeight(expanded: areReactionsExpanded)
         let actionsH = actionsPanelHeight
 
         switch placement {
         case .split:
             let reactionsY = message.canReact
                 ? clampCenterY(
-                    anchor.minY - panelGap - reactionsH / 2,
+                    anchor.minY - Metrics.panelGap - reactionsH / 2,
                     panelHeight: reactionsH,
-                    safeTop: safeTop,
-                    safeBottom: safeBottom,
+                    contentTop: contentTop,
+                    contentBottom: contentBottom,
                     containerHeight: containerHeight
                 )
                 : nil
             let actionsY = clampCenterY(
-                anchor.maxY + panelGap + actionsH / 2,
+                anchor.maxY + Metrics.panelGap + actionsH / 2,
                 panelHeight: actionsH,
-                safeTop: safeTop,
-                safeBottom: safeBottom,
+                contentTop: contentTop,
+                contentBottom: contentBottom,
                 containerHeight: containerHeight
             )
             return PanelPositions(reactionsCenterY: reactionsY, actionsCenterY: actionsY)
 
         case .bothBelow:
-            var cursor = anchor.maxY + panelGap
+            var cursor = anchor.maxY + Metrics.panelGap
             var reactionsY: CGFloat?
             if message.canReact {
                 reactionsY = cursor + reactionsH / 2
-                cursor += reactionsH + panelGap
+                cursor += reactionsH + Metrics.panelGap
             }
             let actionsY = cursor + actionsH / 2
             return clampStack(
@@ -317,15 +426,15 @@ struct ChatMessageContextMenuOverlay: View {
                 actionsCenterY: actionsY,
                 reactionsHeight: reactionsH,
                 actionsHeight: actionsH,
-                safeTop: safeTop,
-                safeBottom: safeBottom,
+                contentTop: contentTop,
+                contentBottom: contentBottom,
                 containerHeight: containerHeight
             )
 
         case .bothAbove:
-            var cursor = anchor.minY - panelGap
+            var cursor = anchor.minY - Metrics.panelGap
             let actionsY = cursor - actionsH / 2
-            cursor -= actionsH + panelGap
+            cursor -= actionsH + Metrics.panelGap
             var reactionsY: CGFloat?
             if message.canReact {
                 reactionsY = cursor - reactionsH / 2
@@ -335,8 +444,8 @@ struct ChatMessageContextMenuOverlay: View {
                 actionsCenterY: actionsY,
                 reactionsHeight: reactionsH,
                 actionsHeight: actionsH,
-                safeTop: safeTop,
-                safeBottom: safeBottom,
+                contentTop: contentTop,
+                contentBottom: contentBottom,
                 containerHeight: containerHeight
             )
         }
@@ -345,12 +454,12 @@ struct ChatMessageContextMenuOverlay: View {
     private func clampCenterY(
         _ centerY: CGFloat,
         panelHeight: CGFloat,
-        safeTop: CGFloat,
-        safeBottom: CGFloat,
+        contentTop: CGFloat,
+        contentBottom: CGFloat,
         containerHeight: CGFloat
     ) -> CGFloat {
-        let minY = safeTop + panelHeight / 2
-        let maxY = containerHeight - safeBottom - panelHeight / 2
+        let minY = contentTop + panelHeight / 2
+        let maxY = containerHeight - contentBottom - panelHeight / 2
         return min(max(centerY, minY), maxY)
     }
 
@@ -359,8 +468,8 @@ struct ChatMessageContextMenuOverlay: View {
         actionsCenterY: CGFloat,
         reactionsHeight: CGFloat,
         actionsHeight: CGFloat,
-        safeTop: CGFloat,
-        safeBottom: CGFloat,
+        contentTop: CGFloat,
+        contentBottom: CGFloat,
         containerHeight: CGFloat
     ) -> PanelPositions {
         let stackTop: CGFloat
@@ -374,8 +483,8 @@ struct ChatMessageContextMenuOverlay: View {
             stackBottom = actionsCenterY + actionsHeight / 2
         }
 
-        let minTop = safeTop
-        let maxBottom = containerHeight - safeBottom
+        let minTop = contentTop
+        let maxBottom = containerHeight - contentBottom
         var offset: CGFloat = 0
 
         if stackBottom > maxBottom {
@@ -390,27 +499,45 @@ struct ChatMessageContextMenuOverlay: View {
         )
     }
 
+    private func effectiveContentTop(in geometry: GeometryProxy) -> CGFloat {
+        let containerMinY = geometry.frame(in: .global).minY
+        let headerBottomY = geometry.safeAreaInsets.top + Metrics.navigationBarHeight
+        let obstructionInLocal = max(0, headerBottomY - containerMinY)
+        return obstructionInLocal + Metrics.safeAreaPadding
+    }
+
+    private func effectiveContentBottom(in geometry: GeometryProxy) -> CGFloat {
+        geometry.safeAreaInsets.bottom + Metrics.safeAreaPadding
+    }
+
     private func anchorInLocalSpace(_ anchor: CGRect, container: GeometryProxy) -> CGRect {
         let origin = container.frame(in: .global).origin
         return anchor.offsetBy(dx: -origin.x, dy: -origin.y)
     }
 
     private func panelLeadingX(in geometry: GeometryProxy, localAnchor: CGRect) -> CGFloat {
-        let margin: CGFloat = 16
-        let maxX = geometry.size.width - panelWidth - margin
+        let maxX = geometry.size.width - Metrics.panelWidth - Metrics.panelMargin
 
         if message.isMine {
-            return max(margin, min(localAnchor.maxX - panelWidth, maxX))
+            return max(Metrics.panelMargin, min(localAnchor.maxX - Metrics.panelWidth, maxX))
         }
-        return max(margin, min(localAnchor.minX, maxX))
+        return max(Metrics.panelMargin, min(localAnchor.minX, maxX))
     }
 
-    private var reactionsPanelHeight: CGFloat {
-        if areReactionsExpanded {
-            let rowCount = CGFloat(ChatQuickReactions.rows.count)
-            return rowCount * 46 + 46 + 24
+    private func reactionsPanelHeight(expanded: Bool) -> CGFloat {
+        let verticalPadding = Metrics.reactionsPaddingVertical * 2
+
+        guard expanded else {
+            return verticalPadding + Metrics.reactionButtonSize
         }
-        return 46 + 24
+
+        let rowCount = CGFloat(ChatQuickReactions.rows.count)
+        let gridRows = rowCount * Metrics.reactionButtonSize
+            + max(0, rowCount - 1) * Metrics.reactionsVStackSpacing
+        let expandRow = Metrics.reactionButtonSize
+        let interBlockSpacing = Metrics.reactionsVStackSpacing
+
+        return verticalPadding + gridRows + interBlockSpacing + expandRow
     }
 
     private var actionsPanelHeight: CGFloat {
@@ -419,6 +546,78 @@ struct ChatMessageContextMenuOverlay: View {
         if message.canCopy { rows += 1 }
         if message.canEdit { rows += 1 }
         if message.canDelete { rows += 1 }
-        return CGFloat(rows) * 50
+        return CGFloat(rows) * Metrics.actionRowHeight
+    }
+}
+
+// MARK: - Metrics
+
+private extension ChatMessageContextMenuOverlay {
+    enum Metrics {
+        static let panelWidth: CGFloat = 280
+        static let panelGap: CGFloat = 10
+        static let panelMargin: CGFloat = 16
+        static let safeAreaPadding: CGFloat = 8
+        static let navigationBarHeight: CGFloat = 44
+
+        static let reactionsCornerRadius: CGFloat = 22
+        static let reactionsGridSpacing: CGFloat = 6
+        static let reactionsVStackSpacing: CGFloat = 8
+        static let reactionsPaddingHorizontal: CGFloat = 12
+        static let reactionsPaddingVertical: CGFloat = 12
+
+        static let reactionButtonSize: CGFloat = 40
+        static let reactionEmojiSize: CGFloat = 24
+        static let expandButtonWidth: CGFloat = 46
+        static let expandButtonIconSize: CGFloat = 14
+
+        static let actionRowSpacing: CGFloat = 12
+        static let actionIconSize: CGFloat = 17
+        static let actionIconFrame: CGFloat = 24
+        static let actionTextSize: CGFloat = 16
+        static let actionRowPaddingVertical: CGFloat = 13
+        static let actionRowHeight: CGFloat = 50
+
+        static let pressedScale: CGFloat = 0.9
+
+        static let shadowRadius: CGFloat = 12
+        static let shadowYOffset: CGFloat = 4
+        static let shadowOpacity: CGFloat = 0.18
+
+        static let panelBorderOpacity: CGFloat = 0.28
+        static let reactionBorderOpacity: CGFloat = 0.22
+        static let reactionIconFillOpacity: CGFloat = 0.3
+        static let panelSurfaceOpacityDark: CGFloat = 0.20
+        static let panelSurfaceOpacityLight: CGFloat = 0.30
+        static let panelGradientPrimaryDark: CGFloat = 0.10
+        static let panelGradientPrimaryLight: CGFloat = 0.14
+        static let panelGradientAccentDark: CGFloat = 0.08
+        static let panelGradientAccentLight: CGFloat = 0.10
+
+        static let dimmingTintDark: CGFloat = 0.18
+        static let dimmingTintLight: CGFloat = 0.06
+        static let hairlineOpacity: CGFloat = 0.85
+
+        static let messageCutoutPadding: CGFloat = 6
+        static let messageCutoutCornerRadius: CGFloat = 18
+        static let messageCutoutStrokeWidth: CGFloat = 1
+        static let messageCutoutStrokeOpacityDark: CGFloat = 0.14
+        static let messageCutoutStrokeOpacityLight: CGFloat = 0.38
+        static let messageCutoutShadowRadius: CGFloat = 10
+        static let messageCutoutShadowYOffset: CGFloat = 4
+        static let messageCutoutShadowOpacityDark: CGFloat = 0.32
+        static let messageCutoutShadowOpacityLight: CGFloat = 0.16
+
+        static var hairlineHeight: CGFloat {
+            #if canImport(UIKit)
+            1.0 / UIScreen.main.scale
+            #else
+            1.0
+            #endif
+        }
+
+        static var expansionAnimation: Animation {
+            .interpolatingSpring(stiffness: 300, damping: 25)
+        }
     }
 }

@@ -189,7 +189,22 @@ struct ChatsView: View {
                 ForEach(listViewModel.conversations) { conversation in
                     ChatConversationRow(
                         conversation: conversation,
-                        isOnline: presenceStore.isOnline(profileID: conversation.otherParticipantProfileID)
+                        isOnline: presenceStore.isOnline(profileID: conversation.otherParticipantProfileID),
+                        isTyping: false,
+                        onDelete: {
+                            MessengerDiagnostics.event(
+                                .conversationRowTapped,
+                                conversationID: conversation.id,
+                                metadata: ["action": "deleteSwipe"]
+                            )
+                        },
+                        onMute: {
+                            MessengerDiagnostics.event(
+                                .conversationRowTapped,
+                                conversationID: conversation.id,
+                                metadata: ["action": "muteSwipe"]
+                            )
+                        }
                     ) {
                         MessengerDiagnostics.event(
                             .conversationRowTapped,
