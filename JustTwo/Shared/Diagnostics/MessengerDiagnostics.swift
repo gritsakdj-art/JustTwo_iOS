@@ -198,6 +198,17 @@ enum MessengerDiagnosticEvent: String, Sendable {
     case deltaImageCacheMiss
     case deltaImageRenderFailed
     case deltaOptimisticImageReconciled
+
+    case messengerLocalStoreInitialized
+    case messengerLocalStoreResetStarted
+    case messengerLocalStoreResetSucceeded
+    case messengerLocalStoreResetFailed
+    case messengerLocalConversationUpserted
+    case messengerLocalMessagesUpserted
+    case messengerLocalMessageDeleted
+    case messengerLocalReceiptApplied
+    case messengerLocalSyncMetadataUpdated
+    case messengerLocalMappingFailed
 }
 
 enum MessengerDiagnostics {

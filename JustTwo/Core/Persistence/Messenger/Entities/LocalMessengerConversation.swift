@@ -1,0 +1,58 @@
+import Foundation
+import SwiftData
+
+@Model
+final class LocalMessengerConversation {
+    @Attribute(.unique) var id: String
+    var type: String
+    var status: String
+    var connectionID: String?
+    var createdAt: Date
+    var updatedAt: Date?
+    var lastMessageAt: Date?
+    var lastReadAt: Date?
+    var unreadCount: Int
+    var otherParticipantProfileID: String?
+    var otherParticipantDisplayName: String?
+    var otherParticipantPrimaryPhotoID: String?
+    var otherParticipantPrimaryPhotoDownloadURLExpiresAt: Date?
+    var lastMessageID: String?
+    var lastSyncedAt: Date?
+    var localUpdatedAt: Date
+
+    init(
+        id: String,
+        type: String,
+        status: String,
+        connectionID: String?,
+        createdAt: Date,
+        updatedAt: Date?,
+        lastMessageAt: Date?,
+        lastReadAt: Date?,
+        unreadCount: Int,
+        otherParticipantProfileID: String?,
+        otherParticipantDisplayName: String?,
+        otherParticipantPrimaryPhotoID: String?,
+        otherParticipantPrimaryPhotoDownloadURLExpiresAt: Date?,
+        lastMessageID: String?,
+        lastSyncedAt: Date?,
+        localUpdatedAt: Date
+    ) {
+        self.id = id
+        self.type = type
+        self.status = status
+        self.connectionID = connectionID
+        self.createdAt = createdAt
+        self.updatedAt = updatedAt
+        self.lastMessageAt = lastMessageAt
+        self.lastReadAt = lastReadAt
+        self.unreadCount = unreadCount
+        self.otherParticipantProfileID = otherParticipantProfileID
+        self.otherParticipantDisplayName = otherParticipantDisplayName
+        self.otherParticipantPrimaryPhotoID = otherParticipantPrimaryPhotoID
+        self.otherParticipantPrimaryPhotoDownloadURLExpiresAt = otherParticipantPrimaryPhotoDownloadURLExpiresAt
+        self.lastMessageID = lastMessageID
+        self.lastSyncedAt = lastSyncedAt
+        self.localUpdatedAt = localUpdatedAt
+    }
+}

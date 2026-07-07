@@ -8,6 +8,12 @@ struct JustTwoApp: App {
     var sharedModelContainer: ModelContainer = {
         let schema = Schema([
             Item.self,
+            LocalMessengerConversation.self,
+            LocalMessengerMessage.self,
+            LocalMessengerAttachment.self,
+            LocalMessengerReactionAggregate.self,
+            LocalMessengerReceipt.self,
+            LocalMessengerSyncMetadata.self,
         ])
 
         let modelConfiguration = ModelConfiguration(
@@ -30,6 +36,7 @@ struct JustTwoApp: App {
         AppTabBarAppearance.configure()
         PushRegistrationService.shared.configure()
         AppBuildEnvironment.beginTestFlightResolutionIfNeeded()
+        MessengerLocalStore.configureShared(modelContainer: sharedModelContainer)
     }
 
     var body: some Scene {

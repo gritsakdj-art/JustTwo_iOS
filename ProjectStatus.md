@@ -144,6 +144,27 @@
 - Manually verified gallery order and avatar presentation persistence.
 - Verified Debug iOS Simulator build with `xcodebuild`; build succeeded.
 
+## 2026-07-07
+
+### Messenger local DB schema foundation (PR15A, after `50fdbaa`)
+
+- Added SwiftData messenger persistence under `Core/Persistence/Messenger/`:
+  - entities: conversation, message, attachment, reaction aggregate, receipt, sync metadata;
+  - `MessengerLocalStore` facade + `SwiftDataMessengerLocalStore` implementation;
+  - DTO mapping and privacy-safe snapshots (`LocalMessengerSnapshots.swift`).
+- Extended `JustTwoApp.sharedModelContainer` schema with messenger `@Model` types; wired `MessengerLocalStore.configureShared(modelContainer:)`.
+- Reaction storage uses per-message emoji aggregates (`count`, `reactedByMe`) aligned with backend DTOs.
+- Does **not** persist signed `downloadUrl` / `uploadUrl`.
+- UI still uses in-memory caches only (`MessengerLocalStorageFeatureFlags.isLocalReadEnabled = false`).
+- Hardened logout local DB reset against fast re-login:
+  - `SessionStore.clearSession()` → `scheduleLogoutReset()`;
+  - `runCriticalWarmup()` → `await waitForLogoutReset()`;
+  - `performReset()` awaits `resetAllMessengerData()`;
+  - `MessengerLocalStore` session-generation guard blocks stale reads/writes during reset.
+- Added messenger local-store diagnostics events in `MessengerDiagnostics.swift`.
+- Added `JustTwoTests/MessengerLocalStoreTests.swift` and extended `AppStartupCoordinatorTests` for reset/wait coverage.
+- Added `Docs/MessengerLocalStorage.md`; updated `Docs/StartupLoading.md` reset section.
+
 ## Notes
 
 - Continue adding completed changes here after each meaningful update.

@@ -18,6 +18,7 @@ final class AppStartupCoordinator {
         router: AppRouter,
         force: Bool = false
     ) async {
+        await waitForLogoutReset()
         guard let userID = session.currentUser?.id else { return }
 
         if !force, warmedUserID == userID {
@@ -117,7 +118,24 @@ final class AppStartupCoordinator {
         )
     }
 
-    func reset() {
+    func reset() async {
+        await performReset()
+    }
+
+    func scheduleLogoutReset() {
+        logoutResetTask = Task { @MainActor in
+            await self.performReset()
+        }
+    }
+
+    func waitForLogoutReset() async {
+        await logoutResetTask?.value
+        logoutResetTask = nil
+    }
+
+    private var logoutResetTask: Task<Void, Never>?
+
+    private func performReset() async {
         criticalTask?.cancel()
         criticalTask = nil
         isRunningCritical = false
@@ -132,5 +150,17 @@ final class AppStartupCoordinator {
         MessengerOutbox.shared.clear()
         MessengerDeltaSyncService.shared.reset()
         ConversationListViewModel.shared.reset()
+
+        do {
+            try await MessengerLocalStore.shared.resetAllMessengerData()
+        } catch {
+            MessengerDiagnostics.event(
+                .messengerLocalStoreResetFailed,
+                metadata: [
+                    "errorCategory": MessengerDiagnostics.sanitizeError(error),
+                    "source": "AppStartupCoordinator.performReset"
+                ]
+            )
+        }
     }
 }

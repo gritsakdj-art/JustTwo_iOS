@@ -110,17 +110,24 @@ Send/edit/delete/reaction in `ChatViewModel` also update cache.
 * `MessengerRealtimeCoordinator.stop()`
 * realtime disconnect
 * `MessengerBadgeStore.reset()`
-* `AppStartupCoordinator.reset()`
+* `AppStartupCoordinator.scheduleLogoutReset()` (async; does not block `clearSession` return)
 * `ProfilePhotoStore.reset()`
 * local avatar/order caches
 
-Coordinator reset also clears:
+`scheduleLogoutReset()` runs `performReset()` on MainActor in a tracked task. The next authenticated warmup calls `await waitForLogoutReset()` first so a fast re-login cannot use stale in-memory or on-disk messenger state.
+
+Coordinator `performReset()` also clears:
 
 * profile loader state
 * photos/conversations startup loader keys
 * messages preload task
 * `MessageCacheStore`
-* `ConversationListViewModel`
+* `MessengerOutbox`, `MessengerDeltaSyncService`, `ConversationListViewModel`
+* `MessengerLocalStore.shared.resetAllMessengerData()` (SwiftData; awaited inside reset task)
+
+`AppStartupWarmupStore.reset()` and `AppStartupCoordinator.reset()` remain direct `await` entry points for tests and explicit resets.
+
+See [Messenger local storage](MessengerLocalStorage.md) for SwiftData schema, session-generation guards, and logout race hardening.
 
 ## Adding a new preload domain
 
@@ -132,5 +139,6 @@ Coordinator reset also clears:
 
 ## Related docs
 
+* [Messenger local storage (PR15A)](MessengerLocalStorage.md)
 * [Invite links and QR flow](InviteLinks.md)
 * [Profile photos and avatar presentation](ProfilePhotos.md)

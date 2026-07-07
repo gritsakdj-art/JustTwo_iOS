@@ -79,7 +79,7 @@ final class SessionStore {
         currentProfile = nil
         pendingVerificationEmail = nil
         PushNotificationRoutingCoordinator.shared.clearPendingRoute()
-        AppStartupCoordinator.shared.reset()
+        AppStartupCoordinator.shared.scheduleLogoutReset()
         ProfilePhotoStore.shared.reset()
     }
 
