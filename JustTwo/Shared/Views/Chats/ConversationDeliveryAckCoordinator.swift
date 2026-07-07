@@ -239,9 +239,21 @@ final class ConversationDeliveryAckCoordinator {
                 messageID: messageID,
                 metadata: ["source": source, "isAppForeground": "\(MessengerSessionSupport.isAppForegroundActive)"]
             )
+            MessengerDiagnostics.event(
+                .messengerDeliveryAckSucceeded,
+                conversationID: conversationID,
+                messageID: messageID,
+                metadata: ["source": source]
+            )
         } catch let error as NetworkError {
             MessengerDiagnostics.event(
                 .deliveredAckFailed,
+                conversationID: conversationID,
+                messageID: messageID,
+                metadata: ["source": source, "errorCategory": MessengerDiagnostics.sanitizeError(error)]
+            )
+            MessengerDiagnostics.event(
+                .messengerDeliveryAckFailed,
                 conversationID: conversationID,
                 messageID: messageID,
                 metadata: ["source": source, "errorCategory": MessengerDiagnostics.sanitizeError(error)]

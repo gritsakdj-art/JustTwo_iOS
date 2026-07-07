@@ -10,10 +10,7 @@ struct MainTabView: View {
     var body: some View {
         VStack(spacing: 0) {
             if session.shouldShowOfflineBanner {
-                OfflineSessionBanner(connectivityState: session.connectivityState)
-                    .padding(.horizontal, 16)
-                    .padding(.top, 8)
-                    .padding(.bottom, 4)
+                offlineBanner
                     .transition(.move(edge: .top).combined(with: .opacity))
             }
 
@@ -46,6 +43,11 @@ struct MainTabView: View {
             }
             .tint(Color.discoverViolet)
             .toolbarBackground(.hidden, for: .tabBar)
+            .background(Color.discoverBackgroundGradient)
+        }
+        .background {
+            Color.discoverBackgroundGradient
+                .ignoresSafeArea()
         }
         .animation(.spring(response: 0.34, dampingFraction: 0.86), value: session.shouldShowOfflineBanner)
         .onAppear {
@@ -69,6 +71,15 @@ struct MainTabView: View {
                 .environment(session)
                 .environment(router)
         }
+    }
+
+    private var offlineBanner: some View {
+        OfflineSessionBanner(connectivityState: session.connectivityState)
+            .padding(.horizontal, 16)
+            .padding(.top, 4)
+            .padding(.bottom, 4)
+            .frame(maxWidth: .infinity)
+            .background(Color.discoverBackgroundGradient)
     }
 
     @ViewBuilder

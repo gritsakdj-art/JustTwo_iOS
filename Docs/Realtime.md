@@ -108,6 +108,8 @@ Realtime/delta may deliver image messages without a persistable signed URL in lo
 * realtime does not write image bytes to SwiftData;
 * delete events still clear renderable attachments and remove disk cache files.
 
+PR15F offline fail-fast and startup local-DB-first do not change disk cache behavior; cached images still render when network REST is skipped.
+
 ## Manual smoke
 
 Use staging only:

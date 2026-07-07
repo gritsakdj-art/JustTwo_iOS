@@ -221,6 +221,20 @@
 - Added `JustTwoTests/MessengerMediaDiskCacheTests.swift`.
 - Out of scope: persistent outbox, outgoing media retry, sync cursor, backend changes.
 
+## 2026-07-07 (PR15F)
+
+### Messenger startup/request optimization
+
+- `MessagesStartupLoader` local-DB-first: SwiftData hydrate → memory before REST preload.
+- `MessengerCacheFreshnessPolicy` centralizes memory TTL (180s), list refresh TTL (120s), message freshness vs `lastMessageAt`.
+- Chat open skips redundant `GET /messages` when cache fresh (`force:false`); manual refresh still forces REST.
+- `ChatsView` no longer refreshes full conversation list on every chat pop.
+- `NetworkPathMonitor.shouldSkipNetworkBecauseOffline` fail-fast for messages/conversations when offline is known.
+- Conversation list delivery ack batch moved to background Task.
+- Added PR15F diagnostics events and `JustTwoTests/MessengerRequestOptimizationTests.swift`.
+- Updated `Docs/StartupLoading.md`, `Docs/MessengerLocalStorage.md`, `Docs/MessengerMediaCache.md`, `Docs/Realtime.md`.
+- Out of scope: persistent outbox, sync cursor, backend changes.
+
 ## Notes
 
 - Continue adding completed changes here after each meaningful update.

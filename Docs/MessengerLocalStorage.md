@@ -11,6 +11,7 @@ On-device messenger persistence using SwiftData.
 | PR15C | Cached per-conversation message history + resilient chat loading | ✅ |
 | PR15D | Offline-friendly splash + startup session snapshot | ✅ |
 | PR15E | Persistent media disk cache for message attachments | ✅ |
+| PR15F | Messenger startup/request optimization | ✅ |
 | PR16 | Persistent outbox | planned |
 | PR17 | Full sync engine | planned |
 
@@ -77,6 +78,51 @@ Confirmed/received image attachments can survive relaunch from disk cache.
 
 See [Messenger Media Cache](MessengerMediaCache.md) for storage layout, security, cleanup, and smoke checklist.
 
+## PR15F — Messenger startup/request optimization
+
+Reduces redundant REST calls while keeping REST authoritative and realtime/delta repair paths.
+
+### Behavior
+
+```text
+1. MessagesStartupLoader hydrates SwiftData messages into MessageCacheStore first.
+2. If local/memory cache is fresh (newest message >= conversation.lastMessageAt or memory TTL), REST preload is skipped.
+3. Stale local cache still shows immediately; REST refresh runs in background.
+4. Chat open uses force:false when cache is fresh — no duplicate GET /messages after preload.
+5. Manual pull-to-refresh still forces REST.
+6. ChatsView no longer runs full GET /conversations on every chat pop.
+7. Known offline (NetworkPathMonitor) skips REST for messages/conversations without waiting for timeout.
+8. Delivery/read acks on conversation list refresh run in background — do not block list UI.
+```
+
+### Freshness policy (`MessengerCacheFreshnessPolicy`)
+
+| Rule | Value |
+|------|-------|
+| Memory cache TTL | 180s |
+| Conversation list refresh TTL | 120s |
+| Message freshness | `newestLocalMessage.createdAt >= conversation.lastMessageAt` (1s tolerance) |
+
+Startup preload skip uses message timeline only. Chat open may also skip on memory TTL (180s) when timeline data is unavailable or already satisfied.
+
+### What still refreshes from REST
+
+- Manual pull-to-refresh (chat or list)
+- Empty or stale local/memory cache
+- Startup preload when local cache empty
+- Background refresh when local cache is stale
+- Delta/realtime updates (unchanged)
+
+### Known limitations
+
+- Freshness uses conversation `lastMessageAt` from list preview; rare clock/skew edge cases may trigger extra REST.
+- `NetworkPathMonitor` offline skip requires at least one path update; until then requests fail gracefully on error.
+- Stale local cache + background REST may briefly show older messages until refresh completes (realtime can still patch).
+
+### Manual smoke
+
+See [Startup loading](StartupLoading.md) PR15F checklist.
+
 ## PR15C — Cached messages per conversation
 
 Chat screen opens from local cached messages when available, then REST remains authoritative refresh.
@@ -87,7 +133,7 @@ Chat screen opens from local cached messages when available, then REST remains a
 1. User opens a chat.
 2. ChatViewModel hydrates in-memory MessageCacheStore from MessengerLocalStore (if enabled).
 3. If cached messages exist, UI shows them immediately (no endless spinner).
-4. REST GET /conversations/:id/messages runs as authoritative refresh.
+4. REST GET /conversations/:id/messages runs as authoritative refresh when cache is stale, empty, or manually requested (PR15F).
 5. REST success merges in-memory state and upserts local DB message rows.
 6. Pagination writes older pages to local DB.
 7. Delta/realtime message events update in-memory state and persist to local message cache.

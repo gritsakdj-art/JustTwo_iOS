@@ -53,15 +53,14 @@ struct ChatsView: View {
             }
             .refreshable {
                 guard !usesPreviewData else { return }
+                MessengerDiagnostics.event(.messengerConversationRefreshForcedManual)
                 await listViewModel.refresh(session: session, router: router)
                 listViewModel.activateRealtime(session: session, router: router)
             }
             .onChange(of: route?.id) { _, newValue in
                 guard newValue == nil, !usesPreviewData else { return }
-                Task {
-                    await listViewModel.refresh(session: session, router: router)
-                    listViewModel.activateRealtime(session: session, router: router)
-                }
+                MessengerDiagnostics.event(.messengerConversationRefreshSkippedChatPop)
+                listViewModel.activateRealtime(session: session, router: router)
             }
             .onChange(of: router.pendingChatConversation?.id) { _, newValue in
                 if newValue != nil {

@@ -249,6 +249,34 @@ enum MessengerDiagnosticEvent: String, Sendable {
     case messengerMessageLoadingStateRecovered
     case messengerMessageFallbackToCache
 
+    case messengerStartupMessagesLocalPreloadStarted
+    case messengerStartupMessagesLocalPreloadSucceeded
+    case messengerStartupMessagesLocalPreloadEmpty
+    case messengerStartupMessagesNetworkPreloadSkippedFreshCache
+    case messengerStartupMessagesNetworkPreloadStarted
+    case messengerStartupMessagesNetworkPreloadSucceeded
+    case messengerStartupMessagesNetworkPreloadFailed
+
+    case messengerChatOpenNetworkRefreshSkippedFreshCache
+    case messengerChatOpenNetworkRefreshSkippedInFlight
+    case messengerChatOpenNetworkRefreshStarted
+    case messengerChatOpenNetworkRefreshSucceeded
+    case messengerChatOpenNetworkRefreshFailed
+
+    case messengerConversationRefreshSkippedChatPop
+    case messengerConversationRefreshSkippedRecent
+    case messengerConversationRefreshForcedManual
+
+    case messengerNetworkRequestSkippedOffline
+    case messengerRequestSingleFlightJoined
+
+    case messengerDeliveryAckScheduled
+    case messengerDeliveryAckSucceeded
+    case messengerDeliveryAckFailed
+    case messengerReadAckScheduled
+    case messengerReadAckSucceeded
+    case messengerReadAckFailed
+
     case messengerMediaDiskCacheLookupStarted
     case messengerMediaDiskCacheHit
     case messengerMediaDiskCacheMiss
@@ -314,8 +342,14 @@ enum MessengerDiagnostics {
 
         NetworkDebug.log("Messenger diagnostic \(entry.exportLine)")
 
-        Task { @MainActor in
-            MessengerDiagnosticsStore.shared.append(entry)
+        if Thread.isMainThread {
+            MainActor.assumeIsolated {
+                MessengerDiagnosticsStore.shared.append(entry)
+            }
+        } else {
+            Task { @MainActor in
+                MessengerDiagnosticsStore.shared.append(entry)
+            }
         }
     }
 

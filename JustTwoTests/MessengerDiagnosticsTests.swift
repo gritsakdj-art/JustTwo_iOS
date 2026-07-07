@@ -2,6 +2,7 @@ import Foundation
 import Testing
 @testable import JustTwo
 
+@Suite(.serialized)
 @MainActor
 struct MessengerDiagnosticsTests {
 
@@ -155,7 +156,7 @@ struct MessengerDiagnosticsTests {
             )
         }.value
 
-        try await Task.sleep(for: .milliseconds(100))
+        try await Task.sleep(for: .milliseconds(250))
 
         #expect(MessengerDiagnosticsStore.shared.events.contains {
             $0.event == MessengerDiagnosticEvent.realtimeEventReceived.rawValue

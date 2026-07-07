@@ -18,6 +18,14 @@ final class ConversationListViewModel {
     private var refreshGeneration = 0
     private var listContentGeneration = 0
     private var appliedRealtimeMessageIDs: Set<UUID> = []
+    private var lastNetworkRefreshAt: Date?
+    private var lastNetworkRefreshFailed = false
+
+    #if DEBUG
+    func setLastNetworkRefreshAtForTesting(_ date: Date?) {
+        lastNetworkRefreshAt = date
+    }
+    #endif
 
     func reset() {
         refreshTask?.cancel()
@@ -27,6 +35,8 @@ final class ConversationListViewModel {
         errorMessage = nil
         didLoad = false
         appliedRealtimeMessageIDs = []
+        lastNetworkRefreshAt = nil
+        lastNetworkRefreshFailed = false
         refreshGeneration += 1
         listContentGeneration += 1
         syncMessengerBadge()
@@ -87,6 +97,7 @@ final class ConversationListViewModel {
     }
 
     func refresh(session: SessionStore, router: AppRouter) async {
+        MessengerDiagnostics.event(.messengerConversationRefreshForcedManual)
         if let refreshTask {
             await refreshTask.value
             return
@@ -104,6 +115,18 @@ final class ConversationListViewModel {
     }
 
     func refreshNetwork(session: SessionStore, router: AppRouter) async {
+        if NetworkPathMonitor.shared.shouldSkipNetworkBecauseOffline {
+            MessengerDiagnostics.event(
+                .messengerNetworkRequestSkippedOffline,
+                metadata: [
+                    "reason": "conversationListRefresh",
+                    "cachedCount": "\(conversations.count)"
+                ]
+            )
+            isLoading = false
+            return
+        }
+
         refreshGeneration += 1
         let generation = refreshGeneration
 
@@ -115,11 +138,14 @@ final class ConversationListViewModel {
                 profileID: profileID,
                 generation: generation
             )
+            lastNetworkRefreshFailed = false
         } catch let error as NetworkError {
             guard generation == refreshGeneration else { return }
+            lastNetworkRefreshFailed = true
             handleNetworkRefreshFailure(error, session: session, router: router)
         } catch {
             guard generation == refreshGeneration else { return }
+            lastNetworkRefreshFailed = true
             if conversations.isEmpty {
                 errorMessage = error.localizedDescription
             }
@@ -133,6 +159,16 @@ final class ConversationListViewModel {
         }
 
         isLoading = false
+    }
+
+    /// Conditional refresh for stale list state without chat-pop full refresh.
+    func refreshNetworkIfStale(session: SessionStore, router: AppRouter) async {
+        if MessengerCacheFreshnessPolicy.isConversationListRefreshFresh(lastNetworkRefreshAt: lastNetworkRefreshAt),
+           !lastNetworkRefreshFailed {
+            MessengerDiagnostics.event(.messengerConversationRefreshSkippedRecent)
+            return
+        }
+        await refreshNetwork(session: session, router: router)
     }
 
     @discardableResult
@@ -206,15 +242,23 @@ final class ConversationListViewModel {
         }
         conversations = mergeRESTPreviews(restPreviews, with: conversations)
         bumpListContentGeneration()
-        await ConversationDeliveryAckCoordinator.shared.acknowledgeDeliveredForConversations(
-            response.conversations,
-            currentProfileID: profileID,
-            session: session,
-            router: router
-        )
+        let conversationsForAck = response.conversations
+        Task { @MainActor in
+            MessengerDiagnostics.event(
+                .messengerDeliveryAckScheduled,
+                metadata: ["source": "conversationListBatch", "count": "\(conversationsForAck.count)"]
+            )
+            await ConversationDeliveryAckCoordinator.shared.acknowledgeDeliveredForConversations(
+                conversationsForAck,
+                currentProfileID: profileID,
+                session: session,
+                router: router
+            )
+        }
         await MessengerConversationCacheService.persistRESTConversations(response.conversations)
         syncMessengerBadge()
         didLoad = true
+        lastNetworkRefreshAt = Date()
         ConversationAvatarsStartupLoader.shared.preloadRemainingIfNeeded(for: conversations)
 
         MessengerDiagnostics.event(

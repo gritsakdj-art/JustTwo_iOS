@@ -75,7 +75,7 @@ struct OfflineSessionBanner: View {
 #Preview("Offline Light") {
     OfflineSessionBanner(connectivityState: .offlineUsingCache)
         .padding(.horizontal, 16)
-        .padding(.top, 8)
+        .padding(.top, 4)
         .background(Color.discoverBackgroundGradient)
         .preferredColorScheme(.light)
 }
@@ -83,7 +83,7 @@ struct OfflineSessionBanner: View {
 #Preview("Offline Dark") {
     OfflineSessionBanner(connectivityState: .offlineUsingCache)
         .padding(.horizontal, 16)
-        .padding(.top, 8)
+        .padding(.top, 4)
         .background(Color.discoverBackgroundGradient)
         .preferredColorScheme(.dark)
 }
@@ -91,6 +91,6 @@ struct OfflineSessionBanner: View {
 #Preview("Validating") {
     OfflineSessionBanner(connectivityState: .validationPending)
         .padding(.horizontal, 16)
-        .padding(.top, 8)
+        .padding(.top, 4)
         .background(Color.discoverBackgroundGradient)
 }

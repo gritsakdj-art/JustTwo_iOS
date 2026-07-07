@@ -182,7 +182,13 @@ final class ChatViewModel {
         )
 
         if !didOpen {
-            await loadMessages(session: session, router: router, generation: generation, isInitialLoad: true)
+            await loadMessages(
+                session: session,
+                router: router,
+                generation: generation,
+                isInitialLoad: true,
+                loadReason: .open
+            )
             guard generation == lifecycleGeneration, isOpen else {
                 MessengerDiagnostics.event(
                     .chatInitialLoadIgnoredStaleGeneration,
@@ -304,7 +310,12 @@ final class ChatViewModel {
         loadTask = nil
         messageCache.cancelLoad(for: conversation.id)
         let generation = lifecycleGeneration
-        await loadMessages(session: session, router: router, generation: generation)
+        await loadMessages(
+            session: session,
+            router: router,
+            generation: generation,
+            loadReason: .manualRefresh
+        )
     }
 
     func loadOlderMessages(session: SessionStore, router: AppRouter) async {
@@ -327,10 +338,14 @@ final class ChatViewModel {
     func refreshFromRealtime(session: SessionStore, router: AppRouter) async {
         guard isOpen else { return }
         let generation = lifecycleGeneration
-        await loadMessages(session: session, router: router, generation: generation)
+        await loadMessages(
+            session: session,
+            router: router,
+            generation: generation,
+            loadReason: .reconnectRepair
+        )
         guard generation == lifecycleGeneration, isOpen else { return }
-        await markDelivered(session: session, router: router)
-        await markRead(session: session, router: router)
+        markDeliveredAndReadInBackground(session: session, router: router)
     }
 
     func openActionMenu(for message: ChatMessage, anchor: CGRect) {
@@ -822,6 +837,16 @@ final class ChatViewModel {
     private func markDeliveredAndReadInBackground(session: SessionStore, router: AppRouter) {
         Task { [weak self] in
             guard let self else { return }
+            MessengerDiagnostics.event(
+                .messengerDeliveryAckScheduled,
+                conversationID: self.conversation.id,
+                metadata: ["source": "chatOpen"]
+            )
+            MessengerDiagnostics.event(
+                .messengerReadAckScheduled,
+                conversationID: self.conversation.id,
+                metadata: ["source": "chatOpen"]
+            )
             await self.markDelivered(session: session, router: router)
             await self.markRead(session: session, router: router)
         }
@@ -831,7 +856,8 @@ final class ChatViewModel {
         session: SessionStore,
         router: AppRouter,
         generation: Int,
-        isInitialLoad: Bool = false
+        isInitialLoad: Bool = false,
+        loadReason: MessageLoadReason = .open
     ) async {
         let startedAt = Date()
         let cachedCountBefore = messageCache.messages(for: conversation.id)?.count ?? 0
@@ -921,7 +947,7 @@ final class ChatViewModel {
                 }
             }
 
-            if isInitialLoad {
+            if isInitialLoad, loadReason == .manualRefresh {
                 messageCache.cancelLoad(for: conversation.id)
                 loadTask?.cancel()
                 loadTask = nil
@@ -933,7 +959,8 @@ final class ChatViewModel {
                 networkLoadGeneration: networkLoadGeneration,
                 isInitialLoad: isInitialLoad,
                 cachedCountBefore: cachedCountBefore,
-                generation: generation
+                generation: generation,
+                loadReason: loadReason
             )
 
             if showedCachedMessages {
@@ -1048,8 +1075,11 @@ final class ChatViewModel {
         networkLoadGeneration: Int,
         isInitialLoad: Bool,
         cachedCountBefore: Int,
-        generation: Int
+        generation: Int,
+        loadReason: MessageLoadReason
     ) -> Task<Void, Never>? {
+        let shouldForceNetwork = loadReason == .manualRefresh
+
         if loadTask == nil {
             loadTask = Task { @MainActor [weak self] in
                 guard let self else { return }
@@ -1058,8 +1088,10 @@ final class ChatViewModel {
                     limit: MessengerLimits.defaultMessagePageSize,
                     session: session,
                     router: router,
-                    force: true,
-                    loadGeneration: networkLoadGeneration
+                    force: shouldForceNetwork,
+                    loadGeneration: networkLoadGeneration,
+                    reason: loadReason,
+                    conversationLastMessageAt: self.conversation.lastMessageAt
                 )
             }
             return loadTask
@@ -1194,9 +1226,21 @@ final class ChatViewModel {
                     "isAppForeground": "\(MessengerSessionSupport.isAppForegroundActive)"
                 ]
             )
+            MessengerDiagnostics.event(
+                .messengerReadAckSucceeded,
+                conversationID: conversation.id,
+                messageID: messageID,
+                metadata: ["source": "chatOpen"]
+            )
         } catch let error as NetworkError {
             MessengerDiagnostics.event(
                 .readAckFailed,
+                conversationID: conversation.id,
+                messageID: messageID,
+                metadata: ["errorCategory": MessengerDiagnostics.sanitizeError(error)]
+            )
+            MessengerDiagnostics.event(
+                .messengerReadAckFailed,
                 conversationID: conversation.id,
                 messageID: messageID,
                 metadata: ["errorCategory": MessengerDiagnostics.sanitizeError(error)]

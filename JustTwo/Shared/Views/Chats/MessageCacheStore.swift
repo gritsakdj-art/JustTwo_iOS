@@ -149,22 +149,41 @@ final class MessageCacheStore {
         session: SessionStore,
         router: AppRouter,
         force: Bool = false,
-        loadGeneration: Int = 0
+        loadGeneration: Int = 0,
+        reason: MessageLoadReason = .open,
+        conversationLastMessageAt: Date? = nil
     ) async -> [ChatMessage] {
         if force {
             cancelLoad(for: conversationID)
         }
 
-        if !force, let cached = entries[conversationID]?.messages, !cached.isEmpty {
+        if !force,
+           let entry = entries[conversationID],
+           !entry.messages.isEmpty,
+           isFreshCache(
+               entry: entry,
+               conversationLastMessageAt: conversationLastMessageAt
+           ) {
             ensurePaginationCursorIfNeeded(conversationID: conversationID, pageSize: limit)
-            return cached
+            emitNetworkRefreshSkipped(
+                reason: reason,
+                conversationID: conversationID,
+                entry: entry,
+                conversationLastMessageAt: conversationLastMessageAt
+            )
+            return entry.messages
         }
 
         if let existingTask = loadTasks[conversationID], !force {
-            // A fetch is already running for this conversation (e.g. startup preload or another
-            // ChatViewModel instance). Reuse its result instead of firing a second, redundant
-            // network request — the caller still gets fresh data without a duplicate round trip,
-            // and without racing two fetches against the same cache entry.
+            MessengerDiagnostics.event(
+                reason == .open ? .messengerChatOpenNetworkRefreshSkippedInFlight : .messengerRequestSingleFlightJoined,
+                conversationID: conversationID,
+                metadata: [
+                    "source": "messageCache",
+                    "reason": reason.rawValue,
+                    "cachedCountBefore": "\(entries[conversationID]?.messages.count ?? 0)"
+                ]
+            )
             MessengerDiagnostics.event(
                 .loadSkippedInFlight,
                 conversationID: conversationID,
@@ -179,6 +198,24 @@ final class MessageCacheStore {
             return entries[conversationID]?.messages ?? []
         }
 
+        if NetworkPathMonitor.shared.shouldSkipNetworkBecauseOffline {
+            let cached = entries[conversationID]?.messages ?? []
+            MessengerDiagnostics.event(
+                .messengerNetworkRequestSkippedOffline,
+                conversationID: conversationID,
+                metadata: [
+                    "reason": reason.rawValue,
+                    "count": "\(cached.count)",
+                    "isManual": reason == .manualRefresh ? "true" : "false"
+                ]
+            )
+            entries[conversationID]?.isLoading = false
+            if reason == .manualRefresh {
+                entries[conversationID]?.errorMessage = NetworkError.noInternet.errorDescription
+            }
+            return cached
+        }
+
         var entry = entries[conversationID] ?? Entry(messages: [], loadedAt: .distantPast)
         entry.isLoading = true
         entry.errorMessage = nil
@@ -186,11 +223,7 @@ final class MessageCacheStore {
         loadGenerations[conversationID] = loadGeneration
 
         let startedAt = Date()
-        MessengerDiagnostics.event(
-            .messengerMessageNetworkRefreshStarted,
-            conversationID: conversationID,
-            metadata: ["source": "rest"]
-        )
+        emitNetworkRefreshStarted(reason: reason, conversationID: conversationID)
 
         let task = Task { @MainActor in
             defer {
@@ -209,7 +242,7 @@ final class MessageCacheStore {
                     MessengerDiagnostics.event(
                         .messengerMessageLoadStaleIgnored,
                         conversationID: conversationID,
-                        metadata: ["source": "rest"]
+                        metadata: ["source": "rest", "reason": reason.rawValue]
                     )
                     return
                 }
@@ -226,20 +259,17 @@ final class MessageCacheStore {
                     response.messages,
                     conversationID: conversationID
                 )
-                MessengerDiagnostics.event(
-                    .messengerMessageNetworkRefreshSucceeded,
+                emitNetworkRefreshSucceeded(
+                    reason: reason,
                     conversationID: conversationID,
-                    metadata: [
-                        "count": "\(mapped.count)",
-                        "durationMs": "\(durationMilliseconds(since: startedAt))",
-                        "source": "rest"
-                    ]
+                    count: mapped.count,
+                    startedAt: startedAt
                 )
             } catch is CancellationError {
                 MessengerDiagnostics.event(
                     .messengerMessageLoadCancelled,
                     conversationID: conversationID,
-                    metadata: ["source": "rest"]
+                    metadata: ["source": "rest", "reason": reason.rawValue]
                 )
             } catch let error as NetworkError {
                 if loadGenerations[conversationID] == loadGeneration {
@@ -249,27 +279,21 @@ final class MessageCacheStore {
                         entries[conversationID]?.errorMessage = error.userMessage
                     }
                 }
-                MessengerDiagnostics.event(
-                    .messengerMessageNetworkRefreshFailed,
+                emitNetworkRefreshFailed(
+                    reason: reason,
                     conversationID: conversationID,
-                    metadata: [
-                        "errorCategory": MessengerDiagnostics.sanitizeError(error),
-                        "durationMs": "\(durationMilliseconds(since: startedAt))",
-                        "source": "rest"
-                    ]
+                    error: error,
+                    startedAt: startedAt
                 )
             } catch {
                 if loadGenerations[conversationID] == loadGeneration {
                     entries[conversationID]?.errorMessage = error.localizedDescription
                 }
-                MessengerDiagnostics.event(
-                    .messengerMessageNetworkRefreshFailed,
+                emitNetworkRefreshFailed(
+                    reason: reason,
                     conversationID: conversationID,
-                    metadata: [
-                        "errorCategory": MessengerDiagnostics.sanitizeError(error),
-                        "durationMs": "\(durationMilliseconds(since: startedAt))",
-                        "source": "rest"
-                    ]
+                    error: error,
+                    startedAt: startedAt
                 )
             }
         }
@@ -277,6 +301,264 @@ final class MessageCacheStore {
         loadTasks[conversationID] = task
         await task.value
         return entries[conversationID]?.messages ?? []
+    }
+
+    func preloadConversationMessages(
+        conversation: ChatConversationPreview,
+        session: SessionStore,
+        router: AppRouter,
+        messagesPerConversation: Int = StartupLoadingLimits.preloadMessagesPerConversation
+    ) async {
+        let conversationID = conversation.id
+        let startedAt = Date()
+        MessengerDiagnostics.event(
+            .messengerStartupMessagesLocalPreloadStarted,
+            conversationID: conversationID
+        )
+
+        if entries[conversationID]?.messages.isEmpty != false {
+            if let profileID = try? await MessengerSessionSupport.resolveCurrentProfileID(session: session),
+               let localMessages = await MessengerMessageCacheService.hydrateCachedMessages(
+                   conversationID: conversationID,
+                   currentProfileID: profileID,
+                   limit: messagesPerConversation
+               ),
+               !localMessages.isEmpty {
+                mergeLoadedMessages(localMessages, for: conversationID)
+                entries[conversationID]?.loadedAt = .now
+                MessengerDiagnostics.event(
+                    .messengerStartupMessagesLocalPreloadSucceeded,
+                    conversationID: conversationID,
+                    metadata: [
+                        "count": "\(localMessages.count)",
+                        "durationMs": "\(durationMilliseconds(since: startedAt))"
+                    ]
+                )
+            } else {
+                MessengerDiagnostics.event(
+                    .messengerStartupMessagesLocalPreloadEmpty,
+                    conversationID: conversationID,
+                    metadata: ["durationMs": "\(durationMilliseconds(since: startedAt))"]
+                )
+            }
+        }
+
+        if let entry = entries[conversationID],
+           !entry.messages.isEmpty,
+           isMessageTimelineFresh(
+               entry: entry,
+               conversationLastMessageAt: conversation.lastMessageAt
+           ) {
+            MessengerDiagnostics.event(
+                .messengerStartupMessagesNetworkPreloadSkippedFreshCache,
+                conversationID: conversationID,
+                metadata: freshCacheMetadata(
+                    entry: entry,
+                    conversationLastMessageAt: conversation.lastMessageAt
+                )
+            )
+            return
+        }
+
+        if NetworkPathMonitor.shared.shouldSkipNetworkBecauseOffline {
+            MessengerDiagnostics.event(
+                .messengerNetworkRequestSkippedOffline,
+                conversationID: conversationID,
+                metadata: [
+                    "reason": MessageLoadReason.startupPreload.rawValue,
+                    "count": "\(entries[conversationID]?.messages.count ?? 0)"
+                ]
+            )
+            return
+        }
+
+        if entries[conversationID]?.messages.isEmpty == false {
+            Task { @MainActor in
+                _ = await self.loadRecentMessagesIfNeeded(
+                    conversationID: conversationID,
+                    limit: messagesPerConversation,
+                    session: session,
+                    router: router,
+                    force: false,
+                    reason: .startupPreload,
+                    conversationLastMessageAt: conversation.lastMessageAt
+                )
+            }
+            return
+        }
+
+        _ = await loadRecentMessagesIfNeeded(
+            conversationID: conversationID,
+            limit: messagesPerConversation,
+            session: session,
+            router: router,
+            force: false,
+            reason: .startupPreload,
+            conversationLastMessageAt: conversation.lastMessageAt
+        )
+    }
+
+    private func isFreshCache(
+        entry: Entry,
+        conversationLastMessageAt: Date?
+    ) -> Bool {
+        if isMessageTimelineFresh(entry: entry, conversationLastMessageAt: conversationLastMessageAt) {
+            return true
+        }
+        return MessengerCacheFreshnessPolicy.isMemoryEntryFresh(loadedAt: entry.loadedAt)
+    }
+
+    private func isMessageTimelineFresh(
+        entry: Entry,
+        conversationLastMessageAt: Date?
+    ) -> Bool {
+        guard !entry.messages.isEmpty else { return false }
+        let newestLocal = MessengerCacheFreshnessPolicy.newestMessageDate(in: entry.messages)
+        return MessengerCacheFreshnessPolicy.isMessageCacheFresh(
+            newestLocalMessageAt: newestLocal,
+            conversationLastMessageAt: conversationLastMessageAt
+        )
+    }
+
+    private func freshCacheMetadata(
+        entry: Entry,
+        conversationLastMessageAt: Date?
+    ) -> [String: String] {
+        let newestLocal = MessengerCacheFreshnessPolicy.newestMessageDate(in: entry.messages)
+        var metadata: [String: String] = [
+            "count": "\(entry.messages.count)",
+            "cacheAgeMs": "\(MessengerCacheFreshnessPolicy.cacheAgeMilliseconds(loadedAt: entry.loadedAt))"
+        ]
+        if let conversationLastMessageAt {
+            metadata["lastMessageAt"] = "\(Int(conversationLastMessageAt.timeIntervalSince1970))"
+        }
+        if let newestLocal {
+            metadata["newestLocalMessageAt"] = "\(Int(newestLocal.timeIntervalSince1970))"
+        }
+        return metadata
+    }
+
+    private func emitNetworkRefreshSkipped(
+        reason: MessageLoadReason,
+        conversationID: UUID,
+        entry: Entry,
+        conversationLastMessageAt: Date?
+    ) {
+        let metadata = freshCacheMetadata(
+            entry: entry,
+            conversationLastMessageAt: conversationLastMessageAt
+        ).merging(["reason": reason.rawValue]) { current, _ in current }
+
+        switch reason {
+        case .open:
+            MessengerDiagnostics.event(
+                .messengerChatOpenNetworkRefreshSkippedFreshCache,
+                conversationID: conversationID,
+                metadata: metadata
+            )
+        case .startupPreload:
+            MessengerDiagnostics.event(
+                .messengerStartupMessagesNetworkPreloadSkippedFreshCache,
+                conversationID: conversationID,
+                metadata: metadata
+            )
+        default:
+            break
+        }
+    }
+
+    private func emitNetworkRefreshStarted(reason: MessageLoadReason, conversationID: UUID) {
+        switch reason {
+        case .open:
+            MessengerDiagnostics.event(
+                .messengerChatOpenNetworkRefreshStarted,
+                conversationID: conversationID,
+                metadata: ["source": "rest"]
+            )
+        case .startupPreload:
+            MessengerDiagnostics.event(
+                .messengerStartupMessagesNetworkPreloadStarted,
+                conversationID: conversationID,
+                metadata: ["source": "rest"]
+            )
+        default:
+            break
+        }
+        MessengerDiagnostics.event(
+            .messengerMessageNetworkRefreshStarted,
+            conversationID: conversationID,
+            metadata: ["source": "rest", "reason": reason.rawValue]
+        )
+    }
+
+    private func emitNetworkRefreshSucceeded(
+        reason: MessageLoadReason,
+        conversationID: UUID,
+        count: Int,
+        startedAt: Date
+    ) {
+        let metadata: [String: String] = [
+            "count": "\(count)",
+            "durationMs": "\(durationMilliseconds(since: startedAt))",
+            "source": "rest",
+            "reason": reason.rawValue
+        ]
+        switch reason {
+        case .open:
+            MessengerDiagnostics.event(
+                .messengerChatOpenNetworkRefreshSucceeded,
+                conversationID: conversationID,
+                metadata: metadata
+            )
+        case .startupPreload:
+            MessengerDiagnostics.event(
+                .messengerStartupMessagesNetworkPreloadSucceeded,
+                conversationID: conversationID,
+                metadata: metadata
+            )
+        default:
+            break
+        }
+        MessengerDiagnostics.event(
+            .messengerMessageNetworkRefreshSucceeded,
+            conversationID: conversationID,
+            metadata: metadata
+        )
+    }
+
+    private func emitNetworkRefreshFailed(
+        reason: MessageLoadReason,
+        conversationID: UUID,
+        error: Error,
+        startedAt: Date
+    ) {
+        let metadata: [String: String] = [
+            "errorCategory": MessengerDiagnostics.sanitizeError(error),
+            "durationMs": "\(durationMilliseconds(since: startedAt))",
+            "source": "rest",
+            "reason": reason.rawValue
+        ]
+        switch reason {
+        case .open:
+            MessengerDiagnostics.event(
+                .messengerChatOpenNetworkRefreshFailed,
+                conversationID: conversationID,
+                metadata: metadata
+            )
+        case .startupPreload:
+            MessengerDiagnostics.event(
+                .messengerStartupMessagesNetworkPreloadFailed,
+                conversationID: conversationID,
+                metadata: metadata
+            )
+        default:
+            break
+        }
+        MessengerDiagnostics.event(
+            .messengerMessageNetworkRefreshFailed,
+            conversationID: conversationID,
+            metadata: metadata
+        )
     }
 
     @discardableResult
@@ -291,6 +573,15 @@ final class MessageCacheStore {
               let before = entry.olderMessagesCursor,
               !entry.isLoadingOlder else {
             NetworkDebug.log("Older messages load skipped: cursor=\(entries[conversationID]?.olderMessagesCursor != nil) loading=\(entries[conversationID]?.isLoadingOlder == true)")
+            return false
+        }
+
+        if NetworkPathMonitor.shared.shouldSkipNetworkBecauseOffline {
+            MessengerDiagnostics.event(
+                .messengerNetworkRequestSkippedOffline,
+                conversationID: conversationID,
+                metadata: ["reason": MessageLoadReason.pagination.rawValue]
+            )
             return false
         }
 
@@ -446,11 +737,11 @@ final class MessageCacheStore {
         await withTaskGroup(of: Void.self) { group in
             for conversation in targets {
                 group.addTask { @MainActor in
-                    _ = await self.loadRecentMessagesIfNeeded(
-                        conversationID: conversation.id,
-                        limit: messagesPerConversation,
+                    await self.preloadConversationMessages(
+                        conversation: conversation,
                         session: session,
-                        router: router
+                        router: router,
+                        messagesPerConversation: messagesPerConversation
                     )
                 }
             }

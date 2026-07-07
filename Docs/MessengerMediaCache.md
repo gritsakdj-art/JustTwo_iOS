@@ -23,7 +23,7 @@ If an image attachment was already loaded/viewed/downloaded, it survives app rel
 - Persistent outgoing outbox / failed upload retry (**PR16**)
 - Persistent sync cursor / full sync engine (**PR17**)
 - Storing signed URLs, upload URLs, storage keys, image bytes, or absolute paths in SwiftData
-- Startup preload optimization
+- Startup preload optimization beyond local-DB-first message hydrate (**PR15F**)
 
 ## Architecture
 

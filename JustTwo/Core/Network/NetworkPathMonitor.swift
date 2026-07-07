@@ -10,6 +10,21 @@ final class NetworkPathMonitor {
     private var lastSignature: String?
     private var handlers: [UUID: () -> Void] = [:]
     private(set) var isNetworkSatisfied = true
+    private(set) var hasReceivedPathUpdate = false
+
+    #if DEBUG
+    nonisolated(unsafe) static var testingForceOffline: Bool?
+    #endif
+
+    /// Skip REST only when the path monitor has reported offline at least once.
+    var shouldSkipNetworkBecauseOffline: Bool {
+        #if DEBUG
+        if let testingForceOffline = Self.testingForceOffline {
+            return testingForceOffline
+        }
+        #endif
+        return hasReceivedPathUpdate && !isNetworkSatisfied
+    }
 
     private init() {}
 
@@ -36,6 +51,7 @@ final class NetworkPathMonitor {
     }
 
     fileprivate func handlePathUpdate(_ path: NWPath) {
+        hasReceivedPathUpdate = true
         isNetworkSatisfied = path.status == .satisfied
 
         let signature = Self.signature(for: path)

@@ -29,7 +29,7 @@ After MainTabView (background):
         ├─ ConversationsStartupLoader.refreshNetworkIfNeeded
         ├─ realtime connect + delta bootstrap
         ├─ ConversationAvatarsStartupLoader (critical + remaining)
-        └─ MessagesStartupLoader
+        └─ MessagesStartupLoader (local-DB-first, PR15F)
         └─ MessengerMediaCacheService.runCleanupIfNeeded (PR15E, background)
 ```
 
@@ -222,15 +222,61 @@ Coordinator `performReset()` also clears:
 1. Login A, seed cache, logout, login B.
 2. A's startup snapshot and messenger cache must not appear.
 
-## Deferred (PR15E/PR15F)
+## PR15F — Messenger request optimization
 
-* `MessagesStartupLoader` local-DB-first optimization
-* skip redundant `force: true` on chat open
-* remove `ChatsView` pop refresh
-* delivery ack batching
+### Goals
+
+- `MessagesStartupLoader` local-DB-first: hydrate SwiftData → memory before REST.
+- Skip redundant `GET /messages` on chat open when cache is fresh.
+- Remove full `GET /conversations` on every chat pop (`ChatsView`).
+- Offline fail-fast via `NetworkPathMonitor.shouldSkipNetworkBecauseOffline`.
+- Delivery ack batch on conversation refresh runs in background.
+
+### Startup message preload flow
+
+```text
+For each top conversation:
+  1. messengerStartupMessagesLocalPreloadStarted
+  2. Hydrate SwiftData → MessageCacheStore
+  3. If fresh → messengerStartupMessagesNetworkPreloadSkippedFreshCache
+  4. If stale local → background REST refresh
+  5. If empty → REST preload (unless offline fail-fast)
+```
+
+### Chat open
+
+```text
+memory/local hydrate → UI
+if cache fresh → messengerChatOpenNetworkRefreshSkippedFreshCache
+else → REST refresh (non-blocking when UI already has messages)
+manual refresh → always force REST
+```
+
+### ChatsView pop
+
+Returning from chat no longer calls `refresh()`. List state comes from realtime/delta/local cache. Manual pull-to-refresh still forces REST.
+
+### Offline fail-fast
+
+When `NetworkPathMonitor` reports offline after first path update, message/conversation REST wrappers return immediately and preserve cached UI.
+
+### Manual smoke checklist
+
+1. **Startup online:** launch → conversations + chats open without obvious delay regression.
+2. **Startup offline:** seed online → kill → airplane → relaunch → list + messages + PR15E images visible; no long timeout.
+3. **Chat after preload:** launch online → wait warmup → open chat → diagnostics show skip or single fetch, not duplicate immediate GET.
+4. **Manual refresh:** pull refresh in chat/list → REST still runs.
+5. **Chat pop:** open chat → back → no full conversations refresh unless manual.
+6. **Realtime:** receive message in list/chat → preview updates; open chat → realtime message not overwritten by stale REST.
+7. **Offline fail-fast:** airplane → open cached chat → no long spinner; manual refresh fails quickly, cache preserved.
+8. **Acks:** open unread chat → UI not frozen by ack network.
+9. **Diagnostics export:** no body/signed URL/JWT/localPath.
+
+## Deferred
 
 ## Related docs
 
+* [Messenger request optimization (PR15F)](MessengerLocalStorage.md#pr15f--messenger-startuprequest-optimization)
 * [Messenger local storage (PR15A–C)](MessengerLocalStorage.md)
 * [Invite links and QR flow](InviteLinks.md)
 * [Profile photos and avatar presentation](ProfilePhotos.md)
