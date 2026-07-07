@@ -6,29 +6,7 @@ struct JustTwoApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
 
     var sharedModelContainer: ModelContainer = {
-        let schema = Schema([
-            Item.self,
-            LocalMessengerConversation.self,
-            LocalMessengerMessage.self,
-            LocalMessengerAttachment.self,
-            LocalMessengerReactionAggregate.self,
-            LocalMessengerReceipt.self,
-            LocalMessengerSyncMetadata.self,
-        ])
-
-        let modelConfiguration = ModelConfiguration(
-            schema: schema,
-            isStoredInMemoryOnly: false
-        )
-
-        do {
-            return try ModelContainer(
-                for: schema,
-                configurations: [modelConfiguration]
-            )
-        } catch {
-            fatalError("Could not create ModelContainer: \(error)")
-        }
+        AppModelContainerFactory.makeSharedContainer()
     }()
 
     init() {

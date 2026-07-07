@@ -152,6 +152,16 @@ struct ChatImageBubbleView: View {
             return
         }
 
+        if let diskCached = await MessengerMediaCacheService.loadBubbleImage(attachmentID: cacheKey) {
+            ChatMessageImageCache.shared.save(diskCached, for: cacheKey)
+            applyLoadedImage(diskCached, source: "disk")
+            MessengerDiagnostics.event(
+                .messengerMediaDiskCacheHit,
+                metadata: renderMetadata(source: "disk")
+            )
+            return
+        }
+
         MessengerDiagnostics.event(
             .imageCacheMiss,
             metadata: renderMetadata(source: "remote")
@@ -179,6 +189,7 @@ struct ChatImageBubbleView: View {
 
             ChatMessageImageCache.shared.save(downloaded, for: cacheKey)
             applyLoadedImage(downloaded, source: "remote")
+            await MessengerMediaCacheService.storeBubbleImage(downloaded, attachmentID: cacheKey)
             MessengerDiagnostics.event(
                 .imageBubbleUsedRemoteURL,
                 metadata: renderMetadata(source: "remote")

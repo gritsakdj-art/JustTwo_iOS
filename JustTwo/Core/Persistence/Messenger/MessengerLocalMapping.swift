@@ -80,8 +80,9 @@ enum MessengerLocalMapping {
         guard dto.deletedAt == nil else { return [] }
 
         return dto.attachments.map { attachment in
-            LocalMessengerAttachment(
-                id: attachment.id.uuidString,
+            let cacheKey = attachment.id.uuidString.lowercased()
+            return LocalMessengerAttachment(
+                id: cacheKey,
                 messageID: dto.id.uuidString,
                 conversationID: dto.conversationID.uuidString,
                 kind: MessageKind.image.rawValue,
@@ -90,7 +91,7 @@ enum MessengerLocalMapping {
                 width: attachment.width,
                 height: attachment.height,
                 createdAt: dto.createdAt,
-                localCacheKey: attachment.id.uuidString,
+                localCacheKey: cacheKey,
                 downloadURLExpiresAt: attachment.downloadUrlExpiresAt,
                 localUpdatedAt: syncedAt
             )
@@ -220,6 +221,12 @@ enum MessengerLocalMapping {
             createdAt: entity.createdAt,
             localCacheKey: entity.localCacheKey,
             downloadURLExpiresAt: entity.downloadURLExpiresAt,
+            hasLocalThumbnail: entity.hasLocalThumbnail ?? false,
+            hasLocalFullImage: entity.hasLocalFullImage ?? false,
+            localThumbnailByteSize: entity.localThumbnailByteSize,
+            localFullByteSize: entity.localFullByteSize,
+            mediaCachedAt: entity.mediaCachedAt,
+            mediaLastAccessedAt: entity.mediaLastAccessedAt,
             localUpdatedAt: entity.localUpdatedAt
         )
     }
@@ -327,7 +334,25 @@ enum MessengerLocalMapping {
         target.createdAt = source.createdAt
         target.localCacheKey = source.localCacheKey
         target.downloadURLExpiresAt = source.downloadURLExpiresAt
+        target.hasLocalThumbnail = source.hasLocalThumbnail
+        target.hasLocalFullImage = source.hasLocalFullImage
+        target.localThumbnailByteSize = source.localThumbnailByteSize
+        target.localFullByteSize = source.localFullByteSize
+        target.mediaCachedAt = source.mediaCachedAt
+        target.mediaLastAccessedAt = source.mediaLastAccessedAt
         target.localUpdatedAt = source.localUpdatedAt
+    }
+
+    static func applyAttachmentMediaMetadata(
+        from source: LocalMessengerAttachment,
+        to target: LocalMessengerAttachment
+    ) {
+        target.hasLocalThumbnail = source.hasLocalThumbnail
+        target.hasLocalFullImage = source.hasLocalFullImage
+        target.localThumbnailByteSize = source.localThumbnailByteSize
+        target.localFullByteSize = source.localFullByteSize
+        target.mediaCachedAt = source.mediaCachedAt
+        target.mediaLastAccessedAt = source.mediaLastAccessedAt
     }
 
     static func applyReceipt(_ incoming: LocalMessengerReceipt, to existing: LocalMessengerReceipt) {

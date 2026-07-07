@@ -65,12 +65,12 @@ struct MessengerMessageCacheTests {
         )
 
         #expect(hydrated[0].kind == .image)
-        #expect(hydrated[0].imageAttachment?.id == attachmentID.uuidString)
+        #expect(hydrated[0].imageAttachment?.id == attachmentID.uuidString.lowercased())
         #expect(hydrated[0].imageAttachment?.downloadURL == nil)
 
         let snapshot = try #require(try await store.fetchLocalMessages(conversationID: conversationID, limit: 10, before: nil).first)
         let attachment = try #require(snapshot.attachments.first)
-        #expect(attachment.localCacheKey == attachmentID.uuidString)
+        #expect(attachment.localCacheKey == attachmentID.uuidString.lowercased())
         let encoded = String(describing: attachment)
         #expect(!encoded.contains("downloadUrl"))
         #expect(!encoded.contains("X-Amz-Signature"))
@@ -415,7 +415,7 @@ struct MessengerMessageCacheTests {
         #expect(hydrated.count == 1)
         #expect(hydrated[0].kind == .image)
         #expect(hydrated[0].imageAttachment?.downloadURL == nil)
-        #expect(hydrated[0].imageAttachment?.id == attachmentID.uuidString)
+        #expect(hydrated[0].imageAttachment?.id == attachmentID.uuidString.lowercased())
         _ = store
     }
 

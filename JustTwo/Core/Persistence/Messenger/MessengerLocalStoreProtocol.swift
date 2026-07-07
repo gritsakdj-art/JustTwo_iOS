@@ -30,4 +30,18 @@ protocol MessengerLocalStoreProtocol: AnyObject {
 
     func upsertSyncMetadata(_ metadata: LocalMessengerSyncMetadataSnapshot) async throws
     func fetchSyncMetadata() async throws -> LocalMessengerSyncMetadataSnapshot?
+
+    func updateAttachmentMediaCacheMetadata(
+        attachmentID: String,
+        variant: MessengerMediaVariant,
+        byteSize: Int,
+        cachedAt: Date
+    ) async throws
+    func recordAttachmentMediaAccess(
+        attachmentID: String,
+        variant: MessengerMediaVariant,
+        accessedAt: Date
+    ) async throws
+    func clearAttachmentMediaCacheMetadata(attachmentID: String) async throws
+    func fetchAttachmentLocalCacheKeys() async throws -> Set<String>
 }

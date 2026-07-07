@@ -58,9 +58,39 @@ struct ChatMessageAttachment: Identifiable, Equatable, Hashable {
     let localFileURL: URL?
     let downloadURL: URL?
     let downloadUrlExpiresAt: Date?
+    let hasLocalDiskThumbnail: Bool
+    let hasLocalDiskFull: Bool
 
-    var aspectRatio: CGFloat {
+    var hasLocalDiskCache: Bool {
+        hasLocalDiskThumbnail || hasLocalDiskFull
+    }
+
+    nonisolated var aspectRatio: CGFloat {
         ChatImageBubbleLayout.aspectRatio(width: width, height: height)
+    }
+
+    nonisolated init(
+        id: String,
+        contentType: String,
+        byteSize: Int,
+        width: Int,
+        height: Int,
+        localFileURL: URL?,
+        downloadURL: URL?,
+        downloadUrlExpiresAt: Date?,
+        hasLocalDiskThumbnail: Bool = false,
+        hasLocalDiskFull: Bool = false
+    ) {
+        self.id = id
+        self.contentType = contentType
+        self.byteSize = byteSize
+        self.width = width
+        self.height = height
+        self.localFileURL = localFileURL
+        self.downloadURL = downloadURL
+        self.downloadUrlExpiresAt = downloadUrlExpiresAt
+        self.hasLocalDiskThumbnail = hasLocalDiskThumbnail
+        self.hasLocalDiskFull = hasLocalDiskFull
     }
 
     nonisolated static func local(
@@ -81,7 +111,7 @@ struct ChatMessageAttachment: Identifiable, Equatable, Hashable {
 
     nonisolated static func remote(_ dto: MessageAttachmentDTO) -> ChatMessageAttachment {
         ChatMessageAttachment(
-            id: dto.id.uuidString,
+            id: dto.id.uuidString.lowercased(),
             contentType: dto.contentType,
             byteSize: dto.byteSize,
             width: dto.width,
@@ -102,7 +132,9 @@ struct ChatMessageAttachment: Identifiable, Equatable, Hashable {
             height: snapshot.height ?? 1,
             localFileURL: nil,
             downloadURL: nil,
-            downloadUrlExpiresAt: snapshot.downloadURLExpiresAt
+            downloadUrlExpiresAt: snapshot.downloadURLExpiresAt,
+            hasLocalDiskThumbnail: snapshot.hasLocalThumbnail,
+            hasLocalDiskFull: snapshot.hasLocalFullImage
         )
     }
 }
@@ -177,6 +209,7 @@ struct ChatMessage: Identifiable, Equatable, Hashable {
 enum ChatImageRenderSource: Equatable {
     case localFile
     case remote(attachmentID: String)
+    case diskCache(attachmentID: String)
 }
 
 extension ChatMessage {
@@ -187,6 +220,9 @@ extension ChatMessage {
 
         if attachment.localFileURL != nil {
             return .localFile
+        }
+        if attachment.hasLocalDiskCache {
+            return .diskCache(attachmentID: attachment.id)
         }
         if attachment.downloadURL != nil {
             return .remote(attachmentID: attachment.id)

@@ -100,6 +100,14 @@ When splash routes to `MainTabView` using a cached session snapshot:
 * delta bootstrap runs in background network warmup after validation;
 * transient network loss during an active session keeps existing realtime behavior unchanged.
 
+## Image attachments offline (PR15E)
+
+Realtime/delta may deliver image messages without a persistable signed URL in local DB. After an image was once loaded online:
+
+* disk cache keyed by `attachmentID` allows offline bubble/viewer rendering;
+* realtime does not write image bytes to SwiftData;
+* delete events still clear renderable attachments and remove disk cache files.
+
 ## Manual smoke
 
 Use staging only:

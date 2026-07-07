@@ -207,6 +207,20 @@
 - Updated `Docs/StartupLoading.md`, `Docs/MessengerLocalStorage.md`, `Docs/Realtime.md`.
 - Deferred: PR15E (MessagesStartupLoader local-DB-first), PR15F (pop refresh removal, ack batching).
 
+## 2026-07-07 (PR15E)
+
+### Persistent media disk cache for message attachments
+
+- Added `MessengerMediaDiskCache` + `MessengerMediaCacheService` (memory → disk → network → placeholder).
+- Storage: `Application Support/JustTwo/MediaCache/attachments/<attachmentID>/thumb.jpg|full.jpg`.
+- Extended `LocalMessengerAttachment` with disk availability metadata flags (no URLs/paths/bytes in SwiftData).
+- Integrated `ChatImageBubbleView` and `ChatPhotoViewerView` with disk cache read/write.
+- Delete message removes disk files; logout clears cache; background quota/LRU cleanup on startup.
+- File protection `completeUntilFirstUserAuthentication`; excluded from iCloud backup.
+- Added `Docs/MessengerMediaCache.md` and updated `Docs/MessengerLocalStorage.md`, `Docs/StartupLoading.md`, `Docs/Realtime.md`.
+- Added `JustTwoTests/MessengerMediaDiskCacheTests.swift`.
+- Out of scope: persistent outbox, outgoing media retry, sync cursor, backend changes.
+
 ## Notes
 
 - Continue adding completed changes here after each meaningful update.

@@ -204,7 +204,7 @@ struct ChatImageRenderStateTests {
         """.utf8))
 
         let message = ChatUIMapping.message(from: dto, currentProfileID: dto.senderProfileID)
-        #expect(message.imageRenderSource == .remote(attachmentID: "44444444-4444-4444-4444-444444444444"))
+        #expect(message.imageRenderSource == .remote(attachmentID: "44444444-4444-4444-4444-444444444444".lowercased()))
     }
 
     @Test

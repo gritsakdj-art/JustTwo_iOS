@@ -111,8 +111,8 @@ struct MessengerLocalStoreTests {
         #expect(message.kind == "image")
         #expect(message.attachments.count == 1)
         let attachment = try #require(message.attachments.first)
-        #expect(attachment.id == attachmentID.uuidString)
-        #expect(attachment.localCacheKey == attachmentID.uuidString)
+        #expect(attachment.id == attachmentID.uuidString.lowercased())
+        #expect(attachment.localCacheKey == attachmentID.uuidString.lowercased())
         #expect(attachment.contentType == "image/jpeg")
         #expect(attachment.byteSize == 12_345)
 

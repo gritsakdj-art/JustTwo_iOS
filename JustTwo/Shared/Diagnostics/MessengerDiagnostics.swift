@@ -210,6 +210,9 @@ enum MessengerDiagnosticEvent: String, Sendable {
     case messengerLocalSyncMetadataUpdated
     case messengerLocalMappingFailed
 
+    case messengerSwiftDataContainerLoadFailed
+    case messengerSwiftDataContainerRecoveredAfterSchemaMismatch
+
     case messengerConversationCacheLoadStarted
     case messengerConversationCacheLoadSucceeded
     case messengerConversationCacheLoadFailed
@@ -245,6 +248,20 @@ enum MessengerDiagnosticEvent: String, Sendable {
     case messengerMessageLoadStaleIgnored
     case messengerMessageLoadingStateRecovered
     case messengerMessageFallbackToCache
+
+    case messengerMediaDiskCacheLookupStarted
+    case messengerMediaDiskCacheHit
+    case messengerMediaDiskCacheMiss
+    case messengerMediaDiskCacheReadFailed
+    case messengerMediaDiskCacheStoreStarted
+    case messengerMediaDiskCacheStoreSucceeded
+    case messengerMediaDiskCacheStoreFailed
+    case messengerMediaDiskCacheRemoved
+    case messengerMediaDiskCacheCleanupStarted
+    case messengerMediaDiskCacheCleanupSucceeded
+    case messengerMediaDiskCacheCleanupFailed
+    case messengerMediaDiskCacheBackupExcluded
+    case messengerMediaDiskCacheFileProtectionApplied
 
     case startupSessionSnapshotLoadStarted
     case startupSessionSnapshotLoadSucceeded

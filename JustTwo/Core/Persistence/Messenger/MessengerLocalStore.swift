@@ -259,6 +259,48 @@ final class MessengerLocalStore: MessengerLocalStoreProtocol {
         }
     }
 
+    func updateAttachmentMediaCacheMetadata(
+        attachmentID: String,
+        variant: MessengerMediaVariant,
+        byteSize: Int,
+        cachedAt: Date
+    ) async throws {
+        try await performSessionBoundOperation(operation: "updateAttachmentMediaCacheMetadata") {
+            try await backingStore.updateAttachmentMediaCacheMetadata(
+                attachmentID: attachmentID,
+                variant: variant,
+                byteSize: byteSize,
+                cachedAt: cachedAt
+            )
+        }
+    }
+
+    func recordAttachmentMediaAccess(
+        attachmentID: String,
+        variant: MessengerMediaVariant,
+        accessedAt: Date
+    ) async throws {
+        try await performSessionBoundOperation(operation: "recordAttachmentMediaAccess") {
+            try await backingStore.recordAttachmentMediaAccess(
+                attachmentID: attachmentID,
+                variant: variant,
+                accessedAt: accessedAt
+            )
+        }
+    }
+
+    func clearAttachmentMediaCacheMetadata(attachmentID: String) async throws {
+        try await performSessionBoundOperation(operation: "clearAttachmentMediaCacheMetadata") {
+            try await backingStore.clearAttachmentMediaCacheMetadata(attachmentID: attachmentID)
+        }
+    }
+
+    func fetchAttachmentLocalCacheKeys() async throws -> Set<String> {
+        try await performSessionBoundOperation(operation: "fetchAttachmentLocalCacheKeys") {
+            try await backingStore.fetchAttachmentLocalCacheKeys()
+        }
+    }
+
     private func performSessionBoundOperation<T>(
         operation: String,
         _ work: () async throws -> T

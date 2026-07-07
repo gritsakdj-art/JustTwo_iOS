@@ -10,6 +10,7 @@ On-device messenger persistence using SwiftData.
 | PR15B | Cached conversation list (read + write from REST/delta/realtime) | ✅ |
 | PR15C | Cached per-conversation message history + resilient chat loading | ✅ |
 | PR15D | Offline-friendly splash + startup session snapshot | ✅ |
+| PR15E | Persistent media disk cache for message attachments | ✅ |
 | PR16 | Persistent outbox | planned |
 | PR17 | Full sync engine | planned |
 
@@ -38,6 +39,43 @@ Splash and critical warmup no longer require network when a usable cached sessio
 ### Manual smoke
 
 See [Startup loading](StartupLoading.md) PR15D checklist.
+
+## PR15E — Persistent media disk cache
+
+Confirmed/received image attachments can survive relaunch from disk cache.
+
+### Behavior
+
+```text
+1. Image bubble/viewer loads memory cache first.
+2. On miss, reads Application Support media disk cache by attachmentID.
+3. On disk hit, renders offline and updates mediaLastAccessedAt in SwiftData.
+4. On disk miss with fresh downloadURL, downloads and stores thumb/full variants.
+5. On disk miss without URL, shows safe placeholder (no crash).
+6. Message delete removes disk files + clears metadata flags.
+7. Background cleanup enforces quota/LRU and removes orphan files.
+8. Logout clears entire media cache directory.
+```
+
+### What is cached
+
+- Received images with server `attachmentID`
+- Confirmed outgoing images after server returns `attachmentID`
+- Thumbnail (bubble) and full (viewer) variants when downloaded
+
+### What is not cached
+
+- Pending outgoing `local-*` attachments before server ID
+- Failed upload temp files / durable outbox media (**PR16**)
+- Signed `downloadUrl`, `uploadUrl`, storage keys, image bytes in SwiftData
+
+### SwiftData attachment fields (PR15E)
+
+`hasLocalThumbnail`, `hasLocalFullImage`, `localThumbnailByteSize`, `localFullByteSize`, `mediaCachedAt`, `mediaLastAccessedAt`
+
+**Schema note (v2):** PR15E adds optional attachment media metadata fields. If an on-device SwiftData store from PR15A–PR15D cannot be opened, `AppModelContainerFactory` recreates the store once (local messenger cache is rebuilt from REST/delta; media disk cache in Application Support is separate and preserved).
+
+See [Messenger Media Cache](MessengerMediaCache.md) for storage layout, security, cleanup, and smoke checklist.
 
 ## PR15C — Cached messages per conversation
 
@@ -95,7 +133,7 @@ Chat screen opens from local cached messages when available, then REST remains a
 
 - Attachment metadata persisted: `attachmentID`, `contentType`, `byteSize`, `width`, `height`, `localCacheKey`.
 - Signed `downloadUrl` / `uploadUrl` / storage keys are **not** persisted.
-- Cached image bubble shows placeholder until REST provides fresh URL or `ChatMessageImageCache` has data.
+- Cached image bubble shows placeholder until REST provides fresh URL, memory cache, or **disk cache (PR15E)**.
 - Deleted image messages do not render stale attachments.
 
 ### Architecture (PR15C)

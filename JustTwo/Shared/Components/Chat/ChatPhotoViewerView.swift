@@ -222,6 +222,17 @@ struct ChatPhotoViewerView: View {
             return
         }
 
+        if let cached = ChatMessageImageCache.shared.image(for: attachment.id) {
+            image = cached
+            return
+        }
+
+        if let diskCached = await MessengerMediaCacheService.loadViewerImage(attachmentID: attachment.id) {
+            ChatMessageImageCache.shared.save(diskCached, for: attachment.id)
+            image = diskCached
+            return
+        }
+
         guard let downloadURL = attachment.downloadURL else {
             loadFailed = true
             return
@@ -235,6 +246,8 @@ struct ChatPhotoViewerView: View {
                 loadFailed = true
                 return
             }
+            ChatMessageImageCache.shared.save(downloaded, for: attachment.id)
+            await MessengerMediaCacheService.storeViewerImage(downloaded, attachmentID: attachment.id)
             image = downloaded
         } catch {
             loadFailed = true

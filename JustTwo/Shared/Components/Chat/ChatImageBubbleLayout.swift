@@ -2,21 +2,21 @@ import CoreGraphics
 
 /// Layout rules for image message bubbles in chat.
 enum ChatImageBubbleLayout {
-    static let fallbackAspectRatio: CGFloat = 4.0 / 3.0
-    static let minWidth: CGFloat = 132
-    static let maxWidthCap: CGFloat = 280
+    nonisolated static let fallbackAspectRatio: CGFloat = 4.0 / 3.0
+    nonisolated static let minWidth: CGFloat = 132
+    nonisolated static let maxWidthCap: CGFloat = 280
     /// Landscape photos get a tighter width cap so they sit inside the bubble
     /// with a comfortable margin instead of hugging (or crossing) its edge.
-    static let landscapeMaxWidthCap: CGFloat = 232
-    static let minHeight: CGFloat = 120
-    static let maxHeight: CGFloat = 340
-    static let cornerRadius: CGFloat = 14
+    nonisolated static let landscapeMaxWidthCap: CGFloat = 232
+    nonisolated static let minHeight: CGFloat = 120
+    nonisolated static let maxHeight: CGFloat = 340
+    nonisolated static let cornerRadius: CGFloat = 14
 
     /// Clamps extreme aspect ratios so portrait/landscape photos stay readable in chat.
-    private static let minAspectRatio: CGFloat = 0.55
-    private static let maxAspectRatio: CGFloat = 1.8
+    nonisolated static let minAspectRatio: CGFloat = 0.55
+    nonisolated static let maxAspectRatio: CGFloat = 1.8
 
-    static func aspectRatio(width: Int, height: Int) -> CGFloat {
+    nonisolated static func aspectRatio(width: Int, height: Int) -> CGFloat {
         guard width > 0, height > 0 else { return fallbackAspectRatio }
         let raw = CGFloat(width) / CGFloat(height)
         return min(maxAspectRatio, max(minAspectRatio, raw))

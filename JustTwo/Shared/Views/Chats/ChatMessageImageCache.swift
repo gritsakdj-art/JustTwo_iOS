@@ -13,7 +13,7 @@ final class ChatMessageImageCache {
     }
 
     static func cacheKey(for attachment: ChatMessageAttachment) -> String {
-        attachment.id
+        attachment.id.lowercased()
     }
 
     func image(for cacheKey: String) -> UIImage? {

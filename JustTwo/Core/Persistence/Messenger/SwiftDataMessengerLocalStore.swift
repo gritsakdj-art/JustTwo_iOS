@@ -153,6 +153,9 @@ final class SwiftDataMessengerLocalStore: MessengerLocalStoreProtocol {
         let id = messageID.uuidString
         guard let existing = try fetchMessageEntity(id: id, context: context) else { return }
 
+        let attachmentSnapshots = try fetchAttachmentSnapshots(messageID: id, context: context)
+        let attachmentIDs = attachmentSnapshots.map { $0.localCacheKey ?? $0.id }
+
         let tombstoneDate = deletedAt ?? Date()
         existing.deletedAt = tombstoneDate
         existing.body = nil
@@ -162,6 +165,10 @@ final class SwiftDataMessengerLocalStore: MessengerLocalStoreProtocol {
         try deleteAttachments(messageID: id, context: context)
         try deleteReactionAggregates(messageID: id, context: context)
         try context.save()
+
+        for attachmentID in attachmentIDs {
+            await MessengerMediaCacheService.removeMedia(attachmentID: attachmentID)
+        }
     }
 
     func upsertReactions(from message: MessageDTO) async throws {
@@ -231,6 +238,70 @@ final class SwiftDataMessengerLocalStore: MessengerLocalStoreProtocol {
 
         return MessengerLocalMapping.syncMetadataSnapshot(from: entity)
     }
+
+    func updateAttachmentMediaCacheMetadata(
+        attachmentID: String,
+        variant: MessengerMediaVariant,
+        byteSize: Int,
+        cachedAt: Date
+    ) async throws {
+        let context = modelContext
+        guard let attachment = try fetchAttachmentEntity(id: attachmentID, context: context) else {
+            return
+        }
+
+        switch variant {
+        case .thumbnail:
+            attachment.hasLocalThumbnail = true
+            attachment.localThumbnailByteSize = byteSize
+        case .full:
+            attachment.hasLocalFullImage = true
+            attachment.localFullByteSize = byteSize
+        }
+
+        attachment.mediaCachedAt = attachment.mediaCachedAt ?? cachedAt
+        attachment.mediaLastAccessedAt = cachedAt
+        attachment.localUpdatedAt = cachedAt
+        try context.save()
+    }
+
+    func recordAttachmentMediaAccess(
+        attachmentID: String,
+        variant: MessengerMediaVariant,
+        accessedAt: Date
+    ) async throws {
+        let context = modelContext
+        guard let attachment = try fetchAttachmentEntity(id: attachmentID, context: context) else {
+            return
+        }
+
+        attachment.mediaLastAccessedAt = accessedAt
+        attachment.localUpdatedAt = accessedAt
+        try context.save()
+    }
+
+    func clearAttachmentMediaCacheMetadata(attachmentID: String) async throws {
+        let context = modelContext
+        guard let attachment = try fetchAttachmentEntity(id: attachmentID, context: context) else {
+            return
+        }
+
+        attachment.hasLocalThumbnail = false
+        attachment.hasLocalFullImage = false
+        attachment.localThumbnailByteSize = nil
+        attachment.localFullByteSize = nil
+        attachment.mediaCachedAt = nil
+        attachment.mediaLastAccessedAt = nil
+        attachment.localUpdatedAt = Date()
+        try context.save()
+    }
+
+    func fetchAttachmentLocalCacheKeys() async throws -> Set<String> {
+        let context = modelContext
+        let descriptor = FetchDescriptor<LocalMessengerAttachment>()
+        let attachments = try context.fetch(descriptor)
+        return Set(attachments.compactMap { $0.localCacheKey ?? $0.id })
+    }
 }
 
 // MARK: - Private helpers
@@ -280,10 +351,22 @@ private extension SwiftDataMessengerLocalStore {
         context: ModelContext
     ) throws {
         let messageID = dto.id.uuidString
+        let existingAttachments = try context.fetch(
+            FetchDescriptor<LocalMessengerAttachment>(
+                predicate: #Predicate { $0.messageID == messageID }
+            )
+        )
+        let preservedMetadata = Dictionary(
+            uniqueKeysWithValues: existingAttachments.map { ($0.id, $0) }
+        )
+
         try deleteAttachments(messageID: messageID, context: context)
 
         let mapped = MessengerLocalMapping.mapAttachments(from: dto, syncedAt: syncedAt)
         for attachment in mapped {
+            if let previous = preservedMetadata[attachment.id] {
+                MessengerLocalMapping.applyAttachmentMediaMetadata(from: previous, to: attachment)
+            }
             context.insert(attachment)
         }
     }
@@ -363,6 +446,35 @@ private extension SwiftDataMessengerLocalStore {
             predicate: #Predicate { $0.messageID == messageID }
         )
         return try context.fetch(descriptor).map(MessengerLocalMapping.reactionAggregateSnapshot(from:))
+    }
+
+    func fetchAttachmentEntity(id: String, context: ModelContext) throws -> LocalMessengerAttachment? {
+        if let exact = try fetchAttachmentEntityByID(entityID: id, context: context) {
+            return exact
+        }
+
+        let normalized = id.lowercased()
+        if normalized != id, let match = try fetchAttachmentEntityByID(entityID: normalized, context: context) {
+            return match
+        }
+
+        var cacheKeyDescriptor = FetchDescriptor<LocalMessengerAttachment>(
+            predicate: #Predicate { attachment in
+                attachment.localCacheKey == id || attachment.localCacheKey == normalized
+            }
+        )
+        cacheKeyDescriptor.fetchLimit = 1
+        return try context.fetch(cacheKeyDescriptor).first
+    }
+
+    func fetchAttachmentEntityByID(entityID: String, context: ModelContext) throws -> LocalMessengerAttachment? {
+        var descriptor = FetchDescriptor<LocalMessengerAttachment>(
+            predicate: #Predicate { attachment in
+                attachment.id == entityID
+            }
+        )
+        descriptor.fetchLimit = 1
+        return try context.fetch(descriptor).first
     }
 
     func deleteAttachments(messageID: String, context: ModelContext) throws {

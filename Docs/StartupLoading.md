@@ -30,6 +30,7 @@ After MainTabView (background):
         ├─ realtime connect + delta bootstrap
         ├─ ConversationAvatarsStartupLoader (critical + remaining)
         └─ MessagesStartupLoader
+        └─ MessengerMediaCacheService.runCleanupIfNeeded (PR15E, background)
 ```
 
 ### Coordinator and loaders

@@ -156,6 +156,10 @@ final class AppStartupCoordinator {
             force: force
         )
 
+        Task {
+            await MessengerMediaCacheService.runCleanupIfNeeded()
+        }
+
         MessengerDiagnostics.event(
             .startupBackgroundNetworkWarmupSucceeded,
             metadata: [
@@ -211,6 +215,7 @@ final class AppStartupCoordinator {
         ConversationListViewModel.shared.reset()
 
         await StartupSessionSnapshotStore.shared.clear()
+        await MessengerMediaCacheService.clearAll()
 
         do {
             try await MessengerLocalStore.shared.resetAllMessengerData()

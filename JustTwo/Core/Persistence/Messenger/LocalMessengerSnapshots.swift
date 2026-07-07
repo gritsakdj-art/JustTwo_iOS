@@ -65,6 +65,12 @@ struct LocalAttachmentSnapshot: Sendable, Equatable, Identifiable {
     let createdAt: Date?
     let localCacheKey: String?
     let downloadURLExpiresAt: Date?
+    let hasLocalThumbnail: Bool
+    let hasLocalFullImage: Bool
+    let localThumbnailByteSize: Int?
+    let localFullByteSize: Int?
+    let mediaCachedAt: Date?
+    let mediaLastAccessedAt: Date?
     let localUpdatedAt: Date
 }
 
