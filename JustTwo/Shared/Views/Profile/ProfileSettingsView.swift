@@ -29,6 +29,7 @@ struct ProfileSettingsView: View {
     @State private var isVisibleInDiscovery = true
     @State private var isUpdatingDiscoveryVisibility = false
     @State private var discoveryVisibilityErrorMessage: String?
+    @FocusState private var isBioFocused: Bool
 
     private let bioLimit = 180
 
@@ -49,6 +50,7 @@ struct ProfileSettingsView: View {
                     Text(errorMessage)
                         .font(Font.App.footnote())
                         .foregroundStyle(Color.error)
+                        .transition(.opacity.combined(with: .move(edge: .top)))
                 }
 
                 PrimaryButton(
@@ -60,9 +62,14 @@ struct ProfileSettingsView: View {
                 }
 
                 if context == .settings {
+                    Divider()
+                        .overlay(Color.hairline)
+                        .padding(.vertical, 2)
+
                     dangerZone
                 }
             }
+            .animation(.easeInOut(duration: 0.22), value: errorMessage)
             .padding(.horizontal, AppSpacing.xl)
             .padding(.top, AppSpacing.lg)
             .padding(.bottom, AppSpacing.xxl)
@@ -114,6 +121,10 @@ struct ProfileSettingsView: View {
 
     private var onboardingHeader: some View {
         VStack(alignment: .leading, spacing: AppSpacing.sm) {
+            Image(systemName: "sparkles")
+                .font(.system(size: 20, weight: .semibold))
+                .foregroundStyle(Color.chatSenderNameGradient)
+
             Text("profile.setup.subtitle")
                 .font(Font.App.subtitle)
                 .foregroundStyle(Color.secondaryText)
@@ -218,8 +229,10 @@ struct ProfileSettingsView: View {
                     .font(Font.App.footnote())
                     .foregroundStyle(Color.error)
                     .fixedSize(horizontal: false, vertical: true)
+                    .transition(.opacity.combined(with: .move(edge: .top)))
             }
         }
+        .animation(.easeInOut(duration: 0.2), value: birthDateValidationMessage)
     }
 
     private var genderSection: some View {
@@ -327,6 +340,7 @@ struct ProfileSettingsView: View {
                     .frame(minHeight: 112, maxHeight: 112)
                     .padding(.horizontal, 10)
                     .padding(.vertical, 8)
+                    .focused($isBioFocused)
 
                 if bio.isEmpty {
                     Text("profile.settings.bio_placeholder")
@@ -340,13 +354,15 @@ struct ProfileSettingsView: View {
             .background(Color.fieldBackground, in: RoundedRectangle(cornerRadius: AppCornerRadius.field, style: .continuous))
             .overlay {
                 RoundedRectangle(cornerRadius: AppCornerRadius.field, style: .continuous)
-                    .strokeBorder(Color.hairline, lineWidth: 1)
+                    .strokeBorder(isBioFocused ? Color.discoverViolet.opacity(0.55) : Color.hairline, lineWidth: isBioFocused ? 1.5 : 1)
             }
+            .animation(.easeOut(duration: 0.18), value: isBioFocused)
 
             Text(bioCounterText)
                 .font(Font.App.caption())
-                .foregroundStyle(Color.secondaryText)
+                .foregroundStyle(bioCounterColor)
                 .frame(maxWidth: .infinity, alignment: .trailing)
+                .animation(.easeOut(duration: 0.15), value: bio.count)
         }
     }
 
@@ -361,6 +377,7 @@ struct ProfileSettingsView: View {
                         .foregroundStyle(Color.onAccentText)
                         .frame(width: 36, height: 36)
                         .background(Color.discoverSelectedGradient, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                        .contentTransition(.symbolEffect(.replace))
 
                     VStack(alignment: .leading, spacing: 4) {
                         Text("profile.settings.discovery_visibility.title")
@@ -392,6 +409,7 @@ struct ProfileSettingsView: View {
                         .font(Font.App.footnote())
                         .foregroundStyle(Color.error)
                         .fixedSize(horizontal: false, vertical: true)
+                        .transition(.opacity)
                 }
             }
             .padding(.horizontal, 14)
@@ -401,6 +419,7 @@ struct ProfileSettingsView: View {
                 RoundedRectangle(cornerRadius: AppCornerRadius.field, style: .continuous)
                     .stroke(Color.hairline, lineWidth: 1)
             }
+            .animation(.easeInOut(duration: 0.2), value: isVisibleInDiscovery)
         }
     }
 
@@ -592,6 +611,14 @@ struct ProfileSettingsView: View {
             bio.count,
             bioLimit
         )
+    }
+
+    private var bioCounterColor: Color {
+        if bio.count >= bioLimit {
+            return .error
+        }
+        let ratio = Double(bio.count) / Double(bioLimit)
+        return ratio > 0.9 ? .warning : .secondaryText
     }
 
     private var discoveryVisibilityBinding: Binding<Bool> {

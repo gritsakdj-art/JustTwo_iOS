@@ -123,6 +123,8 @@ struct ChatBubbleView: View {
                     .padding(.top, scaledTextToReactionsSpacing)
                     .padding(.leading, bottomLeadingInset)
                     .padding(.trailing, bottomTrailingInset)
+                    .transition(.scale(scale: 0.85).combined(with: .opacity))
+                    .animation(.spring(response: 0.3, dampingFraction: 0.7), value: reactions.map(\.emoji))
 
                     HStack {
                         Spacer(minLength: 0)
@@ -266,7 +268,11 @@ struct ChatBubbleView: View {
     }
 
     private func failedSendFooter(onRetry: @escaping () -> Void) -> some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 6) {
+            Image(systemName: "exclamationmark.circle.fill")
+                .font(.system(size: 12))
+                .foregroundStyle(Color.error)
+
             Text("chats.message.sendFailed")
                 .font(Font.App.caption())
                 .foregroundStyle(Color.secondaryText)

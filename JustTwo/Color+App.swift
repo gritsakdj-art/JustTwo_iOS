@@ -37,7 +37,7 @@ extension Color {
     private static let lightDiscoverBackgroundTop = Color(hex: "#FFFDFB")
     private static let darkDiscoverBackgroundTop = Color(hex: "#0B0813")
 
-    private static let lightDiscoverBackgroundMiddle = Color(hex: "#FFF0F2") // Мягкий пастельный вместо едкого розового
+    private static let lightDiscoverBackgroundMiddle = Color(hex: "#FBEEFA") // Мягкий пастельный вместо едкого розового
     private static let darkDiscoverBackgroundMiddle = Color(hex: "#160F24")
 
     private static let lightDiscoverBackgroundBottom = Color(hex: "#F6F0FF")
@@ -67,7 +67,7 @@ extension Color {
     private static let lightDiscoverMockLavender = Color(hex: "#F3EDFF")
     private static let darkDiscoverMockLavender = Color(hex: "#251D36")
 
-    private static let lightDiscoverMockPeach = Color(hex: "#FFEBE5")
+    private static let lightDiscoverMockPeach = Color(hex: "#F3E5FB")
     private static let darkDiscoverMockPeach = Color(hex: "#361B22")
 
     private static let lightDiscoverOnline = Color(hex: "#10D37F")
@@ -90,10 +90,10 @@ extension Color {
     private static let lightCardSurface = Color(hex: "#FFFFFF")
     private static let darkCardSurface = Color(hex: "#14101F") // Эффект многослойности: карточка чуть светлее подложки
 
-    private static let lightElevatedSurface = Color(hex: "#FFF8F6")
+    private static let lightElevatedSurface = Color(hex: "#FAF6FF")
     private static let darkElevatedSurface = Color(hex: "#1C162A")
 
-    private static let lightFieldBackground = Color(hex: "#F5EFF2") // Инпуты слегка утоплены относительно фона
+    private static let lightFieldBackground = Color(hex: "#F3EDFA") // Инпуты слегка утоплены относительно фона
     private static let darkFieldBackground = Color(hex: "#171224")
 
     private static let lightHairline = Color(hex: "#EFE5EA")
@@ -116,7 +116,7 @@ extension Color {
 
     // Warm far stop of the outgoing bubble gradient: lavender melts into a rose blush,
     // so my messages feel affectionate instead of office-lilac. Dark theme gets a wine tint.
-    private static let lightChatBubbleMineBlush = Color(hex: "#FBD5E4")
+    private static let lightChatBubbleMineBlush = Color(hex: "#F8E0EA")
     private static let darkChatBubbleMineBlush = Color(hex: "#46283F")
 
     // Incoming bubbles: a whisper of warmth (ivory -> soft peach) instead of flat card white.

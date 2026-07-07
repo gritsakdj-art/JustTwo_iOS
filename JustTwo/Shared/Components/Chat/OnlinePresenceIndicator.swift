@@ -36,6 +36,53 @@ struct OnlinePresenceIndicator: View {
     }
 }
 
+private struct OnlinePresenceRingModifier: ViewModifier {
+    let isOnline: Bool
+    let avatarSize: CGFloat
+    let lineWidth: CGFloat
+    let spacing: CGFloat
+    let backgroundPadding: CGFloat
+
+    @State private var isPulsing = false
+
+    func body(content: Content) -> some View {
+        let ringSize = avatarSize + (lineWidth + spacing) * 2
+        let outerSize = ringSize + backgroundPadding * 2
+
+        return ZStack {
+            FilledPresenceRing(lineWidth: lineWidth)
+                .fill(
+                    isOnline ? Color.discoverOnline : Color.surface,
+                    style: FillStyle(eoFill: true)
+                )
+                .frame(width: ringSize, height: ringSize)
+                .scaleEffect(isOnline && isPulsing ? 1.12 : 1.0)
+                .opacity(isOnline && isPulsing ? 0.75 : 1.0)
+                .animation(
+                    isOnline ? .easeInOut(duration: 1.3).repeatForever(autoreverses: true) : .default,
+                    value: isPulsing
+                )
+
+            content
+                .frame(width: avatarSize, height: avatarSize)
+        }
+        .frame(width: outerSize, height: outerSize)
+        .fixedSize()
+        .animation(.easeOut(duration: 0.2), value: isOnline)
+        .onChange(of: isOnline) { _, newValue in
+            isPulsing = newValue
+        }
+        .onAppear {
+            if isOnline {
+                isPulsing = true
+            }
+        }
+        .onDisappear {
+            isPulsing = false
+        }
+    }
+}
+
 extension View {
     func onlinePresenceIndicator(
         isVisible: Bool,
@@ -59,22 +106,14 @@ extension View {
         spacing: CGFloat = 1,
         backgroundPadding: CGFloat = 1
     ) -> some View {
-        let ringSize = avatarSize + (lineWidth + spacing) * 2
-        let outerSize = ringSize + backgroundPadding * 2
-
-        return ZStack {
-            FilledPresenceRing(lineWidth: lineWidth)
-                .fill(
-                    isOnline ? Color.discoverOnline : Color.surface,
-                    style: FillStyle(eoFill: true)
-                )
-                .frame(width: ringSize, height: ringSize)
-
-            self
-                .frame(width: avatarSize, height: avatarSize)
-        }
-        .frame(width: outerSize, height: outerSize)
-        .fixedSize()
-        .animation(.easeOut(duration: 0.2), value: isOnline)
+        modifier(
+            OnlinePresenceRingModifier(
+                isOnline: isOnline,
+                avatarSize: avatarSize,
+                lineWidth: lineWidth,
+                spacing: spacing,
+                backgroundPadding: backgroundPadding
+            )
+        )
     }
 }
