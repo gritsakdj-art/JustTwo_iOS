@@ -302,8 +302,8 @@ final class MessengerLocalStore: MessengerLocalStoreProtocol {
 }
 
 enum MessengerLocalStorageFeatureFlags {
-    /// PR15C will enable local reads for per-conversation message history.
-    static let isLocalReadEnabled = false
+    /// PR15C: per-conversation message history reads from local DB.
+    static let isLocalReadEnabled = true
     /// PR15B enables cached conversation list hydration and persistence.
     static let isCachedConversationListEnabled = true
 }

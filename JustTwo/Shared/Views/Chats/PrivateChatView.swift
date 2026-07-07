@@ -264,7 +264,9 @@ struct PrivateChatView: View {
     }
 
     private var shouldShowMessageList: Bool {
-        usesPreviewData || didCompleteInitialPositioning
+        usesPreviewData
+            || didCompleteInitialPositioning
+            || (!viewModel.isLoading && !viewModel.messages.isEmpty)
     }
 
     private var messageScrollView: some View {

@@ -86,9 +86,12 @@ Limits live in `StartupLoadingLimits`.
 
 ### Private chat
 
-* `ChatViewModel.open` reads `MessageCacheStore` first.
-* If cache exists, messages render immediately without empty-state spinner.
-* REST refresh still runs through cache loader with `force: true`.
+* `ChatViewModel.open` hydrates from `MessengerLocalStore` via `MessengerMessageCacheService` when `isLocalReadEnabled` (PR15C).
+* In-memory `MessageCacheStore` is updated from local DB snapshots, then messages render immediately when cache exists.
+* REST refresh still runs through cache loader with `force: true` and remains authoritative on success.
+* Network failure does not clear cached messages; loading flags always terminate.
+* Pagination persists older pages to local DB.
+* Delivered/read acks run in background and do not block chat open when cache is shown.
 
 ### Profile / photos
 

@@ -327,6 +327,42 @@ struct MessageCacheStoreTests {
         #expect(store.messages(for: conversationID) == nil)
     }
 
+    @Test
+    func cancelLoadClearsLoadingFlag() {
+        let store = MessageCacheStore.shared
+        store.reset()
+        let message = makeMessage(
+            id: UUID(),
+            createdAt: .now,
+            isMine: true,
+            status: .sent
+        )
+        store.setMessages([message], for: conversationID)
+        store.cancelLoad(for: conversationID)
+
+        #expect(store.messages(for: conversationID)?.count == 1)
+        #expect(store.entry(for: conversationID)?.isLoading == false)
+    }
+
+    @Test
+    func mergeDoesNotClearMessagesWhenIncomingIsEmpty() {
+        let store = MessageCacheStore.shared
+        store.reset()
+        let existing = makeMessage(
+            id: UUID(),
+            createdAt: .now,
+            isMine: false,
+            status: nil,
+            text: "Cached"
+        )
+        store.setMessages([existing], for: conversationID)
+
+        store.mergeLoadedMessages([], for: conversationID)
+
+        #expect(store.messages(for: conversationID)?.count == 1)
+        #expect(store.messages(for: conversationID)?.first?.displayText == "Cached")
+    }
+
     private func makeMessage(
         id: UUID,
         createdAt: Date,

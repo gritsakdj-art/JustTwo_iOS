@@ -23,8 +23,15 @@ final class MessageCacheStore {
 
     private(set) var entries: [UUID: Entry] = [:]
     private var loadTasks: [UUID: Task<Void, Never>] = [:]
+    private var loadGenerations: [UUID: Int] = [:]
 
     private init() {}
+
+    func cancelLoad(for conversationID: UUID) {
+        loadTasks[conversationID]?.cancel()
+        loadTasks.removeValue(forKey: conversationID)
+        entries[conversationID]?.isLoading = false
+    }
 
     func messages(for conversationID: UUID) -> [ChatMessage]? {
         entries[conversationID]?.messages
@@ -141,14 +148,19 @@ final class MessageCacheStore {
         limit: Int = StartupLoadingLimits.preloadMessagesPerConversation,
         session: SessionStore,
         router: AppRouter,
-        force: Bool = false
+        force: Bool = false,
+        loadGeneration: Int = 0
     ) async -> [ChatMessage] {
+        if force {
+            cancelLoad(for: conversationID)
+        }
+
         if !force, let cached = entries[conversationID]?.messages, !cached.isEmpty {
             ensurePaginationCursorIfNeeded(conversationID: conversationID, pageSize: limit)
             return cached
         }
 
-        if let existingTask = loadTasks[conversationID] {
+        if let existingTask = loadTasks[conversationID], !force {
             // A fetch is already running for this conversation (e.g. startup preload or another
             // ChatViewModel instance). Reuse its result instead of firing a second, redundant
             // network request — the caller still gets fresh data without a duplicate round trip,
@@ -171,6 +183,14 @@ final class MessageCacheStore {
         entry.isLoading = true
         entry.errorMessage = nil
         entries[conversationID] = entry
+        loadGenerations[conversationID] = loadGeneration
+
+        let startedAt = Date()
+        MessengerDiagnostics.event(
+            .messengerMessageNetworkRefreshStarted,
+            conversationID: conversationID,
+            metadata: ["source": "rest"]
+        )
 
         let task = Task { @MainActor in
             defer {
@@ -184,6 +204,15 @@ final class MessageCacheStore {
                     conversationID: conversationID,
                     limit: limit
                 )
+                guard !Task.isCancelled,
+                      loadGenerations[conversationID] == loadGeneration else {
+                    MessengerDiagnostics.event(
+                        .messengerMessageLoadStaleIgnored,
+                        conversationID: conversationID,
+                        metadata: ["source": "rest"]
+                    )
+                    return
+                }
                 let mapped = response.messages.map {
                     ChatUIMapping.message(from: $0, currentProfileID: profileID)
                 }
@@ -193,14 +222,55 @@ final class MessageCacheStore {
                     response: response,
                     fetchedMessages: mapped
                 )
+                await MessengerMessageCacheService.persistRESTMessages(
+                    response.messages,
+                    conversationID: conversationID
+                )
+                MessengerDiagnostics.event(
+                    .messengerMessageNetworkRefreshSucceeded,
+                    conversationID: conversationID,
+                    metadata: [
+                        "count": "\(mapped.count)",
+                        "durationMs": "\(durationMilliseconds(since: startedAt))",
+                        "source": "rest"
+                    ]
+                )
+            } catch is CancellationError {
+                MessengerDiagnostics.event(
+                    .messengerMessageLoadCancelled,
+                    conversationID: conversationID,
+                    metadata: ["source": "rest"]
+                )
             } catch let error as NetworkError {
-                if let message = MessengerSessionSupport.handleNetworkError(error, session: session, router: router) {
-                    entries[conversationID]?.errorMessage = message
-                } else {
-                    entries[conversationID]?.errorMessage = error.userMessage
+                if loadGenerations[conversationID] == loadGeneration {
+                    if let message = MessengerSessionSupport.handleNetworkError(error, session: session, router: router) {
+                        entries[conversationID]?.errorMessage = message
+                    } else {
+                        entries[conversationID]?.errorMessage = error.userMessage
+                    }
                 }
+                MessengerDiagnostics.event(
+                    .messengerMessageNetworkRefreshFailed,
+                    conversationID: conversationID,
+                    metadata: [
+                        "errorCategory": MessengerDiagnostics.sanitizeError(error),
+                        "durationMs": "\(durationMilliseconds(since: startedAt))",
+                        "source": "rest"
+                    ]
+                )
             } catch {
-                entries[conversationID]?.errorMessage = error.localizedDescription
+                if loadGenerations[conversationID] == loadGeneration {
+                    entries[conversationID]?.errorMessage = error.localizedDescription
+                }
+                MessengerDiagnostics.event(
+                    .messengerMessageNetworkRefreshFailed,
+                    conversationID: conversationID,
+                    metadata: [
+                        "errorCategory": MessengerDiagnostics.sanitizeError(error),
+                        "durationMs": "\(durationMilliseconds(since: startedAt))",
+                        "source": "rest"
+                    ]
+                )
             }
         }
 
@@ -214,7 +284,8 @@ final class MessageCacheStore {
         conversationID: UUID,
         limit: Int = MessengerLimits.defaultMessagePageSize,
         session: SessionStore,
-        router: AppRouter
+        router: AppRouter,
+        loadGeneration: Int = 0
     ) async -> Bool {
         guard var entry = entries[conversationID],
               let before = entry.olderMessagesCursor,
@@ -234,6 +305,12 @@ final class MessageCacheStore {
         }
 
         let previousCount = entries[conversationID]?.messages.count ?? 0
+        let startedAt = Date()
+        MessengerDiagnostics.event(
+            .messengerMessagePaginationStarted,
+            conversationID: conversationID,
+            metadata: ["source": "pagination"]
+        )
 
         do {
             let profileID = try await MessengerSessionSupport.resolveCurrentProfileID(session: session)
@@ -242,6 +319,15 @@ final class MessageCacheStore {
                 limit: limit,
                 before: before
             )
+            guard !Task.isCancelled,
+                  loadGenerations[conversationID] == loadGeneration else {
+                MessengerDiagnostics.event(
+                    .messengerMessageLoadStaleIgnored,
+                    conversationID: conversationID,
+                    metadata: ["source": "pagination"]
+                )
+                return false
+            }
             let mapped = response.messages.map {
                 ChatUIMapping.message(from: $0, currentProfileID: profileID)
             }
@@ -251,17 +337,55 @@ final class MessageCacheStore {
                 response: response,
                 fetchedMessages: mapped
             )
+            await MessengerMessageCacheService.persistPaginationMessages(
+                response.messages,
+                conversationID: conversationID
+            )
             let nextCursorLabel = entries[conversationID]?.olderMessagesCursor.map { String($0.prefix(8)) } ?? "nil"
             NetworkDebug.log("Older messages loaded incoming=\(mapped.count) total=\(entries[conversationID]?.messages.count ?? 0) nextCursor=\(nextCursorLabel)")
+            MessengerDiagnostics.event(
+                .messengerMessagePaginationSucceeded,
+                conversationID: conversationID,
+                metadata: [
+                    "count": "\(mapped.count)",
+                    "durationMs": "\(durationMilliseconds(since: startedAt))",
+                    "source": "pagination"
+                ]
+            )
+        } catch is CancellationError {
+            MessengerDiagnostics.event(
+                .messengerMessageLoadCancelled,
+                conversationID: conversationID,
+                metadata: ["source": "pagination"]
+            )
+            return false
         } catch let error as NetworkError {
             if let message = MessengerSessionSupport.handleNetworkError(error, session: session, router: router) {
                 entries[conversationID]?.errorMessage = message
             } else {
                 entries[conversationID]?.errorMessage = error.userMessage
             }
+            MessengerDiagnostics.event(
+                .messengerMessagePaginationFailed,
+                conversationID: conversationID,
+                metadata: [
+                    "errorCategory": MessengerDiagnostics.sanitizeError(error),
+                    "durationMs": "\(durationMilliseconds(since: startedAt))",
+                    "source": "pagination"
+                ]
+            )
             return false
         } catch {
             entries[conversationID]?.errorMessage = error.localizedDescription
+            MessengerDiagnostics.event(
+                .messengerMessagePaginationFailed,
+                conversationID: conversationID,
+                metadata: [
+                    "errorCategory": MessengerDiagnostics.sanitizeError(error),
+                    "durationMs": "\(durationMilliseconds(since: startedAt))",
+                    "source": "pagination"
+                ]
+            )
             return false
         }
 
@@ -708,6 +832,11 @@ final class MessageCacheStore {
             task.cancel()
         }
         loadTasks.removeAll()
+        loadGenerations.removeAll()
         entries.removeAll()
+    }
+
+    private func durationMilliseconds(since startDate: Date) -> Int {
+        max(0, Int(Date().timeIntervalSince(startDate) * 1_000))
     }
 }

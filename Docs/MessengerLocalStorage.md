@@ -8,13 +8,99 @@ On-device messenger persistence using SwiftData.
 |----|-------|--------|
 | PR15A | SwiftData schema foundation, store API, logout reset | ✅ |
 | PR15B | Cached conversation list (read + write from REST/delta/realtime) | ✅ |
-| PR15C | Cached per-conversation message history | planned |
+| PR15C | Cached per-conversation message history + resilient chat loading | ✅ |
 | PR16 | Persistent outbox | planned |
 | PR17 | Full sync engine | planned |
 
+## PR15C — Cached messages per conversation
+
+Chat screen opens from local cached messages when available, then REST remains authoritative refresh.
+
+### Behavior
+
+```text
+1. User opens a chat.
+2. ChatViewModel hydrates in-memory MessageCacheStore from MessengerLocalStore (if enabled).
+3. If cached messages exist, UI shows them immediately (no endless spinner).
+4. REST GET /conversations/:id/messages runs as authoritative refresh.
+5. REST success merges in-memory state and upserts local DB message rows.
+6. Pagination writes older pages to local DB.
+7. Delta/realtime message events update in-memory state and persist to local message cache.
+8. Network failure does NOT clear cached messages.
+9. Stale/cancelled network loads do NOT overwrite current chat.
+10. Logout reset clears local message cache (PR15A hardening preserved).
+```
+
+### Offline / network failure (chat)
+
+- If network fails but local cache exists, cached messages remain visible.
+- Local DB hydrate runs **before** network using `session.currentProfile?.id` when available.
+- When cache is shown, REST refresh runs in the **background** without blocking `open()`.
+- `isLoading` terminates on success, failure, cancellation, and stale generation.
+- `isAwaitingInitialMessagePage` is `true` only when `isLoading && messages.isEmpty` (no blank-screen hang on partial cache).
+- Empty cache + network failure shows recoverable error state, not endless spinner.
+- Manual pull-to-refresh / `reload()` can recover after failure.
+
+### Anti-stale protections
+
+- `ChatViewModel.lifecycleGeneration` — stale `open()`/`loadMessages` work is ignored after `close()`/`reload()`.
+- `ChatViewModel.messageContentGeneration` — local DB hydrate cannot overwrite fresher realtime/delta mutations.
+- `ChatViewModel.messageLoadGeneration` + `MessageCacheStore.loadGenerations` — stale REST/pagination responses are ignored per conversation.
+- `MessageCacheStore.cancelLoad` — in-flight refresh cancelled on chat reload/close.
+- Conversation list anti-stale (`refreshGeneration`, `listContentGeneration`) unchanged from PR15B.
+
+### Delta/realtime persistence
+
+- Delta `message.created` / `message.edited` / `message.deleted` persist via `MessengerMessageCacheService`.
+- Delta reactions persist when event includes full `MessageDTO` snapshot.
+- Delta `conversation.read` / `conversation.delivered` persist receipts (monotonic).
+- Realtime `message.created` / `message.edited` / `message.deleted` persist to local DB.
+- **Limitation:** realtime `reaction.added` / `reaction.removed` without full `MessageDTO` update in-memory UI only; local DB is repaired on next delta/REST refresh.
+
+### Optimistic sends (PR15C limitation)
+
+- In-memory optimistic text/image messages still appear immediately.
+- Server confirmation reconciles by `clientMessageID` and persists to local DB.
+- Failed in-memory outbox remains in-memory only until PR16.
+- After app kill, unsent optimistic messages may be lost until PR16.
+
+### Image messages
+
+- Attachment metadata persisted: `attachmentID`, `contentType`, `byteSize`, `width`, `height`, `localCacheKey`.
+- Signed `downloadUrl` / `uploadUrl` / storage keys are **not** persisted.
+- Cached image bubble shows placeholder until REST provides fresh URL or `ChatMessageImageCache` has data.
+- Deleted image messages do not render stale attachments.
+
+### Architecture (PR15C)
+
+```text
+ChatViewModel.open / loadMessages
+  ├─ MessengerMessageCacheService.hydrateCachedMessages
+  ├─ MessageCacheStore.loadRecentMessagesIfNeeded (REST)
+  └─ MessageCacheStore.loadOlderMessages (pagination)
+
+MessengerDeltaSyncService / MessengerRealtimeCoordinator
+  └─ MessengerMessageCacheService persist hooks
+```
+
+### Diagnostics (PR15C)
+
+See `messengerMessageCache*` and `messengerMessageNetwork*` / `messengerMessagePagination*` events in `MessengerDiagnostics`.
+
+### Manual smoke checklist (PR15C)
+
+1. Load chat with network → kill/relaunch → cached messages appear before/during REST refresh.
+2. Disable network after cache warm → reopen chat → messages visible, no endless spinner.
+3. Empty cache + no network → recoverable error, not spinner forever.
+4. Realtime/delta message while offline → reconnect → relaunch → message from local cache.
+5. Edit/delete/reaction → relaunch → cached state correct.
+6. Image after relaunch → no raw URL/crash.
+7. Logout isolation between accounts.
+8. Diagnostics export privacy-safe.
+
 ## PR15B — Cached conversation list
 
-Conversation list can hydrate from local DB on app/tab open, then refresh from REST. Delta and realtime keep the local conversation cache updated. Chat message screens still use REST + in-memory `MessageCacheStore` (PR15C).
+Conversation list can hydrate from local DB on app/tab open, then refresh from REST. Delta and realtime keep the local conversation cache updated.
 
 ### Behavior
 
@@ -40,7 +126,7 @@ Conversation list can hydrate from local DB on app/tab open, then refresh from R
 
 ```swift
 enum MessengerLocalStorageFeatureFlags {
-    static let isLocalReadEnabled = false              // PR15C: message history reads
+    static let isLocalReadEnabled = true               // PR15C: message history reads
     static let isCachedConversationListEnabled = true // PR15B: conversation list
 }
 ```
@@ -74,8 +160,8 @@ LocalMessengerConversation → LocalConversationSnapshot → ChatConversationPre
 |------|-----------|-------------|
 | Conversation list snapshots | yes | yes (hydration) |
 | Denormalized lastMessage preview fields | yes | yes (list preview text) |
-| lastMessage row in message table | yes (metadata only) | no (chat screen) |
-| Full message history | no (beyond lastMessage) | no |
+| lastMessage row in message table | yes | yes (list preview + chat cache) |
+| Full message history | yes (PR15C) | yes (chat hydration) |
 | Signed photo/message URLs | no | no |
 | Persistent sync cursor | no | no |
 
@@ -144,11 +230,15 @@ Six messenger entities (plus `Item.self` in app container):
 | Path | Responsibility |
 |------|----------------|
 | `Core/Persistence/Messenger/MessengerConversationCacheService.swift` | PR15B cache hydrate/persist orchestration |
+| `Core/Persistence/Messenger/MessengerMessageCacheService.swift` | PR15C message cache hydrate/persist orchestration |
 | `Core/Persistence/Messenger/MessengerLocalStore.swift` | Facade + feature flags |
 | `Core/Persistence/Messenger/MessengerLocalMapping.swift` | DTO ↔ entity mapping |
 | `Shared/Views/Chats/ViewModels/ConversationListViewModel.swift` | Cache-first list load |
+| `Shared/Views/Chats/ViewModels/ChatViewModel.swift` | Cache-first chat load + resilient loading |
+| `Shared/Views/Chats/MessageCacheStore.swift` | In-memory cache + REST persist hooks |
 | `Shared/Views/Chats/MessengerDeltaSyncService.swift` | Delta → local cache writes |
 | `JustTwoTests/MessengerConversationCacheTests.swift` | PR15B focused tests |
+| `JustTwoTests/MessengerMessageCacheTests.swift` | PR15C focused tests |
 | `JustTwoTests/MessengerLocalStoreTests.swift` | Store foundation tests |
 
 ### Tests
@@ -156,6 +246,7 @@ Six messenger entities (plus `Item.self` in app container):
 ```bash
 xcodebuild test -scheme JustTwo \
   -destination 'platform=iOS Simulator,name=iPhone 16' \
+  -only-testing:JustTwoTests/MessengerMessageCacheTests \
   -only-testing:JustTwoTests/MessengerConversationCacheTests \
   -only-testing:JustTwoTests/MessengerLocalStoreTests \
   -only-testing:JustTwoTests/AppStartupCoordinatorTests

@@ -224,6 +224,27 @@ enum MessengerDiagnosticEvent: String, Sendable {
     case messengerConversationCacheDeltaApplied
     case messengerConversationCacheRealtimeApplied
     case messengerConversationCacheSkippedStale
+
+    case messengerMessageCacheHydrateStarted
+    case messengerMessageCacheHydrateSucceeded
+    case messengerMessageCacheHydrateFailed
+    case messengerMessageCacheHydratedUI
+    case messengerMessageCacheEmpty
+    case messengerMessageNetworkRefreshStarted
+    case messengerMessageNetworkRefreshSucceeded
+    case messengerMessageNetworkRefreshFailed
+    case messengerMessagePaginationStarted
+    case messengerMessagePaginationSucceeded
+    case messengerMessagePaginationFailed
+    case messengerMessageCacheUpsertStarted
+    case messengerMessageCacheUpsertSucceeded
+    case messengerMessageCacheUpsertFailed
+    case messengerMessageDeltaPersisted
+    case messengerMessageRealtimePersisted
+    case messengerMessageLoadCancelled
+    case messengerMessageLoadStaleIgnored
+    case messengerMessageLoadingStateRecovered
+    case messengerMessageFallbackToCache
 }
 
 enum MessengerDiagnostics {

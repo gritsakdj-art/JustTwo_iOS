@@ -91,6 +91,20 @@ struct ChatMessageAttachment: Identifiable, Equatable, Hashable {
             downloadUrlExpiresAt: dto.downloadUrlExpiresAt
         )
     }
+
+    /// Cached attachment metadata without signed download URL. `localCacheKey` is stable for image cache lookup.
+    nonisolated static func cached(_ snapshot: LocalAttachmentSnapshot) -> ChatMessageAttachment {
+        ChatMessageAttachment(
+            id: snapshot.localCacheKey ?? snapshot.id,
+            contentType: snapshot.contentType ?? "image/jpeg",
+            byteSize: snapshot.byteSize ?? 0,
+            width: snapshot.width ?? 1,
+            height: snapshot.height ?? 1,
+            localFileURL: nil,
+            downloadURL: nil,
+            downloadUrlExpiresAt: snapshot.downloadURLExpiresAt
+        )
+    }
 }
 
 struct ChatMessage: Identifiable, Equatable, Hashable {
@@ -505,6 +519,99 @@ enum ChatUIMapping {
                 )
             },
             deliveryStatus: isMine && !isDeleted ? (dto.deliveryStatus ?? .sent) : nil
+        )
+    }
+
+    static func message(
+        from snapshot: LocalMessageSnapshot,
+        currentProfileID: UUID
+    ) -> ChatMessage {
+        let isDeleted = snapshot.localState == .deleted || snapshot.deletedAt != nil
+        let kind = MessageKind(rawValue: snapshot.kind) ?? .text
+        let imageAttachment: ChatMessageAttachment?
+        if isDeleted {
+            imageAttachment = nil
+        } else if kind == .image, let attachment = snapshot.attachments.first {
+            imageAttachment = ChatMessageAttachment.cached(attachment)
+        } else {
+            imageAttachment = nil
+        }
+
+        let displayText: String
+        if isDeleted {
+            displayText = String(localized: "chats.messageDeleted")
+        } else if kind == .image, (snapshot.body?.isEmpty ?? true) {
+            displayText = imageMessagePreviewText
+        } else {
+            displayText = snapshot.body ?? ""
+        }
+
+        let replyPreview: ChatReplyPreview?
+        if let replyIDString = snapshot.replyToMessageID,
+           let replyID = UUID(uuidString: replyIDString) {
+            if snapshot.replyToBody == nil {
+                replyPreview = ChatReplyPreview(
+                    id: replyID,
+                    body: String(localized: "chats.messageDeleted"),
+                    isDeleted: true
+                )
+            } else if let body = snapshot.replyToBody, !body.isEmpty {
+                replyPreview = ChatReplyPreview(id: replyID, body: body, isDeleted: false)
+            } else {
+                replyPreview = ChatReplyPreview(
+                    id: replyID,
+                    body: imageMessagePreviewText,
+                    isDeleted: false
+                )
+            }
+        } else {
+            replyPreview = nil
+        }
+
+        let senderUUID = UUID(uuidString: snapshot.senderProfileID)
+        let isMine = senderUUID == currentProfileID
+        let messageID = UUID(uuidString: snapshot.id) ?? UUID()
+
+        let localSendState: MessageLocalSendState?
+        switch snapshot.localState {
+        case .sending:
+            localSendState = .sending
+        case .failed:
+            localSendState = .failed
+        case .pendingUpload:
+            localSendState = .sending
+        case .serverConfirmed, .deleted:
+            localSendState = nil
+        }
+
+        let deliveryStatus: MessageDeliveryStatus?
+        if isMine, !isDeleted, localSendState == nil, let statusString = snapshot.deliveryStatus {
+            deliveryStatus = MessageDeliveryStatus(rawValue: statusString) ?? .sent
+        } else {
+            deliveryStatus = nil
+        }
+
+        return ChatMessage(
+            id: messageID,
+            clientMessageID: snapshot.clientMessageID,
+            localSendState: localSendState,
+            kind: kind,
+            displayText: displayText,
+            rawBody: isDeleted ? nil : snapshot.body,
+            imageAttachment: imageAttachment,
+            createdAt: snapshot.createdAt,
+            isMine: isMine,
+            isDeleted: isDeleted,
+            isEdited: snapshot.editedAt != nil && !isDeleted,
+            replyPreview: replyPreview,
+            reactions: snapshot.reactions.map {
+                ChatMessageReaction(
+                    emoji: ReactionEmoji.normalized($0.emoji),
+                    count: $0.count,
+                    reactedByMe: $0.reactedByMe
+                )
+            },
+            deliveryStatus: deliveryStatus
         )
     }
 

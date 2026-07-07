@@ -555,6 +555,7 @@ final class MessengerDeltaSyncService {
                     "target": "activeChat"
                 ]
             )
+            persistDeltaMessageCache(message, eventType: eventType.rawValue)
             return
         }
 
@@ -593,6 +594,13 @@ final class MessengerDeltaSyncService {
                 "target": "cache"
             ]
         )
+        persistDeltaMessageCache(message, eventType: eventType.rawValue)
+    }
+
+    private func persistDeltaMessageCache(_ message: MessageDTO, eventType: String) {
+        Task {
+            await MessengerMessageCacheService.persistDeltaMessage(message, eventType: eventType)
+        }
     }
 
     private func applyDeletedMessage(
@@ -630,6 +638,12 @@ final class MessengerDeltaSyncService {
             messageID: messageID,
             metadata: ["source": "delta"]
         )
+        Task {
+            await MessengerMessageCacheService.persistMessageDeleted(
+                messageID: messageID,
+                deletedAt: deletedAt
+            )
+        }
     }
 
     private func applyReceiptEvent(
@@ -672,6 +686,14 @@ final class MessengerDeltaSyncService {
                 "status": status.rawValue
             ]
         )
+        if let receipt = event.receipt {
+            Task {
+                await MessengerMessageCacheService.persistReceipt(
+                    receipt,
+                    eventType: event.type.rawValue
+                )
+            }
+        }
     }
 
     private func logImageDeltaIfNeeded(

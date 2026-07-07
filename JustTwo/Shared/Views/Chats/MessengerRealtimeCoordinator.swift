@@ -291,6 +291,11 @@ final class MessengerRealtimeCoordinator {
                     router: self.router
                 )
             }
+
+            await MessengerMessageCacheService.persistRealtimeMessage(
+                message,
+                eventType: "message.created"
+            )
         }
     }
 
@@ -325,6 +330,11 @@ final class MessengerRealtimeCoordinator {
 
                 self.refreshConversationsFromRealtime()
             }
+
+            await MessengerMessageCacheService.persistRealtimeMessage(
+                message,
+                eventType: "message.edited"
+            )
         }
     }
 
@@ -362,6 +372,13 @@ final class MessengerRealtimeCoordinator {
         }
 
         refreshConversationsFromRealtime()
+
+        Task {
+            await MessengerMessageCacheService.persistMessageDeleted(
+                messageID: payload.messageID,
+                deletedAt: payload.deletedAt
+            )
+        }
     }
 
     private func handleReactionAdded(_ payload: ReactionAddedPayload, conversationID: UUID) {

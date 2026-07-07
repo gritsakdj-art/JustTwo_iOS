@@ -38,6 +38,8 @@ final class ChatViewModel {
     private var isOpen = false
     private var isRealtimeActive = false
     private var lifecycleGeneration = 0
+    private var messageContentGeneration = 0
+    private var messageLoadGeneration = 0
     private var loadTask: Task<Void, Never>?
     private var sendTask: Task<Void, Never>?
     private var typingTimeoutTasks: [UUID: Task<Void, Never>] = [:]
@@ -66,14 +68,9 @@ final class ChatViewModel {
         }
     }
 
-    /// `true` while the first message page is still incomplete and we should not reveal the list yet.
+    /// `true` only while the first page is still loading and nothing is available to render yet.
     var isAwaitingInitialMessagePage: Bool {
-        guard isLoading else { return false }
-        guard !messages.isEmpty else { return true }
-        if messages.count >= MessengerLimits.defaultMessagePageSize {
-            return false
-        }
-        return hasMoreOlderMessages
+        isLoading && messages.isEmpty
     }
 
     convenience init(conversation: ChatConversationPreview) {
@@ -196,12 +193,16 @@ final class ChatViewModel {
             }
             didOpen = true
         } else {
+            await hydrateFromLocalMessageCacheIfNeeded(
+                session: session,
+                generation: generation,
+                limit: MessengerLimits.defaultMessagePageSize
+            )
             syncMessagesFromCache()
             syncPaginationStateFromCache()
         }
 
-        await markDelivered(session: session, router: router)
-        await markRead(session: session, router: router)
+        await markDeliveredAndReadInBackground(session: session, router: router)
 
         Task {
             await MessengerDeltaSyncService.shared.syncDeltas(
@@ -238,10 +239,13 @@ final class ChatViewModel {
             metadata: lifecycleMetadata(generation: lifecycleGeneration)
         )
         lifecycleGeneration += 1
+        messageContentGeneration += 1
+        messageLoadGeneration += 1
         isOpen = false
         isLoading = false
         loadTask?.cancel()
         loadTask = nil
+        messageCache.cancelLoad(for: conversation.id)
         unsubscribeFromCacheNotifications()
         clearTypingState()
         deactivateRealtime()
@@ -295,6 +299,10 @@ final class ChatViewModel {
 
     func reload(session: SessionStore, router: AppRouter) async {
         lifecycleGeneration += 1
+        messageLoadGeneration += 1
+        loadTask?.cancel()
+        loadTask = nil
+        messageCache.cancelLoad(for: conversation.id)
         let generation = lifecycleGeneration
         await loadMessages(session: session, router: router, generation: generation)
     }
@@ -308,7 +316,8 @@ final class ChatViewModel {
         let didLoad = await messageCache.loadOlderMessages(
             conversationID: conversation.id,
             session: session,
-            router: router
+            router: router,
+            loadGeneration: messageLoadGeneration
         )
         messages = messageCache.messages(for: conversation.id) ?? messages
         syncPaginationStateFromCache()
@@ -666,6 +675,9 @@ final class ChatViewModel {
             }
             let mapped = ChatUIMapping.message(from: dto, currentProfileID: profileID)
             appendOrReplace(mapped)
+            Task {
+                await MessengerMessageCacheService.persistDeltaMessage(dto, eventType: "message.edited")
+            }
             MessengerDiagnostics.event(
                 .sendSucceeded,
                 conversationID: conversation.id,
@@ -787,6 +799,9 @@ final class ChatViewModel {
             let dto = try await MessageService.deleteMessage(messageID: message.id)
             let mapped = ChatUIMapping.message(from: dto, currentProfileID: profileID)
             appendOrReplace(mapped)
+            Task {
+                await MessengerMessageCacheService.persistDeltaMessage(dto, eventType: "message.deleted")
+            }
 
             if editingMessage?.id == message.id {
                 cancelCompose()
@@ -804,6 +819,14 @@ final class ChatViewModel {
         }
     }
 
+    private func markDeliveredAndReadInBackground(session: SessionStore, router: AppRouter) {
+        Task { [weak self] in
+            guard let self else { return }
+            await self.markDelivered(session: session, router: router)
+            await self.markRead(session: session, router: router)
+        }
+    }
+
     private func loadMessages(
         session: SessionStore,
         router: AppRouter,
@@ -812,6 +835,8 @@ final class ChatViewModel {
     ) async {
         let startedAt = Date()
         let cachedCountBefore = messageCache.messages(for: conversation.id)?.count ?? 0
+        let networkLoadGeneration = messageLoadGeneration
+        let contentGenerationAtStart = messageContentGeneration
         MessengerDiagnostics.event(
             .loadMessagesStarted,
             conversationID: conversation.id,
@@ -837,19 +862,33 @@ final class ChatViewModel {
             }
         }
 
-        isLoading = true
-        if let cached = messageCache.messages(for: conversation.id), !cached.isEmpty {
-            messages = cached
-            syncPaginationStateFromCache()
-            if isInitialLoad {
+        var showedCachedMessages = applyInMemoryMessageCacheIfAvailable(isInitialLoad: isInitialLoad)
+        errorMessage = nil
+
+        if !showedCachedMessages, let profileID = session.currentProfile?.id {
+            currentProfileID = profileID
+            await hydrateFromLocalMessageCacheIfNeeded(
+                profileID: profileID,
+                generation: generation,
+                contentGenerationAtStart: contentGenerationAtStart,
+                limit: MessengerLimits.defaultMessagePageSize
+            )
+            if let hydrated = messageCache.messages(for: conversation.id), !hydrated.isEmpty {
+                messages = hydrated
+                syncPaginationStateFromCache()
+                showedCachedMessages = true
                 MessengerDiagnostics.event(
-                    .chatInitialCacheSync,
+                    .messengerMessageCacheHydratedUI,
                     conversationID: conversation.id,
-                    metadata: ["messageCount": "\(cached.count)"]
+                    metadata: [
+                        "count": "\(hydrated.count)",
+                        "source": "localDBBeforeNetwork"
+                    ]
                 )
             }
         }
-        errorMessage = nil
+
+        isLoading = !showedCachedMessages
 
         do {
             let profileID = try await MessengerSessionSupport.resolveCurrentProfileID(session: session)
@@ -867,36 +906,57 @@ final class ChatViewModel {
             }
             currentProfileID = profileID
 
-            if loadTask == nil {
-                loadTask = Task { @MainActor [weak self] in
-                    guard let self else { return }
-                    _ = await self.messageCache.loadRecentMessagesIfNeeded(
-                        conversationID: self.conversation.id,
-                        limit: MessengerLimits.defaultMessagePageSize,
-                        session: session,
-                        router: router,
-                        force: true
-                    )
-                }
-            } else {
-                MessengerDiagnostics.event(
-                    .loadSkippedInFlight,
-                    conversationID: conversation.id,
-                    metadata: [
-                        "generation": "\(generation)",
-                        "cachedCountBefore": "\(cachedCountBefore)"
-                    ]
+            if !showedCachedMessages {
+                await hydrateFromLocalMessageCacheIfNeeded(
+                    profileID: profileID,
+                    generation: generation,
+                    contentGenerationAtStart: contentGenerationAtStart,
+                    limit: MessengerLimits.defaultMessagePageSize
                 )
-                if isInitialLoad {
-                    MessengerDiagnostics.event(
-                        .chatInitialLoadSkippedInFlight,
-                        conversationID: conversation.id,
-                        metadata: ["generation": "\(generation)"]
-                    )
+                if let hydrated = messageCache.messages(for: conversation.id), !hydrated.isEmpty {
+                    messages = hydrated
+                    syncPaginationStateFromCache()
+                    showedCachedMessages = true
+                    isLoading = false
                 }
             }
 
-            await loadTask?.value
+            if isInitialLoad {
+                messageCache.cancelLoad(for: conversation.id)
+                loadTask?.cancel()
+                loadTask = nil
+            }
+
+            let refreshTask = startNetworkMessageRefresh(
+                session: session,
+                router: router,
+                networkLoadGeneration: networkLoadGeneration,
+                isInitialLoad: isInitialLoad,
+                cachedCountBefore: cachedCountBefore,
+                generation: generation
+            )
+
+            if showedCachedMessages {
+                if let refreshTask {
+                    Task { @MainActor [weak self] in
+                        await refreshTask.value
+                        guard let self,
+                              generation == self.lifecycleGeneration,
+                              self.isOpen else { return }
+                        self.applyNetworkRefreshResult(
+                            generation: generation,
+                            networkLoadGeneration: networkLoadGeneration,
+                            showedCachedMessages: true,
+                            startedAt: startedAt,
+                            cachedCountBefore: cachedCountBefore,
+                            isInitialLoad: isInitialLoad
+                        )
+                    }
+                }
+                return
+            }
+
+            await refreshTask?.value
             if generation == lifecycleGeneration {
                 loadTask = nil
             }
@@ -912,33 +972,15 @@ final class ChatViewModel {
                 )
                 return
             }
-            let loaded = messageCache.messages(for: conversation.id) ?? []
-            messages = loaded
-            syncPaginationStateFromCache()
-            if let cacheError = messageCache.entry(for: conversation.id)?.errorMessage {
-                errorMessage = cacheError
-            }
-            MessengerDiagnostics.event(
-                .loadMessagesSucceeded,
-                conversationID: conversation.id,
-                metadata: [
-                    "generation": "\(generation)",
-                    "durationMs": "\(durationMilliseconds(since: startedAt))",
-                    "resultCount": "\(loaded.count)",
-                    "cachedCountBefore": "\(cachedCountBefore)",
-                    "cachedCountAfter": "\(messageCache.messages(for: conversation.id)?.count ?? 0)"
-                ]
+
+            applyNetworkRefreshResult(
+                generation: generation,
+                networkLoadGeneration: networkLoadGeneration,
+                showedCachedMessages: showedCachedMessages,
+                startedAt: startedAt,
+                cachedCountBefore: cachedCountBefore,
+                isInitialLoad: isInitialLoad
             )
-            if isInitialLoad {
-                MessengerDiagnostics.event(
-                    loaded.isEmpty ? .chatInitialLoadNoMessages : .chatInitialLoadApplied,
-                    conversationID: conversation.id,
-                    metadata: [
-                        "generation": "\(generation)",
-                        "resultCount": "\(loaded.count)"
-                    ]
-                )
-            }
         } catch let error as NetworkError {
             let errorCategory = MessengerDiagnostics.sanitizeError(error)
             MessengerDiagnostics.event(
@@ -950,6 +992,15 @@ final class ChatViewModel {
                     "errorCategory": errorCategory
                 ]
             )
+            if showedCachedMessages {
+                syncMessagesFromCache()
+                syncPaginationStateFromCache()
+                MessengerDiagnostics.event(
+                    .messengerMessageFallbackToCache,
+                    conversationID: conversation.id,
+                    metadata: ["count": "\(messages.count)"]
+                )
+            }
             if let message = MessengerSessionSupport.handleNetworkError(error, session: session, router: router) {
                 errorMessage = message
             }
@@ -963,7 +1014,129 @@ final class ChatViewModel {
                     "errorCategory": MessengerDiagnostics.sanitizeError(error)
                 ]
             )
+            if showedCachedMessages {
+                syncMessagesFromCache()
+                syncPaginationStateFromCache()
+                MessengerDiagnostics.event(
+                    .messengerMessageFallbackToCache,
+                    conversationID: conversation.id,
+                    metadata: ["count": "\(messages.count)"]
+                )
+            }
             errorMessage = error.localizedDescription
+        }
+    }
+
+    @discardableResult
+    private func applyInMemoryMessageCacheIfAvailable(isInitialLoad: Bool) -> Bool {
+        guard let cached = messageCache.messages(for: conversation.id), !cached.isEmpty else { return false }
+        messages = cached
+        syncPaginationStateFromCache()
+        if isInitialLoad {
+            MessengerDiagnostics.event(
+                .chatInitialCacheSync,
+                conversationID: conversation.id,
+                metadata: ["messageCount": "\(cached.count)"]
+            )
+        }
+        return true
+    }
+
+    private func startNetworkMessageRefresh(
+        session: SessionStore,
+        router: AppRouter,
+        networkLoadGeneration: Int,
+        isInitialLoad: Bool,
+        cachedCountBefore: Int,
+        generation: Int
+    ) -> Task<Void, Never>? {
+        if loadTask == nil {
+            loadTask = Task { @MainActor [weak self] in
+                guard let self else { return }
+                _ = await self.messageCache.loadRecentMessagesIfNeeded(
+                    conversationID: self.conversation.id,
+                    limit: MessengerLimits.defaultMessagePageSize,
+                    session: session,
+                    router: router,
+                    force: true,
+                    loadGeneration: networkLoadGeneration
+                )
+            }
+            return loadTask
+        }
+
+        MessengerDiagnostics.event(
+            .loadSkippedInFlight,
+            conversationID: conversation.id,
+            metadata: [
+                "generation": "\(generation)",
+                "cachedCountBefore": "\(cachedCountBefore)"
+            ]
+        )
+        if isInitialLoad {
+            MessengerDiagnostics.event(
+                .chatInitialLoadSkippedInFlight,
+                conversationID: conversation.id,
+                metadata: ["generation": "\(generation)"]
+            )
+        }
+        return loadTask
+    }
+
+    private func applyNetworkRefreshResult(
+        generation: Int,
+        networkLoadGeneration: Int,
+        showedCachedMessages: Bool,
+        startedAt: Date,
+        cachedCountBefore: Int,
+        isInitialLoad: Bool
+    ) {
+        guard networkLoadGeneration == messageLoadGeneration else {
+            MessengerDiagnostics.event(
+                .messengerMessageLoadStaleIgnored,
+                conversationID: conversation.id,
+                metadata: ["generation": "\(generation)"]
+            )
+            if showedCachedMessages {
+                syncMessagesFromCache()
+                syncPaginationStateFromCache()
+            }
+            return
+        }
+
+        let loaded = messageCache.messages(for: conversation.id) ?? messages
+        messages = loaded
+        syncPaginationStateFromCache()
+        if let cacheError = messageCache.entry(for: conversation.id)?.errorMessage {
+            errorMessage = cacheError
+        } else if showedCachedMessages, !loaded.isEmpty {
+            MessengerDiagnostics.event(
+                .messengerMessageLoadingStateRecovered,
+                conversationID: conversation.id,
+                metadata: ["count": "\(loaded.count)"]
+            )
+        }
+
+        MessengerDiagnostics.event(
+            .loadMessagesSucceeded,
+            conversationID: conversation.id,
+            metadata: [
+                "generation": "\(generation)",
+                "durationMs": "\(durationMilliseconds(since: startedAt))",
+                "resultCount": "\(loaded.count)",
+                "cachedCountBefore": "\(cachedCountBefore)",
+                "cachedCountAfter": "\(messageCache.messages(for: conversation.id)?.count ?? 0)"
+            ]
+        )
+        if isInitialLoad {
+            MessengerDiagnostics.event(
+                loaded.isEmpty ? .chatInitialLoadNoMessages : .chatInitialLoadApplied,
+                conversationID: conversation.id,
+                metadata: [
+                    "generation": "\(generation)",
+                    "resultCount": "\(loaded.count)"
+                ]
+            )
         }
     }
 
@@ -1123,6 +1296,7 @@ final class ChatViewModel {
     @discardableResult
     func applyRealtimeMessage(_ dto: MessageDTO, currentProfileID: UUID) -> Bool {
         self.currentProfileID = currentProfileID
+        messageContentGeneration += 1
         clearTyping(for: dto.senderProfileID)
         let applied = messageCache.applyRealtimeMessage(
             dto,
@@ -1148,6 +1322,7 @@ final class ChatViewModel {
         messageID: UUID?,
         cutoffDate: Date?
     ) -> Bool {
+        messageContentGeneration += 1
         let targetDate = cutoffDate ?? messageID.flatMap { id in
             messages.first(where: { $0.id == id })?.createdAt
         }
@@ -1291,6 +1466,62 @@ final class ChatViewModel {
             "didOpen": "\(didOpen)",
             "isOpen": "\(isOpen)"
         ]
+    }
+
+    private func hydrateFromLocalMessageCacheIfNeeded(
+        session: SessionStore,
+        generation: Int,
+        limit: Int
+    ) async {
+        guard let profileID = try? await MessengerSessionSupport.resolveCurrentProfileID(session: session) else {
+            return
+        }
+        guard generation == lifecycleGeneration, isOpen else { return }
+        currentProfileID = profileID
+        await hydrateFromLocalMessageCacheIfNeeded(
+            profileID: profileID,
+            generation: generation,
+            contentGenerationAtStart: messageContentGeneration,
+            limit: limit
+        )
+    }
+
+    private func hydrateFromLocalMessageCacheIfNeeded(
+        profileID: UUID,
+        generation: Int,
+        contentGenerationAtStart: Int,
+        limit: Int
+    ) async {
+        guard generation == lifecycleGeneration, isOpen else { return }
+        guard messageCache.messages(for: conversation.id)?.isEmpty != false else { return }
+
+        guard let cached = await MessengerMessageCacheService.hydrateCachedMessages(
+            conversationID: conversation.id,
+            currentProfileID: profileID,
+            limit: limit
+        ), !cached.isEmpty else {
+            return
+        }
+
+        guard generation == lifecycleGeneration,
+              contentGenerationAtStart == messageContentGeneration,
+              isOpen else {
+            MessengerDiagnostics.event(
+                .messengerMessageLoadStaleIgnored,
+                conversationID: conversation.id,
+                metadata: ["source": "cache"]
+            )
+            return
+        }
+
+        messageCache.mergeLoadedMessages(cached, for: conversation.id)
+        messages = messageCache.messages(for: conversation.id) ?? cached
+        syncPaginationStateFromCache()
+        MessengerDiagnostics.event(
+            .messengerMessageCacheHydratedUI,
+            conversationID: conversation.id,
+            metadata: ["count": "\(cached.count)", "source": "cache"]
+        )
     }
 
     private func hydrateFromMessageCacheIfAvailable() {

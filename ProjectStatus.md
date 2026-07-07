@@ -179,6 +179,21 @@
 - Added PR15B diagnostics events and `JustTwoTests/MessengerConversationCacheTests.swift`.
 - Updated `Docs/MessengerLocalStorage.md`, `Docs/StartupLoading.md`, `Docs/Realtime.md`.
 
+## 2026-07-07 (PR15C)
+
+### Cached messenger messages per conversation + resilient chat loading
+
+- Added `MessengerMessageCacheService` for local DB message hydrate/persist orchestration.
+- `ChatViewModel` hydrates from `MessengerLocalStore` before REST; cached messages show immediately.
+- `MessageCacheStore` persists REST/pagination to local DB; stale/cancelled loads ignored via `loadGeneration`.
+- Fixed chat loading lifecycle: `isLoading` / `isLoadingOlderMessages` always terminate; network failure does not clear cache.
+- Delta/realtime message handlers persist to local message cache.
+- Added `ChatUIMapping.message(from: LocalMessageSnapshot)` and `ChatMessageAttachment.cached`.
+- Feature flag: `MessengerLocalStorageFeatureFlags.isLocalReadEnabled = true`.
+- Fixed offline/airplane mode hang: local DB hydrate before network, background REST when cache shown, `isAwaitingInitialMessagePage` simplified, delivered/read acks non-blocking.
+- Updated `Docs/MessengerLocalStorage.md`, `Docs/StartupLoading.md`, `Docs/Realtime.md`.
+- Out of scope: persistent cursor runtime, persistent outbox runner, full `MessengerSyncEngine`, backend changes.
+
 ## Notes
 
 - Continue adding completed changes here after each meaningful update.
