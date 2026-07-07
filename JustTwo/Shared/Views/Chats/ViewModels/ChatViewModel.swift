@@ -202,7 +202,7 @@ final class ChatViewModel {
             syncPaginationStateFromCache()
         }
 
-        await markDeliveredAndReadInBackground(session: session, router: router)
+        markDeliveredAndReadInBackground(session: session, router: router)
 
         Task {
             await MessengerDeltaSyncService.shared.syncDeltas(

@@ -61,6 +61,23 @@ final class ConversationListViewModel {
         await refresh(session: session, router: router)
     }
 
+    @discardableResult
+    func loadLocalWarmupIfNeeded(session: SessionStore) async -> Int {
+        if didLoad {
+            return conversations.count
+        }
+
+        return await performLocalHydrate(session: session)
+    }
+
+    func refreshNetworkIfNeeded(session: SessionStore, router: AppRouter, force: Bool = false) async {
+        if didLoad, !force {
+            return
+        }
+
+        await refreshNetwork(session: session, router: router)
+    }
+
     func activateRealtime(session: SessionStore, router: AppRouter) {
         MessengerRealtimeCoordinator.shared.activateConversationList(self, session: session, router: router)
     }
@@ -76,7 +93,8 @@ final class ConversationListViewModel {
         }
 
         let task = Task { @MainActor in
-            await performRefresh(session: session, router: router)
+            _ = await self.performLocalHydrate(session: session)
+            await self.refreshNetwork(session: session, router: router)
         }
         refreshTask = task
         await task.value
@@ -85,10 +103,40 @@ final class ConversationListViewModel {
         }
     }
 
-    private func performRefresh(session: SessionStore, router: AppRouter) async {
+    func refreshNetwork(session: SessionStore, router: AppRouter) async {
         refreshGeneration += 1
         let generation = refreshGeneration
 
+        do {
+            let profileID = try await MessengerSessionSupport.resolveCurrentProfileID(session: session)
+            try await performNetworkRefresh(
+                session: session,
+                router: router,
+                profileID: profileID,
+                generation: generation
+            )
+        } catch let error as NetworkError {
+            guard generation == refreshGeneration else { return }
+            handleNetworkRefreshFailure(error, session: session, router: router)
+        } catch {
+            guard generation == refreshGeneration else { return }
+            if conversations.isEmpty {
+                errorMessage = error.localizedDescription
+            }
+            MessengerDiagnostics.event(
+                .messengerConversationCacheNetworkRefreshFailed,
+                metadata: [
+                    "errorCategory": MessengerDiagnostics.sanitizeError(error),
+                    "cachedCount": "\(conversations.count)"
+                ]
+            )
+        }
+
+        isLoading = false
+    }
+
+    @discardableResult
+    private func performLocalHydrate(session: SessionStore) async -> Int {
         let showLoading = conversations.isEmpty
         if showLoading {
             isLoading = true
@@ -104,7 +152,6 @@ final class ConversationListViewModel {
 
             if let cached,
                !cached.isEmpty,
-               generation == refreshGeneration,
                contentGenerationAtStart == listContentGeneration {
                 conversations = cached
                 syncMessengerBadge()
@@ -115,88 +162,91 @@ final class ConversationListViewModel {
                     .messengerConversationCacheHydratedUI,
                     metadata: ["count": "\(cached.count)"]
                 )
-            } else if let cached,
-                      !cached.isEmpty,
-                      generation == refreshGeneration,
-                      contentGenerationAtStart != listContentGeneration {
-                MessengerDiagnostics.event(
-                    .messengerConversationCacheSkippedStale,
-                    metadata: ["source": "cache"]
-                )
+                return cached.count
             }
-
-            let networkStartedAt = Date()
-            MessengerDiagnostics.event(.messengerConversationCacheNetworkRefreshStarted)
-
-            let response = try await ConversationService.fetchConversations()
-
-            guard generation == refreshGeneration else {
-                MessengerDiagnostics.event(
-                    .messengerConversationCacheSkippedStale,
-                    metadata: ["source": "rest"]
-                )
-                return
-            }
-
-            let restPreviews = response.conversations.map {
-                ChatUIMapping.conversationPreview(from: $0, currentProfileID: profileID)
-            }
-            conversations = mergeRESTPreviews(restPreviews, with: conversations)
-            bumpListContentGeneration()
-            await ConversationDeliveryAckCoordinator.shared.acknowledgeDeliveredForConversations(
-                response.conversations,
-                currentProfileID: profileID,
-                session: session,
-                router: router
-            )
-            await MessengerConversationCacheService.persistRESTConversations(response.conversations)
-            syncMessengerBadge()
-            didLoad = true
-            ConversationAvatarsStartupLoader.shared.preloadRemainingIfNeeded(for: conversations)
-
-            MessengerDiagnostics.event(
-                .messengerConversationCacheNetworkRefreshSucceeded,
-                metadata: [
-                    "count": "\(response.conversations.count)",
-                    "durationMs": "\(durationMilliseconds(since: networkStartedAt))"
-                ]
-            )
-        } catch let error as NetworkError {
-            guard generation == refreshGeneration else { return }
-
-            if conversations.isEmpty,
-               let message = MessengerSessionSupport.handleNetworkError(error, session: session, router: router) {
-                errorMessage = message
-            } else if conversations.isEmpty {
-                errorMessage = error.localizedDescription
-            } else if let message = MessengerSessionSupport.handleNetworkError(error, session: session, router: router) {
-                errorMessage = message
-            }
-
-            MessengerDiagnostics.event(
-                .messengerConversationCacheNetworkRefreshFailed,
-                metadata: [
-                    "errorCategory": MessengerDiagnostics.sanitizeError(error),
-                    "cachedCount": "\(conversations.count)"
-                ]
-            )
         } catch {
-            guard generation == refreshGeneration else { return }
-
             if conversations.isEmpty {
                 errorMessage = error.localizedDescription
             }
-
-            MessengerDiagnostics.event(
-                .messengerConversationCacheNetworkRefreshFailed,
-                metadata: [
-                    "errorCategory": MessengerDiagnostics.sanitizeError(error),
-                    "cachedCount": "\(conversations.count)"
-                ]
-            )
         }
 
-        isLoading = false
+        if showLoading, conversations.isEmpty {
+            isLoading = false
+        }
+
+        return conversations.count
+    }
+
+    private func performRefresh(session: SessionStore, router: AppRouter) async {
+        _ = await performLocalHydrate(session: session)
+        await refreshNetwork(session: session, router: router)
+    }
+
+    private func performNetworkRefresh(
+        session: SessionStore,
+        router: AppRouter,
+        profileID: UUID,
+        generation: Int
+    ) async throws {
+        let networkStartedAt = Date()
+        MessengerDiagnostics.event(.messengerConversationCacheNetworkRefreshStarted)
+
+        let response = try await ConversationService.fetchConversations()
+
+        guard generation == refreshGeneration else {
+            MessengerDiagnostics.event(
+                .messengerConversationCacheSkippedStale,
+                metadata: ["source": "rest"]
+            )
+            return
+        }
+
+        let restPreviews = response.conversations.map {
+            ChatUIMapping.conversationPreview(from: $0, currentProfileID: profileID)
+        }
+        conversations = mergeRESTPreviews(restPreviews, with: conversations)
+        bumpListContentGeneration()
+        await ConversationDeliveryAckCoordinator.shared.acknowledgeDeliveredForConversations(
+            response.conversations,
+            currentProfileID: profileID,
+            session: session,
+            router: router
+        )
+        await MessengerConversationCacheService.persistRESTConversations(response.conversations)
+        syncMessengerBadge()
+        didLoad = true
+        ConversationAvatarsStartupLoader.shared.preloadRemainingIfNeeded(for: conversations)
+
+        MessengerDiagnostics.event(
+            .messengerConversationCacheNetworkRefreshSucceeded,
+            metadata: [
+                "count": "\(response.conversations.count)",
+                "durationMs": "\(durationMilliseconds(since: networkStartedAt))"
+            ]
+        )
+    }
+
+    private func handleNetworkRefreshFailure(
+        _ error: NetworkError,
+        session: SessionStore,
+        router: AppRouter
+    ) {
+        if conversations.isEmpty,
+           let message = MessengerSessionSupport.handleNetworkError(error, session: session, router: router) {
+            errorMessage = message
+        } else if conversations.isEmpty {
+            errorMessage = error.localizedDescription
+        } else if let message = MessengerSessionSupport.handleNetworkError(error, session: session, router: router) {
+            errorMessage = message
+        }
+
+        MessengerDiagnostics.event(
+            .messengerConversationCacheNetworkRefreshFailed,
+            metadata: [
+                "errorCategory": MessengerDiagnostics.sanitizeError(error),
+                "cachedCount": "\(conversations.count)"
+            ]
+        )
     }
 
     private func durationMilliseconds(since startDate: Date) -> Int {

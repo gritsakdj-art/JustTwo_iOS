@@ -39,6 +39,10 @@ final class AppRouter {
             splashError = error
             screen = .splash
 
+        case .offlineRecoverable:
+            splashError = nil
+            screen = .splash
+
         case .result(let result):
             splashError = nil
 

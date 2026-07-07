@@ -209,6 +209,17 @@ extension NetworkError {
         isUnauthorized
     }
 
+    var isRecoverableForOfflineStartup: Bool {
+        switch self {
+        case .noInternet, .tlsFailure, .timeout, .connectionLost, .serverUnavailable:
+            return true
+        case .httpError(let statusCode, _):
+            return statusCode >= 500
+        case .cancelled, .unauthorized, .decodingError, .invalidResponse, .unknown:
+            return false
+        }
+    }
+
     var userMessage: String {
         if case .httpError(_, let response) = self {
             return response?.userFriendlyMessage ?? localizedDescription

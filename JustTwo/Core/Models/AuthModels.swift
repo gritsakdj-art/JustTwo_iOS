@@ -35,7 +35,7 @@ struct AuthResponse: Decodable {
     }
 }
 
-struct UserResponse: Decodable {
+nonisolated struct UserResponse: Decodable, Sendable {
     let id: UUID
     let email: String
     let emailVerified: Bool

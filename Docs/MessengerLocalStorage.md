@@ -9,8 +9,35 @@ On-device messenger persistence using SwiftData.
 | PR15A | SwiftData schema foundation, store API, logout reset | ✅ |
 | PR15B | Cached conversation list (read + write from REST/delta/realtime) | ✅ |
 | PR15C | Cached per-conversation message history + resilient chat loading | ✅ |
+| PR15D | Offline-friendly splash + startup session snapshot | ✅ |
 | PR16 | Persistent outbox | planned |
 | PR17 | Full sync engine | planned |
+
+## PR15D — Offline-friendly startup
+
+Splash and critical warmup no longer require network when a usable cached session exists.
+
+### Behavior
+
+1. `StartupSessionSnapshotStore` persists safe user/profile fields (no JWT, no signed URLs).
+2. Splash hydrates `SessionStore` from snapshot before network validation.
+3. Recoverable network errors with cached user + profile → `MainTabView` with `offlineUsingCache`.
+4. `401` still clears session; network timeout/offline is not treated as auth failure.
+5. Critical warmup = local conversation hydrate only; REST/photos/avatars/realtime move to background.
+6. `StartupSessionValidationService` re-validates when network returns.
+7. Logout reset clears startup snapshot alongside messenger SwiftData.
+
+### What stays separate from messenger SwiftData
+
+| Data | Storage |
+|------|---------|
+| JWT | Keychain only |
+| User/profile snapshot | Application Support JSON |
+| Conversations/messages | SwiftData (`MessengerLocalStore`) |
+
+### Manual smoke
+
+See [Startup loading](StartupLoading.md) PR15D checklist.
 
 ## PR15C — Cached messages per conversation
 

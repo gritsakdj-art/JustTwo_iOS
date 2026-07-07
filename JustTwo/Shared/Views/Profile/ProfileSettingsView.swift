@@ -697,6 +697,9 @@ struct ProfileSettingsView: View {
             do {
                 let profile = try await ProfileService.upsertProfile(body)
                 session.updateCurrentProfile(profile)
+                if let user = session.currentUser {
+                    await StartupSessionSnapshotStore.shared.save(user: user, profile: profile)
+                }
 
                 switch context {
                 case .onboarding:

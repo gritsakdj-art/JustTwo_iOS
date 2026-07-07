@@ -1,7 +1,6 @@
 import Foundation
-import SwiftUI
 
-struct UserProfileDTO: Decodable {
+nonisolated struct UserProfileDTO: Decodable, Sendable {
     let id: UUID
     let displayName: String
     let birthDate: String
@@ -30,6 +29,36 @@ struct UserProfileDTO: Decodable {
         case isVisibleInDiscovery
         case createdAt
         case updatedAt
+    }
+
+    init(
+        id: UUID,
+        displayName: String,
+        birthDate: String,
+        gender: String,
+        bio: String? = nil,
+        city: String? = nil,
+        latitude: Double? = nil,
+        longitude: Double? = nil,
+        moodModeEnabled: Bool,
+        activityModeEnabled: Bool,
+        isVisibleInDiscovery: Bool = true,
+        createdAt: Date? = nil,
+        updatedAt: Date? = nil
+    ) {
+        self.id = id
+        self.displayName = displayName
+        self.birthDate = birthDate
+        self.gender = gender
+        self.bio = bio
+        self.city = city
+        self.latitude = latitude
+        self.longitude = longitude
+        self.moodModeEnabled = moodModeEnabled
+        self.activityModeEnabled = activityModeEnabled
+        self.isVisibleInDiscovery = isVisibleInDiscovery
+        self.createdAt = createdAt
+        self.updatedAt = updatedAt
     }
 
     init(from decoder: any Decoder) throws {

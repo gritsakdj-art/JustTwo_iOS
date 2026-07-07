@@ -8,35 +8,46 @@ struct MainTabView: View {
     @State private var chatsViewModel = ConversationListViewModel.shared
 
     var body: some View {
-        TabView(selection: $selectedTab) {
-            DiscoverView()
-                .tag(AppTab.discover)
-                .tabItem {
-                    tabItem(for: .discover)
-                }
+        VStack(spacing: 0) {
+            if session.shouldShowOfflineBanner {
+                OfflineSessionBanner(connectivityState: session.connectivityState)
+                    .padding(.horizontal, 16)
+                    .padding(.top, 8)
+                    .padding(.bottom, 4)
+                    .transition(.move(edge: .top).combined(with: .opacity))
+            }
 
-            MatchesView()
-                .tag(AppTab.matches)
-                .tabItem {
-                    tabItem(for: .matches)
-                }
+            TabView(selection: $selectedTab) {
+                DiscoverView()
+                    .tag(AppTab.discover)
+                    .tabItem {
+                        tabItem(for: .discover)
+                    }
 
-            chatsTab
+                MatchesView()
+                    .tag(AppTab.matches)
+                    .tabItem {
+                        tabItem(for: .matches)
+                    }
 
-            PlansView()
-                .tag(AppTab.plans)
-                .tabItem {
-                    tabItem(for: .plans)
-                }
+                chatsTab
 
-            ProfileView()
-                .tag(AppTab.profile)
-                .tabItem {
-                    tabItem(for: .profile)
-                }
+                PlansView()
+                    .tag(AppTab.plans)
+                    .tabItem {
+                        tabItem(for: .plans)
+                    }
+
+                ProfileView()
+                    .tag(AppTab.profile)
+                    .tabItem {
+                        tabItem(for: .profile)
+                    }
+            }
+            .tint(Color.discoverViolet)
+            .toolbarBackground(.hidden, for: .tabBar)
         }
-        .tint(Color.discoverViolet)
-        .toolbarBackground(.hidden, for: .tabBar)
+        .animation(.spring(response: 0.34, dampingFraction: 0.86), value: session.shouldShowOfflineBanner)
         .onAppear {
             selectedTab = router.selectedMainTab
         }

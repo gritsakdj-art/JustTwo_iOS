@@ -1,5 +1,12 @@
 import Foundation
 
+enum SessionConnectivityState: Equatable, Sendable {
+    case online
+    case offlineUsingCache
+    case validationPending
+    case validationFailedRecoverable
+}
+
 @MainActor
 @Observable
 final class SessionStore {
@@ -9,6 +16,8 @@ final class SessionStore {
     private(set) var currentUser: UserResponse?
     private(set) var currentProfile: UserProfileDTO?
     private(set) var pendingVerificationEmail: String?
+    private(set) var connectivityState: SessionConnectivityState = .online
+    private(set) var lastValidationError: NetworkError?
     let realtimeClient = RealtimeClient.shared
 
     var isEmailVerified: Bool {
@@ -23,6 +32,10 @@ final class SessionStore {
         hasActiveSession && isEmailVerified
     }
 
+    var shouldShowOfflineBanner: Bool {
+        connectivityState == .offlineUsingCache || connectivityState == .validationPending
+    }
+
     private init() {}
 
     func signIn(_ response: AuthResponse) throws {
@@ -34,6 +47,12 @@ final class SessionStore {
         currentUser = user
         currentProfile = nil
         pendingVerificationEmail = user.emailVerified ? nil : user.email
+        connectivityState = .online
+        lastValidationError = nil
+
+        Task {
+            await StartupSessionSnapshotStore.shared.save(user: user, profile: nil)
+        }
 
         connectRealtimeIfEligible()
         syncPushRegistrationIfEligible()
@@ -51,8 +70,35 @@ final class SessionStore {
         }
     }
 
+    func applyStartupSnapshot(_ snapshot: StartupSessionSnapshot) {
+        currentUser = StartupSessionSnapshotMapping.userResponse(from: snapshot.user)
+        pendingVerificationEmail = snapshot.user.emailVerified ? nil : snapshot.user.email
+        currentProfile = snapshot.profile.map(StartupSessionSnapshotMapping.userProfile(from:))
+        markOfflineUsingCache()
+    }
+
     func updateCurrentProfile(_ profile: UserProfileDTO?) {
         currentProfile = profile
+    }
+
+    func markOnlineValidated() {
+        connectivityState = .online
+        lastValidationError = nil
+        StartupSessionValidationService.shared.stopWatching()
+    }
+
+    func markValidationPending() {
+        connectivityState = .validationPending
+    }
+
+    func markOfflineUsingCache(lastError: NetworkError? = nil) {
+        connectivityState = .offlineUsingCache
+        lastValidationError = lastError
+    }
+
+    func markValidationFailedRecoverable(lastError: NetworkError? = nil) {
+        connectivityState = .validationFailedRecoverable
+        lastValidationError = lastError
     }
 
     func setPendingVerificationEmail(_ email: String?) {
@@ -60,6 +106,8 @@ final class SessionStore {
     }
 
     func clearSession() {
+        StartupSessionValidationService.shared.stopWatching()
+
         let pushUnregisterToken = APIAuth.accessToken
         Task { @MainActor in
             await PushRegistrationService.shared.unregisterCurrentDevice(accessToken: pushUnregisterToken)
@@ -78,6 +126,8 @@ final class SessionStore {
         currentUser = nil
         currentProfile = nil
         pendingVerificationEmail = nil
+        connectivityState = .online
+        lastValidationError = nil
         PushNotificationRoutingCoordinator.shared.clearPendingRoute()
         AppStartupCoordinator.shared.scheduleLogoutReset()
         ProfilePhotoStore.shared.reset()

@@ -194,6 +194,19 @@
 - Updated `Docs/MessengerLocalStorage.md`, `Docs/StartupLoading.md`, `Docs/Realtime.md`.
 - Out of scope: persistent cursor runtime, persistent outbox runner, full `MessengerSyncEngine`, backend changes.
 
+## 2026-07-07 (PR15D)
+
+### Offline-friendly splash and cache-first critical warmup
+
+- Added `StartupSessionSnapshotStore` for persisted user/profile snapshot (Application Support JSON; no JWT/signed URLs).
+- Splash hydrates cached session before network validation; recoverable network errors route to main when cache is usable.
+- Split `AppStartupCoordinator` into critical local warmup (SwiftData conversation hydrate) and background network warmup (REST, photos, avatars, delta, realtime).
+- Added `SessionConnectivityState`, `OfflineSessionBanner`, `StartupSessionValidationService` for background re-validation.
+- `401` still clears session; network unavailable is not treated as invalid session.
+- Added startup diagnostics events and `JustTwoTests/OfflineStartupTests.swift`.
+- Updated `Docs/StartupLoading.md`, `Docs/MessengerLocalStorage.md`, `Docs/Realtime.md`.
+- Deferred: PR15E (MessagesStartupLoader local-DB-first), PR15F (pop refresh removal, ack batching).
+
 ## Notes
 
 - Continue adding completed changes here after each meaningful update.

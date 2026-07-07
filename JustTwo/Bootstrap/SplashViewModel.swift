@@ -9,6 +9,7 @@ final class SplashViewModel {
 
     private let session: SessionStore
     private let router: AppRouter
+    private let snapshotStore: StartupSessionSnapshotStoreProtocol
     private var didStart = false
     private var flowToken = UUID()
     private var flowTask: Task<Void, Never>?
@@ -18,9 +19,14 @@ final class SplashViewModel {
         static let minimumDisplayDuration: Duration = .milliseconds(900)
     }
 
-    init(session: SessionStore, router: AppRouter) {
+    init(
+        session: SessionStore,
+        router: AppRouter,
+        snapshotStore: StartupSessionSnapshotStoreProtocol? = nil
+    ) {
         self.session = session
         self.router = router
+        self.snapshotStore = snapshotStore ?? StartupSessionSnapshotStore.shared
     }
 
     func onAppear() {
@@ -107,56 +113,127 @@ final class SplashViewModel {
             try APIAuth.restorePersistedSession()
             guard flowToken == token else { return }
 
-            guard APIAuth.accessToken != nil else {
+            guard let accessToken = APIAuth.accessToken else {
+                MessengerDiagnostics.event(.splashTokenMissing)
                 session.clearSession()
                 await ensureMinimumDisplayDuration(since: startedAt, token: token)
                 guard flowToken == token else { return }
                 logFlowFinished(since: startedAt, result: "needAuth")
+                MessengerDiagnostics.event(.splashRouteAuth)
                 setState(.result(.needAuth))
                 return
             }
 
-            setPhase(.loadingUser)
-            let user = try await AuthService.currentUser(
-                strategies: SplashStartupPolicy.authStrategies,
-                configuration: .splash
-            )
-            session.setCurrentUser(user)
-            guard flowToken == token else { return }
+            MessengerDiagnostics.event(.splashTokenFound)
 
-            guard user.emailVerified else {
+            if JWTPayloadReader.isExpired(token: accessToken) == true {
+                MessengerDiagnostics.event(.splashTokenExpiredLocal)
+                session.clearSession()
                 await ensureMinimumDisplayDuration(since: startedAt, token: token)
                 guard flowToken == token else { return }
-                logFlowFinished(since: startedAt, result: "needEmailVerification")
-                setState(.result(.needEmailVerification(email: user.email)))
+                MessengerDiagnostics.event(.splashRouteAuth)
+                setState(.result(.needAuth))
                 return
             }
 
-            setPhase(.loadingProfile)
-            let profile = try await ProfileStartupLoader.shared.loadIfNeeded(
+            let cachedSnapshot = await snapshotStore.load()
+            if let cachedSnapshot {
+                session.applyStartupSnapshot(cachedSnapshot)
+            }
+
+            setPhase(.loadingUser)
+            MessengerDiagnostics.event(
+                .splashNetworkValidationStarted,
+                metadata: [
+                    "hasCachedUser": cachedSnapshot == nil ? "false" : "true",
+                    "hasCachedProfile": cachedSnapshot?.profile == nil ? "false" : "true"
+                ]
+            )
+
+            let validation = await performNetworkValidation(session: session, hadUsableCache: cachedSnapshot?.isUsableForOfflineMain == true)
+            guard flowToken == token else { return }
+
+            if case .recoverableFailure = validation,
+               cachedSnapshot?.isUsableForOfflineMain != true {
+                let error = session.lastValidationError ?? .noInternet
+                setState(.networkError(error))
+                beginNetworkWatchForAutoRetry(token: token)
+                return
+            }
+
+            let route = SplashRouteResolver.resolve(
+                hasToken: true,
+                isTokenLocallyExpired: false,
+                cachedSnapshot: cachedSnapshot,
+                validation: validation
+            )
+
+            switch route {
+            case .needAuth:
+                session.clearSession()
+                stopNetworkWatch()
+                await ensureMinimumDisplayDuration(since: startedAt, token: token)
+                guard flowToken == token else { return }
+                MessengerDiagnostics.event(.splashRouteAuth)
+                setState(.result(.needAuth))
+                return
+
+            case .needEmailVerification(let email):
+                stopNetworkWatch()
+                await ensureMinimumDisplayDuration(since: startedAt, token: token)
+                guard flowToken == token else { return }
+                setState(.result(.needEmailVerification(email: email)))
+                return
+
+            case .needProfileSetup:
+                stopNetworkWatch()
+                await ensureMinimumDisplayDuration(since: startedAt, token: token)
+                guard flowToken == token else { return }
+                MessengerDiagnostics.event(.splashRouteProfileSetup)
+                setState(.result(.needProfileSetup))
+                return
+
+            case .recoverableOfflineError:
+                MessengerDiagnostics.event(.splashOfflineCachedSessionRejected)
+                setState(.offlineRecoverable)
+                beginNetworkWatchForAutoRetry(token: token)
+                return
+
+            case .readyFromNetwork:
+                setPhase(.loadingProfile)
+                session.markOnlineValidated()
+                MessengerDiagnostics.event(.splashRouteMainFromNetwork)
+                MessengerDiagnostics.event(.splashNetworkValidationSucceeded)
+
+            case .readyFromCache:
+                session.markOfflineUsingCache()
+                MessengerDiagnostics.event(.splashOfflineCachedSessionAccepted)
+                MessengerDiagnostics.event(.splashRouteMainFromCache)
+                MessengerDiagnostics.event(
+                    .splashNetworkValidationFailedRecoverable,
+                    metadata: ["route": "cachedSession"]
+                )
+            }
+
+            setPhase(.loadingChats)
+            await AppStartupWarmupStore.shared.warmupAuthenticatedHome(
                 session: session,
-                strategies: SplashStartupPolicy.authStrategies,
-                configuration: .splash
+                router: router
             )
             guard flowToken == token else { return }
 
-            if profile != nil {
-                setPhase(.loadingChats)
+            if route == .readyFromNetwork {
                 session.connectRealtimeIfEligible()
                 session.syncPushRegistrationIfEligible()
-                await AppStartupWarmupStore.shared.warmupAuthenticatedHome(
-                    session: session,
-                    router: router
-                )
+            } else if route == .readyFromCache {
+                StartupSessionValidationService.shared.beginWatching(session: session, router: router)
             }
-            guard flowToken == token else { return }
 
             stopNetworkWatch()
             await ensureMinimumDisplayDuration(since: startedAt, token: token)
             guard flowToken == token else { return }
-            let result: SplashResult = profile == nil ? .needProfileSetup : .ready
-            logFlowFinished(since: startedAt, result: String(describing: result))
-            setState(.result(result))
+            logFlowFinished(since: startedAt, result: "ready")
+            setState(.result(.ready))
         } catch is CancellationError {
             return
         } catch let error as NetworkError where error.shouldClearSession {
@@ -165,6 +242,10 @@ final class SplashViewModel {
             stopNetworkWatch()
             await ensureMinimumDisplayDuration(since: startedAt, token: token)
             guard flowToken == token else { return }
+            MessengerDiagnostics.event(
+                .splashNetworkValidationFailedAuth,
+                metadata: ["errorCategory": MessengerDiagnostics.sanitizeError(error)]
+            )
             setState(.result(.needAuth))
         } catch let error as NetworkError {
             NetworkDebug.log("Splash flow failed phase=\(phase.logLabel) error=\(error)")
@@ -180,13 +261,76 @@ final class SplashViewModel {
         }
     }
 
+    private func performNetworkValidation(
+        session: SessionStore,
+        hadUsableCache: Bool
+    ) async -> SplashNetworkValidationResult {
+        if hadUsableCache, !NetworkPathMonitor.shared.isNetworkSatisfied {
+            return .offlineAccepted
+        }
+
+        do {
+            let user = try await AuthService.currentUser(
+                strategies: SplashStartupPolicy.authStrategies,
+                configuration: .splash
+            )
+            session.setCurrentUser(user)
+            await snapshotStore.save(user: user, profile: session.currentProfile)
+
+            guard user.emailVerified else {
+                return .needsEmailVerification(email: user.email)
+            }
+
+            let profile = try await ProfileStartupLoader.shared.loadIfNeeded(
+                session: session,
+                strategies: SplashStartupPolicy.authStrategies,
+                configuration: .splash
+            )
+
+            return .success(hasProfile: profile != nil)
+        } catch let error as NetworkError where error.shouldClearSession {
+            MessengerDiagnostics.event(
+                .splashNetworkValidationFailedAuth,
+                metadata: ["errorCategory": MessengerDiagnostics.sanitizeError(error)]
+            )
+            return .authFailure
+        } catch let error as NetworkError where error.isRecoverableForOfflineStartup {
+            if hadUsableCache {
+                return .offlineAccepted
+            }
+            if session.currentUser != nil, session.currentProfile == nil {
+                session.markValidationFailedRecoverable(lastError: error)
+                return .offlineRejectedNoProfile
+            }
+            session.markValidationFailedRecoverable(lastError: error)
+            return .recoverableFailure
+        } catch {
+            let mapped = NetworkError.map(error)
+            if mapped.isRecoverableForOfflineStartup {
+                if hadUsableCache {
+                    return .offlineAccepted
+                }
+                if session.currentUser != nil, session.currentProfile == nil {
+                    session.markValidationFailedRecoverable(lastError: mapped)
+                    return .offlineRejectedNoProfile
+                }
+                session.markValidationFailedRecoverable(lastError: mapped)
+            }
+            return .recoverableFailure
+        }
+    }
+
     private func beginNetworkWatchForAutoRetry(token: UUID) {
         stopNetworkWatch()
         networkWatchID = NetworkPathMonitor.shared.registerPathChangeHandler { [weak self] in
             guard let self, self.flowToken == token else { return }
-            guard case .networkError = self.state else { return }
-            NetworkDebug.log("Splash auto-retry: network path changed")
-            self.retry()
+            switch self.state {
+            case .networkError, .offlineRecoverable:
+                NetworkDebug.log("Splash auto-retry: network path changed")
+                self.retry()
+            default:
+                break
+            }
         }
     }
 

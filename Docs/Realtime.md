@@ -92,6 +92,14 @@ PR15C: realtime and delta message handlers also persist per-conversation message
 * conversation list rows and private chat header show a small online indicator when the other participant is online;
 * REST remains the source of truth for messenger data.
 
+## Offline startup (PR15D)
+
+When splash routes to `MainTabView` using a cached session snapshot:
+
+* realtime connect is **deferred** until `StartupSessionValidationService` succeeds;
+* delta bootstrap runs in background network warmup after validation;
+* transient network loss during an active session keeps existing realtime behavior unchanged.
+
 ## Manual smoke
 
 Use staging only:

@@ -6,34 +6,46 @@ JustTwo iOS warms authenticated home data during splash and keeps it in shared s
 
 After session restore and profile availability:
 
-1. User enters main UI with profile, photos, conversations, badge state, and realtime subscriptions ready.
+1. User enters main UI with profile, conversations, badge state, and (when online) realtime subscriptions ready.
 2. Recent chat messages preload in the background.
 3. Opening a chat uses cached messages first, then refreshes from REST.
 4. Logout/session clear resets all warmed state.
+5. **Offline cold relaunch (PR15D):** token + cached user/profile snapshot → `MainTabView` without waiting for network.
 
 ## Architecture
 
 ```text
 SplashViewModel
-  └─ ProfileStartupLoader.loadIfNeeded
-  └─ AppStartupCoordinator.runCriticalWarmup
+  ├─ Keychain token restore
+  ├─ StartupSessionSnapshotStore.load (local user/profile)
+  ├─ Network validation (/me + /profile/me) — recoverable when cache exists
+  └─ AppStartupCoordinator.runCriticalLocalWarmup
+        └─ ConversationsStartupLoader.loadLocalWarmupIfNeeded (SwiftData hydrate only)
+
+After MainTabView (background):
+  AppStartupCoordinator.runBackgroundNetworkWarmup
+        ├─ GET /sync/state baseline
         ├─ ProfilePhotosStartupLoader
-        ├─ ConversationsStartupLoader
-        ├─ realtime activate (MessengerRealtimeCoordinator)
-        └─ MessagesStartupLoader (background)
+        ├─ ConversationsStartupLoader.refreshNetworkIfNeeded
+        ├─ realtime connect + delta bootstrap
+        ├─ ConversationAvatarsStartupLoader (critical + remaining)
+        └─ MessagesStartupLoader
 ```
 
 ### Coordinator and loaders
 
 | Component | Path | Responsibility |
 |-----------|------|----------------|
-| `AppStartupCoordinator` | `Bootstrap/Startup/AppStartupCoordinator.swift` | Critical warmup orchestration, dedupe, background scheduling, reset |
+| `SplashViewModel` | `Bootstrap/SplashViewModel.swift` | Token restore, snapshot hydrate, network validation, offline route |
+| `StartupSessionSnapshotStore` | `Core/Persistence/Startup/StartupSessionSnapshotStore.swift` | Persist last-known user/profile for offline splash |
+| `StartupSessionValidationService` | `Bootstrap/Startup/StartupSessionValidationService.swift` | Background `/me` + `/profile/me` after offline entry |
+| `AppStartupCoordinator` | `Bootstrap/Startup/AppStartupCoordinator.swift` | Critical local warmup + background network warmup, reset |
 | `AppStartupWarmupStore` | `Bootstrap/AppStartupWarmupStore.swift` | Backward-compatible facade over coordinator |
-| `ProfileStartupLoader` | `Bootstrap/Startup/ProfileStartupLoader.swift` | `/profile/me` single-flight load into `SessionStore` |
-| `ProfilePhotosStartupLoader` | `Bootstrap/Startup/ProfilePhotosStartupLoader.swift` | Wraps `ProfilePhotoStore.loadPhotos` |
-| `ConversationsStartupLoader` | `Bootstrap/Startup/ConversationsStartupLoader.swift` | Wraps `ConversationListViewModel.loadIfNeeded` + realtime activation |
+| `ProfileStartupLoader` | `Bootstrap/Startup/ProfileStartupLoader.swift` | `/profile/me` single-flight load into `SessionStore` + snapshot persist |
+| `ProfilePhotosStartupLoader` | `Bootstrap/Startup/ProfilePhotosStartupLoader.swift` | Wraps `ProfilePhotoStore.loadPhotos` (background) |
+| `ConversationsStartupLoader` | `Bootstrap/Startup/ConversationsStartupLoader.swift` | Local hydrate + network refresh split |
 | `MessagesStartupLoader` | `Bootstrap/Startup/MessagesStartupLoader.swift` | Background message preload |
-| `ConversationAvatarsStartupLoader` | `Bootstrap/Startup/ConversationAvatarsStartupLoader.swift` | Critical + background partner avatar preload |
+| `ConversationAvatarsStartupLoader` | `Bootstrap/Startup/ConversationAvatarsStartupLoader.swift` | Background partner avatar preload |
 | `ChatPartnerAvatarCache` | `Shared/Views/Chats/ChatPartnerAvatarCache.swift` | Download/cache helper for chat avatars |
 | `MessageCacheStore` | `Shared/Views/Chats/MessageCacheStore.swift` | In-memory messages cache per conversation |
 | `StartupSingleFlight` | `Bootstrap/Startup/StartupSingleFlight.swift` | Shared single-flight helper |
@@ -45,30 +57,66 @@ Each loader supports:
 * `reset` on session clear
 * duplicate request coalescing
 
+## Offline-capable splash (PR15D)
+
+### Rules
+
+| Condition | Route |
+|-----------|-------|
+| No token | `AuthView` |
+| Token locally expired (`JWTPayloadReader`) | `AuthView` |
+| Server `401` / invalid token | clear session → `AuthView` |
+| Email not verified (server) | verification gate |
+| Profile not found (server, online) | `ProfileSetup` |
+| Network unavailable + cached user + cached profile + `emailVerified` | `MainTabView` (stale/offline session) |
+| Network unavailable + no cached profile | recoverable splash error (not fake main) |
+| Network success | fresh server state → save snapshot → main |
+
+**Network failure ≠ invalid session.** Only confirmed `401` clears the session.
+
+### Startup session snapshot
+
+Stored in Application Support JSON (`startup-session-snapshot.json`):
+
+* `UserResponse` safe fields (id, email, emailVerified, dates)
+* `UserProfileDTO` safe fields (no signed URLs, no JWT)
+* `updatedAt`
+
+Token stays in Keychain only.
+
+Snapshot written on:
+
+* successful splash `/me` + `/profile/me`
+* profile upsert (`ProfileSettingsView`)
+* sign-in (user only, profile when available)
+
+Cleared on logout via `AppStartupCoordinator.performReset()`.
+
+### Offline UI
+
+* `SessionStore.connectivityState` → `offlineUsingCache` / `validationPending`
+* `OfflineSessionBanner` in `MainTabView` when offline cached session is active
+* `StartupSessionValidationService` retries when network returns
+
 ## Critical vs background
 
-### Critical (before main UI)
+### Critical local (before main UI, no network required)
 
-Executed in splash `.finishing` when profile exists, and after onboarding profile save:
+Executed in splash when profile route is allowed:
 
-* session restore (`SplashViewModel`)
-* `/me` user load
-* `/profile/me` via `ProfileStartupLoader`
-* profile photos via `ProfilePhotoStore`
-* conversations list via `ConversationListViewModel`
-* partner avatars for the top `10` recent chats via `ConversationAvatarsStartupLoader`
-* badge sync via conversation list refresh
-* realtime connect (`SessionStore.connectRealtimeIfEligible`)
-* conversation list realtime subscriptions
+* `waitForLogoutReset`
+* hydrate conversation list from SwiftData (`ConversationListViewModel.loadLocalWarmupIfNeeded`)
+* completes without `GET /conversations`, profile photos, or avatars
 
-Non-fatal: photo/conversation network errors do not block splash routing.
+### Background network (after main UI or in parallel when online)
 
-### Background (after critical warmup)
-
-* preload last `10` messages for top `15` recent conversations
-* partner avatars for remaining conversations
-* stored in `MessageCacheStore`
-* does not block splash completion
+* `GET /sync/state` baseline
+* profile photos
+* `GET /conversations` REST refresh
+* delivery acks
+* realtime connect + delta bootstrap
+* critical + remaining partner avatars
+* message preload for top `15` conversations
 
 Limits live in `StartupLoadingLimits`.
 
@@ -77,7 +125,7 @@ Limits live in `StartupLoadingLimits`.
 ### Chats
 
 * `ChatsView` uses `ConversationListViewModel.shared`.
-* `ConversationListViewModel.performRefresh` hydrates from `MessengerLocalStore` when `isCachedConversationListEnabled`, then runs REST `GET /conversations`.
+* `ConversationListViewModel` hydrates from `MessengerLocalStore` first, then REST in background or on explicit refresh.
 * REST success upserts conversation snapshots into local DB via `MessengerConversationCacheService`.
 * Delta/realtime list updates also write local conversation cache (PR15B).
 * `ChatAvatarView` reads `ProfilePhotoImageCache` by `avatarPhotoID` before any network request.
@@ -96,6 +144,7 @@ Limits live in `StartupLoadingLimits`.
 ### Profile / photos
 
 * `ProfileView` and `ProfilePhotosView` skip `loadPhotos()` when startup already populated `ProfilePhotoStore`.
+* Profile photos load in background network warmup, not on splash critical path.
 
 ## Realtime and cache
 
@@ -107,6 +156,8 @@ Realtime updates:
 * inactive cached conversation → `MessageCacheStore` only
 * conversation list → `ConversationListViewModel`
 
+Offline entry defers realtime connect until background validation succeeds.
+
 Send/edit/delete/reaction in `ChatViewModel` also update cache.
 
 ## Reset paths
@@ -116,6 +167,7 @@ Send/edit/delete/reaction in `ChatViewModel` also update cache.
 * `MessengerRealtimeCoordinator.stop()`
 * realtime disconnect
 * `MessengerBadgeStore.reset()`
+* `StartupSessionValidationService.stopWatching()`
 * `AppStartupCoordinator.scheduleLogoutReset()` (async; does not block `clearSession` return)
 * `ProfilePhotoStore.reset()`
 * local avatar/order caches
@@ -124,6 +176,7 @@ Send/edit/delete/reaction in `ChatViewModel` also update cache.
 
 Coordinator `performReset()` also clears:
 
+* `StartupSessionSnapshotStore`
 * profile loader state
 * photos/conversations startup loader keys
 * messages preload task
@@ -131,20 +184,52 @@ Coordinator `performReset()` also clears:
 * `MessengerOutbox`, `MessengerDeltaSyncService`, `ConversationListViewModel`
 * `MessengerLocalStore.shared.resetAllMessengerData()` (SwiftData; awaited inside reset task)
 
-`AppStartupWarmupStore.reset()` and `AppStartupCoordinator.reset()` remain direct `await` entry points for tests and explicit resets.
+## Manual smoke checklist (PR15D)
 
-See [Messenger local storage](MessengerLocalStorage.md) for SwiftData schema, session-generation guards, and logout race hardening.
+### Online existing user
 
-## Adding a new preload domain
+1. Launch with network, token exists.
+2. `/me` + `/profile/me` succeed.
+3. Main UI appears; conversation list loads.
+4. Chat opens.
 
-1. Create a focused loader/store with `loadIfNeeded`, `force`, `reset`, and single-flight.
-2. Add it to `AppStartupCoordinator.runCriticalWarmup` if blocking, or schedule background task if optional.
-3. Reset it from `AppStartupCoordinator.reset`.
-4. Make screens read shared store state instead of fetching on every appear.
-5. Document the domain here.
+### Offline cold relaunch with cache
+
+1. Login online; open conversations and at least one chat.
+2. Kill app; enable airplane mode; relaunch.
+3. Splash must not hang or route to Auth.
+4. Main UI opens; offline banner visible.
+5. Cached conversations and messages visible.
+
+### Offline with no cached profile
+
+1. Token without profile snapshot; disable network; launch.
+2. Recoverable splash state — not fake MainTabView.
+
+### Invalid token
+
+1. Server `401` → clear session → Auth.
+2. Network timeout/offline must not be treated as `401`.
+
+### Network returns
+
+1. Start offline cached main; disable airplane mode.
+2. Background validation succeeds; banner clears; REST/delta/realtime resume.
+
+### Logout isolation
+
+1. Login A, seed cache, logout, login B.
+2. A's startup snapshot and messenger cache must not appear.
+
+## Deferred (PR15E/PR15F)
+
+* `MessagesStartupLoader` local-DB-first optimization
+* skip redundant `force: true` on chat open
+* remove `ChatsView` pop refresh
+* delivery ack batching
 
 ## Related docs
 
-* [Messenger local storage (PR15A)](MessengerLocalStorage.md)
+* [Messenger local storage (PR15A–C)](MessengerLocalStorage.md)
 * [Invite links and QR flow](InviteLinks.md)
 * [Profile photos and avatar presentation](ProfilePhotos.md)

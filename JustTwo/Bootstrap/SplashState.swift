@@ -4,6 +4,7 @@ enum SplashState {
     case loading
     case result(SplashResult)
     case networkError(NetworkError)
+    case offlineRecoverable
 }
 
 enum SplashResult: Equatable {

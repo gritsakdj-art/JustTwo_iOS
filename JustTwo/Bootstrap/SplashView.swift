@@ -40,6 +40,16 @@ struct SplashView: View {
                         }
                     }
 
+                case .offlineRecoverable:
+                    StatePlaceholderView(
+                        title: String(localized: "splash.error.offline_needs_connection"),
+                        subtitle: String(localized: "splash.error.no_internet"),
+                        systemImage: "wifi.slash",
+                        actionTitle: "common.retry"
+                    ) {
+                        viewModel.retry()
+                    }
+
                 default:
                     JustTwoLoaderCard(
                         title: viewModel.phase.title,

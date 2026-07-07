@@ -9,6 +9,7 @@ final class NetworkPathMonitor {
     private var monitor: NWPathMonitor?
     private var lastSignature: String?
     private var handlers: [UUID: () -> Void] = [:]
+    private(set) var isNetworkSatisfied = true
 
     private init() {}
 
@@ -35,11 +36,12 @@ final class NetworkPathMonitor {
     }
 
     fileprivate func handlePathUpdate(_ path: NWPath) {
-        guard path.status == .satisfied else { return }
+        isNetworkSatisfied = path.status == .satisfied
 
         let signature = Self.signature(for: path)
         defer { lastSignature = signature }
 
+        guard path.status == .satisfied else { return }
         guard let lastSignature, lastSignature != signature else { return }
 
         NetworkDebug.log("Network path changed \(lastSignature) → \(signature)")

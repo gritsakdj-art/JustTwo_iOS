@@ -38,6 +38,9 @@ final class ProfileStartupLoader {
                 configuration: configuration
             )
             session.updateCurrentProfile(profile)
+            if let user = session.currentUser {
+                await StartupSessionSnapshotStore.shared.save(user: user, profile: profile)
+            }
             return profile
         }
         loadTask = task

@@ -527,7 +527,7 @@ enum ChatUIMapping {
         currentProfileID: UUID
     ) -> ChatMessage {
         let isDeleted = snapshot.localState == .deleted || snapshot.deletedAt != nil
-        let kind = MessageKind(rawValue: snapshot.kind) ?? .text
+        let kind = MessageKind(rawValue: snapshot.kind)
         let imageAttachment: ChatMessageAttachment?
         if isDeleted {
             imageAttachment = nil

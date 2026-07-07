@@ -245,6 +245,36 @@ enum MessengerDiagnosticEvent: String, Sendable {
     case messengerMessageLoadStaleIgnored
     case messengerMessageLoadingStateRecovered
     case messengerMessageFallbackToCache
+
+    case startupSessionSnapshotLoadStarted
+    case startupSessionSnapshotLoadSucceeded
+    case startupSessionSnapshotLoadFailed
+    case startupSessionSnapshotSaved
+    case startupSessionSnapshotCleared
+
+    case splashTokenFound
+    case splashTokenMissing
+    case splashTokenExpiredLocal
+    case splashNetworkValidationStarted
+    case splashNetworkValidationSucceeded
+    case splashNetworkValidationFailedRecoverable
+    case splashNetworkValidationFailedAuth
+    case splashOfflineCachedSessionAccepted
+    case splashOfflineCachedSessionRejected
+    case splashRouteMainFromCache
+    case splashRouteMainFromNetwork
+    case splashRouteAuth
+    case splashRouteProfileSetup
+
+    case startupCriticalLocalWarmupStarted
+    case startupCriticalLocalWarmupSucceeded
+    case startupBackgroundNetworkWarmupScheduled
+    case startupBackgroundNetworkWarmupSucceeded
+    case startupBackgroundNetworkWarmupFailed
+
+    case startupSkippedNetworkCriticalBecauseCacheAvailable
+    case startupProfilePhotosDeferred
+    case startupConversationAvatarsDeferred
 }
 
 enum MessengerDiagnostics {
@@ -304,6 +334,12 @@ enum MessengerDiagnostics {
             clientMessageID: sanitizedClientMessageID(clientMessageID),
             metadata: sanitizedMetadata(metadata)
         )
+    }
+
+    nonisolated static func sanitizeID(_ id: UUID) -> String {
+        let value = id.uuidString
+        guard value.count > 8 else { return value }
+        return String(value.prefix(8)) + "..."
     }
 
     static func sanitizeError(_ error: Error) -> String {
