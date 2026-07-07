@@ -1,6 +1,7 @@
 import Foundation
 
 enum ImageDownloadClient {
+    private static let imageDownloadTimeout: TimeInterval = 20
 
     static func data(from url: URL) async throws -> (Data, URLResponse) {
         let label = url.host ?? url.absoluteString
@@ -8,7 +9,9 @@ enum ImageDownloadClient {
         NetworkDebug.log("Image download start: \(label)")
 
         do {
-            let result = try await URLSessionProvider.imageSession.data(from: url)
+            let result = try await withTimeout(seconds: imageDownloadTimeout) {
+                try await URLSessionProvider.imageSession.data(from: url)
+            }
             let duration = Date().timeIntervalSince(startedAt)
             let bytes = result.0.count
             NetworkDebug.log(

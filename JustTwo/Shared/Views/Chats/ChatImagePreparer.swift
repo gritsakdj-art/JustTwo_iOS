@@ -31,18 +31,20 @@ enum ChatImagePreparationError: LocalizedError, Equatable {
 }
 
 enum ChatImagePreparer {
-    private static let maxDimension: CGFloat = 1_600
-    private static let jpegQuality: CGFloat = 0.80
-    private static let directoryName = "justtwo-chat-images"
+    private nonisolated static let maxDimension: CGFloat = 1_600
+    private nonisolated static let jpegQuality: CGFloat = 0.80
+    private nonisolated static let directoryName = "justtwo-chat-images"
 
     static func prepare(_ item: PhotosPickerItem, clientMessageID: String) async throws -> PreparedChatImage {
         guard let data = try await item.loadTransferable(type: Data.self) else {
             throw ChatImagePreparationError.loadFailed
         }
-        return try prepare(data: data, clientMessageID: clientMessageID)
+        return try await Task.detached(priority: .userInitiated) {
+            try prepare(data: data, clientMessageID: clientMessageID)
+        }.value
     }
 
-    static func prepare(data: Data, clientMessageID: String) throws -> PreparedChatImage {
+    nonisolated static func prepare(data: Data, clientMessageID: String) throws -> PreparedChatImage {
         #if canImport(UIKit)
         guard let image = UIImage(data: data) else {
             throw ChatImagePreparationError.invalidImage
@@ -79,25 +81,25 @@ enum ChatImagePreparer {
         #endif
     }
 
-    static func removeTemporaryFile(_ fileURL: URL) {
+    nonisolated static func removeTemporaryFile(_ fileURL: URL) {
         try? FileManager.default.removeItem(at: fileURL)
     }
 
-    static func cleanupTemporaryDirectory() {
+    nonisolated static func cleanupTemporaryDirectory() {
         try? FileManager.default.removeItem(at: temporaryDirectoryURL())
     }
 
-    private static func temporaryDirectory() throws -> URL {
+    private nonisolated static func temporaryDirectory() throws -> URL {
         let directory = temporaryDirectoryURL()
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         return directory
     }
 
-    private static func temporaryDirectoryURL() -> URL {
+    private nonisolated static func temporaryDirectoryURL() -> URL {
         FileManager.default.temporaryDirectory.appendingPathComponent(directoryName, isDirectory: true)
     }
 
-    private static func safeFileName(for clientMessageID: String) -> String {
+    private nonisolated static func safeFileName(for clientMessageID: String) -> String {
         let allowed = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "-"))
         let characters = clientMessageID.unicodeScalars.map { scalar in
             allowed.contains(scalar) ? Character(String(scalar)) : "-"
@@ -107,7 +109,7 @@ enum ChatImagePreparer {
     }
 
     #if canImport(UIKit)
-    private static func normalizedAndResized(_ image: UIImage) -> UIImage {
+    private nonisolated static func normalizedAndResized(_ image: UIImage) -> UIImage {
         let sourceSize = image.size
         guard sourceSize.width > 0, sourceSize.height > 0 else { return image }
 

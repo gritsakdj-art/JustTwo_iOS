@@ -19,6 +19,8 @@ final class MessengerRealtimeCoordinator {
     private var conversationListSubscriptionIDs: Set<UUID> = []
     private var isRefreshingAfterReconnect = false
     private var connectAndSyncGeneration = 0
+    private var conversationFallbackRefreshTask: Task<Void, Never>?
+    private var activeChatFallbackRefreshTask: Task<Void, Never>?
 
     init(
         realtimeClient: RealtimeClient,
@@ -123,6 +125,10 @@ final class MessengerRealtimeCoordinator {
         subscribedConversationID = nil
         conversationListSubscriptionIDs = []
         isRefreshingAfterReconnect = false
+        conversationFallbackRefreshTask?.cancel()
+        conversationFallbackRefreshTask = nil
+        activeChatFallbackRefreshTask?.cancel()
+        activeChatFallbackRefreshTask = nil
         connectAndSyncGeneration += 1
         presenceStore.clearAll()
     }
@@ -574,7 +580,11 @@ final class MessengerRealtimeCoordinator {
             .realtimeEventFallbackRefresh,
             metadata: ["target": "conversationList"]
         )
-        Task { [weak self] in
+        guard conversationFallbackRefreshTask == nil else { return }
+        conversationFallbackRefreshTask = Task { @MainActor [weak self] in
+            defer { self?.conversationFallbackRefreshTask = nil }
+            try? await Task.sleep(for: .milliseconds(250))
+            guard !Task.isCancelled else { return }
             await self?.refreshConversations()
         }
     }
@@ -585,7 +595,11 @@ final class MessengerRealtimeCoordinator {
             conversationID: activeConversationID,
             metadata: ["target": "activeChat"]
         )
-        Task { [weak self] in
+        guard activeChatFallbackRefreshTask == nil else { return }
+        activeChatFallbackRefreshTask = Task { @MainActor [weak self] in
+            defer { self?.activeChatFallbackRefreshTask = nil }
+            try? await Task.sleep(for: .milliseconds(250))
+            guard !Task.isCancelled else { return }
             await self?.refreshActiveChat()
         }
     }

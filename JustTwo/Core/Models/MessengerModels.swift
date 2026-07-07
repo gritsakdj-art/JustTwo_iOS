@@ -54,7 +54,7 @@ nonisolated struct MessageResponseDTO: Decodable, Sendable {
     let message: MessageDTO
 }
 
-enum MessageKind: Equatable, Hashable, Sendable, Codable {
+nonisolated enum MessageKind: Equatable, Hashable, Sendable, Codable {
     case text
     case image
     case unknown(String)
@@ -193,12 +193,12 @@ nonisolated struct MessageReactionDTO: Decodable, Sendable, Hashable {
 
 enum ReactionEmoji {
     /// Raw emoji for models, UI, and URL path components. HTTPClient encodes path segments.
-    static func normalized(_ emoji: String) -> String {
+    nonisolated static func normalized(_ emoji: String) -> String {
         emoji.removingPercentEncoding ?? emoji
     }
 
     /// Defensive display fallback for legacy/local percent-encoded values.
-    static func display(_ emoji: String) -> String {
+    nonisolated static func display(_ emoji: String) -> String {
         normalized(emoji)
     }
 }

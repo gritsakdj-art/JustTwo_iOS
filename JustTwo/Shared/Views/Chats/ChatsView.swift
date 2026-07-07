@@ -43,6 +43,7 @@ struct ChatsView: View {
                     conversation: route.conversation,
                     targetMessageID: route.targetMessageID
                 )
+                .id(route.id)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .navigationStackHostingBackgroundClear()
             }

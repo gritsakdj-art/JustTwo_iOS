@@ -1558,7 +1558,7 @@ final class ChatViewModel {
             return
         }
 
-        messageCache.mergeLoadedMessages(cached, for: conversation.id)
+        messageCache.mergeLoadedMessages(cached, for: conversation.id, marksRecentPageLoaded: false)
         messages = messageCache.messages(for: conversation.id) ?? cached
         syncPaginationStateFromCache()
         MessengerDiagnostics.event(

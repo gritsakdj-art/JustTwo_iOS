@@ -19,6 +19,7 @@ final class MessageCacheStore {
         var isLoadingOlder = false
         var errorMessage: String?
         var olderMessagesCursor: String?
+        var recentPageLoaded = false
     }
 
     private(set) var entries: [UUID: Entry] = [:]
@@ -47,7 +48,12 @@ final class MessageCacheStore {
     }
 
     func setMessages(_ messages: [ChatMessage], for conversationID: UUID) {
-        entries[conversationID] = Entry(messages: sortedMessages(messages), loadedAt: .now, olderMessagesCursor: nil)
+        entries[conversationID] = Entry(
+            messages: sortedMessages(messages),
+            loadedAt: .now,
+            olderMessagesCursor: nil,
+            recentPageLoaded: true
+        )
     }
 
     func insertOptimisticMessage(_ message: ChatMessage, for conversationID: UUID) {
@@ -324,7 +330,7 @@ final class MessageCacheStore {
                    limit: messagesPerConversation
                ),
                !localMessages.isEmpty {
-                mergeLoadedMessages(localMessages, for: conversationID)
+                mergeLoadedMessages(localMessages, for: conversationID, marksRecentPageLoaded: false)
                 entries[conversationID]?.loadedAt = .now
                 MessengerDiagnostics.event(
                     .messengerStartupMessagesLocalPreloadSucceeded,
@@ -345,6 +351,7 @@ final class MessageCacheStore {
 
         if let entry = entries[conversationID],
            !entry.messages.isEmpty,
+           entry.recentPageLoaded,
            isMessageTimelineFresh(
                entry: entry,
                conversationLastMessageAt: conversation.lastMessageAt
@@ -402,6 +409,7 @@ final class MessageCacheStore {
         entry: Entry,
         conversationLastMessageAt: Date?
     ) -> Bool {
+        guard entry.recentPageLoaded else { return false }
         if isMessageTimelineFresh(entry: entry, conversationLastMessageAt: conversationLastMessageAt) {
             return true
         }
@@ -427,7 +435,8 @@ final class MessageCacheStore {
         let newestLocal = MessengerCacheFreshnessPolicy.newestMessageDate(in: entry.messages)
         var metadata: [String: String] = [
             "count": "\(entry.messages.count)",
-            "cacheAgeMs": "\(MessengerCacheFreshnessPolicy.cacheAgeMilliseconds(loadedAt: entry.loadedAt))"
+            "cacheAgeMs": "\(MessengerCacheFreshnessPolicy.cacheAgeMilliseconds(loadedAt: entry.loadedAt))",
+            "recentPageLoaded": "\(entry.recentPageLoaded)"
         ]
         if let conversationLastMessageAt {
             metadata["lastMessageAt"] = "\(Int(conversationLastMessageAt.timeIntervalSince1970))"
@@ -841,8 +850,13 @@ final class MessageCacheStore {
         return upsertMessage(message, conversationID: conversationID)
     }
 
-    func mergeLoadedMessages(_ loadedMessages: [ChatMessage], for conversationID: UUID) {
-        let existingMessages = entries[conversationID]?.messages ?? []
+    func mergeLoadedMessages(
+        _ loadedMessages: [ChatMessage],
+        for conversationID: UUID,
+        marksRecentPageLoaded: Bool = true
+    ) {
+        let existingEntry = entries[conversationID]
+        let existingMessages = existingEntry?.messages ?? []
         var preservedDeleteCount = 0
         var preservedEditCount = 0
         var preservedReceiptCount = 0
@@ -918,7 +932,12 @@ final class MessageCacheStore {
 
         let merged = sortedMessages(Array(mergedByID.values))
 
-        entries[conversationID] = Entry(messages: merged, loadedAt: .now, olderMessagesCursor: entries[conversationID]?.olderMessagesCursor)
+        entries[conversationID] = Entry(
+            messages: merged,
+            loadedAt: .now,
+            olderMessagesCursor: existingEntry?.olderMessagesCursor,
+            recentPageLoaded: existingEntry?.recentPageLoaded == true || marksRecentPageLoaded
+        )
         if preservedDeleteCount > 0 || preservedEditCount > 0 || preservedReceiptCount > 0 {
             MessengerDiagnostics.event(
                 .cacheMergePreservedRealtimeState,

@@ -1,6 +1,7 @@
 import Foundation
 
 enum ObjectStorageUploader {
+    private static let uploadOperationTimeout: TimeInterval = 45
 
     enum UploadError: LocalizedError {
         case invalidURL
@@ -18,8 +19,8 @@ enum ObjectStorageUploader {
 
     private static let uploadSession: URLSession = {
         let configuration = URLSessionConfiguration.ephemeral
-        configuration.timeoutIntervalForRequest = 120
-        configuration.timeoutIntervalForResource = 180
+        configuration.timeoutIntervalForRequest = 30
+        configuration.timeoutIntervalForResource = 60
         configuration.httpShouldSetCookies = false
         configuration.httpCookieAcceptPolicy = .never
         return URLSession(configuration: configuration)
@@ -47,7 +48,10 @@ enum ObjectStorageUploader {
 
         NetworkDebug.log("➡️ \(method) \(redactedObjectStorageURL(uploadURL)) bytes=\(data.count)")
 
-        let (_, response) = try await uploadSession.data(for: request)
+        let uploadRequest = request
+        let (_, response) = try await withTimeout(seconds: uploadOperationTimeout) {
+            try await uploadSession.data(for: uploadRequest)
+        }
 
         guard let httpResponse = response as? HTTPURLResponse else {
             throw NetworkError.invalidResponse
@@ -77,7 +81,10 @@ enum ObjectStorageUploader {
         let byteCount = (try? FileManager.default.attributesOfItem(atPath: fileURL.path)[.size] as? NSNumber)?.intValue ?? 0
         NetworkDebug.log("➡️ \(method) \(redactedObjectStorageURL(uploadURL.absoluteString)) bytes=\(byteCount)")
 
-        let (_, response) = try await uploadSession.upload(for: request, fromFile: fileURL)
+        let uploadRequest = request
+        let (_, response) = try await withTimeout(seconds: uploadOperationTimeout) {
+            try await uploadSession.upload(for: uploadRequest, fromFile: fileURL)
+        }
 
         guard let httpResponse = response as? HTTPURLResponse else {
             throw NetworkError.invalidResponse

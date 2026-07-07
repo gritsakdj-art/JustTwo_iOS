@@ -134,7 +134,7 @@ struct ChatImageBubbleView: View {
         )
 
         if let localFileURL = attachment.localFileURL,
-           let localImage = UIImage(contentsOfFile: localFileURL.path) {
+           let localImage = await ChatImageDecoder.image(contentsOfFile: localFileURL.path) {
             applyLoadedImage(localImage, source: "local")
             MessengerDiagnostics.event(
                 .imageBubbleUsedLocalFile,
@@ -182,7 +182,7 @@ struct ChatImageBubbleView: View {
 
             guard let http = response as? HTTPURLResponse,
                   (200..<300).contains(http.statusCode),
-                  let downloaded = UIImage(data: data) else {
+                  let downloaded = await ChatImageDecoder.image(data: data) else {
                 markLoadFailed(source: "invalidResponse")
                 return
             }
@@ -201,12 +201,16 @@ struct ChatImageBubbleView: View {
     }
 
     private func applyLoadedImage(_ loaded: UIImage, source: String) {
+        let wasEmpty = image == nil
         image = loaded
         loadFailed = false
         MessengerDiagnostics.event(
             .imageBubbleRenderSucceeded,
             metadata: renderMetadata(source: source)
         )
+        if wasEmpty {
+            NotificationCenter.default.post(name: .chatImageBubbleDidRender, object: nil)
+        }
     }
 
     private func markLoadFailed(source: String) {
@@ -228,6 +232,29 @@ struct ChatImageBubbleView: View {
             "isMine": "\(isMine)"
         ]
     }
+}
+
+private struct SendableUIImage: @unchecked Sendable {
+    let image: UIImage
+}
+
+private enum ChatImageDecoder {
+    nonisolated static func image(contentsOfFile path: String) async -> UIImage? {
+        await Task.detached(priority: .userInitiated) {
+            UIImage(contentsOfFile: path).map { SendableUIImage(image: $0) }
+        }.value?.image
+    }
+
+    nonisolated static func image(data: Data) async -> UIImage? {
+        await Task.detached(priority: .userInitiated) {
+            UIImage(data: data).map { SendableUIImage(image: $0) }
+        }.value?.image
+    }
+}
+
+extension Notification.Name {
+    /// Posted when an image bubble finishes its first render (local/cache/remote).
+    static let chatImageBubbleDidRender = Notification.Name("chatImageBubbleDidRender")
 }
 
 #if DEBUG

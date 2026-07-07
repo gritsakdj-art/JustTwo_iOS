@@ -10,7 +10,7 @@ struct MessageRow: View {
     var replyImageAttachment: ChatMessageAttachment?
     var onReplyTap: (() -> Void)?
 
-    @State private var bubbleFrame: CGRect = .zero
+    @State private var bubbleFrameReference = SilentGlobalFrameReference()
 
     /// The reply DTO carries no attachment info, so a quoted photo message arrives with
     /// a nil body and would read as "deleted". When the original resolves to an image,
@@ -46,14 +46,12 @@ struct MessageRow: View {
                 onImageTap: onImageTap
             )
             .contentShape(Rectangle())
-            .onGeometryChange(for: CGRect.self, of: { $0.frame(in: .global) }) { _, frame in
-                bubbleFrame = frame
-            }
+            .silentGlobalFrameReader(bubbleFrameReference)
             .onLongPressGesture(minimumDuration: 0.35) {
                 guard message.canReply || message.canCopy || message.canEdit || message.canDelete || message.canReact else {
                     return
                 }
-                onLongPress(bubbleFrame)
+                onLongPress(bubbleFrameReference.rect)
             }
 
             if !message.isMine { Spacer() }

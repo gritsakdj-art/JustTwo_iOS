@@ -160,13 +160,53 @@ struct MessengerRequestOptimizationTests {
         let sawLocal = await waitForDiagnostics(
             event: MessengerDiagnosticEvent.messengerStartupMessagesLocalPreloadSucceeded.rawValue
         )
-        let sawSkip = await waitForDiagnostics(
+        let sawFreshSkip = await waitForDiagnostics(
             event: MessengerDiagnosticEvent.messengerStartupMessagesNetworkPreloadSkippedFreshCache.rawValue
+        )
+        let sawOfflineSkip = await waitForDiagnostics(
+            event: MessengerDiagnosticEvent.messengerNetworkRequestSkippedOffline.rawValue
         )
 
         #expect(store.hasCachedMessages(for: conversationID))
         #expect(sawLocal)
-        #expect(sawSkip)
+        #expect(!sawFreshSkip)
+        #expect(sawOfflineSkip)
+        #expect(store.entry(for: conversationID)?.recentPageLoaded == false)
+    }
+
+    @Test
+    func partialMemoryCacheDoesNotSkipNetworkOnOpenEvenWhenTimelineLooksFresh() async {
+        MessengerDiagnosticsStore.shared.clear()
+        let store = MessageCacheStore.shared
+        store.reset()
+        defer { store.reset() }
+
+        let lastMessageAt = Date(timeIntervalSince1970: 5_000)
+        let partialMessage = makeMessage(createdAt: lastMessageAt)
+        store.mergeLoadedMessages([partialMessage], for: conversationID, marksRecentPageLoaded: false)
+
+        NetworkPathMonitor.testingForceOffline = true
+        defer { NetworkPathMonitor.testingForceOffline = nil }
+
+        _ = await store.loadRecentMessagesIfNeeded(
+            conversationID: conversationID,
+            session: SessionStore.shared,
+            router: AppRouter.shared,
+            force: false,
+            reason: .open,
+            conversationLastMessageAt: lastMessageAt
+        )
+
+        let sawFreshSkip = await waitForDiagnostics(
+            event: MessengerDiagnosticEvent.messengerChatOpenNetworkRefreshSkippedFreshCache.rawValue
+        )
+        let sawOfflineSkip = await waitForDiagnostics(
+            event: MessengerDiagnosticEvent.messengerNetworkRequestSkippedOffline.rawValue
+        )
+
+        #expect(!sawFreshSkip)
+        #expect(sawOfflineSkip)
+        #expect(store.entry(for: conversationID)?.recentPageLoaded == false)
     }
 
     @Test

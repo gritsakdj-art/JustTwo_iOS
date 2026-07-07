@@ -45,12 +45,12 @@ enum MessengerMediaCacheService {
     }
 
     static func storeBubbleImage(_ image: UIImage, attachmentID: String) async {
-        guard let data = image.jpegData(compressionQuality: 0.86) else { return }
+        guard let data = await jpegData(from: image, quality: 0.86) else { return }
         await storeImageData(data, attachmentID: attachmentID, variant: .thumbnail)
     }
 
     static func storeViewerImage(_ image: UIImage, attachmentID: String) async {
-        guard let data = image.jpegData(compressionQuality: 0.92) else { return }
+        guard let data = await jpegData(from: image, quality: 0.92) else { return }
         await storeImageData(data, attachmentID: attachmentID, variant: .full)
     }
 
@@ -107,10 +107,23 @@ enum MessengerMediaCacheService {
         variant: MessengerMediaVariant
     ) async -> UIImage? {
         guard let data = try? await diskCache.cachedImageData(for: attachmentID, variant: variant),
-              let image = UIImage(data: data) else {
+              let image = await image(data: data) else {
             return nil
         }
         return image
+    }
+
+    private static func image(data: Data) async -> UIImage? {
+        await Task.detached(priority: .userInitiated) {
+            UIImage(data: data).map { SendableMessengerMediaImage(image: $0) }
+        }.value?.image
+    }
+
+    private static func jpegData(from image: UIImage, quality: CGFloat) async -> Data? {
+        let sendableImage = SendableMessengerMediaImage(image: image)
+        return await Task.detached(priority: .utility) {
+            sendableImage.image.jpegData(compressionQuality: quality)
+        }.value
     }
 
     private static func metadataStoreForUpdates() -> MessengerLocalStore {
@@ -191,4 +204,8 @@ enum MessengerMediaCacheService {
         guard trimmed.count > 8 else { return trimmed }
         return String(trimmed.prefix(8)) + "..."
     }
+}
+
+private struct SendableMessengerMediaImage: @unchecked Sendable {
+    let image: UIImage
 }
