@@ -7,6 +7,8 @@ enum MessengerLocalMapping {
     ) -> LocalMessengerConversation {
         let participant = dto.otherParticipant
         let photo = participant?.profile.primaryPhoto
+        let lastMessage = dto.lastMessage
+        let preview = lastMessagePreviewFields(from: lastMessage)
 
         return LocalMessengerConversation(
             id: dto.id.uuidString,
@@ -22,10 +24,26 @@ enum MessengerLocalMapping {
             otherParticipantDisplayName: participant?.profile.displayName,
             otherParticipantPrimaryPhotoID: photo?.id.uuidString,
             otherParticipantPrimaryPhotoDownloadURLExpiresAt: nil,
-            lastMessageID: dto.lastMessage?.id.uuidString,
+            lastMessageID: lastMessage?.id.uuidString,
+            lastMessageKind: preview.kind,
+            lastMessageBody: preview.body,
+            lastMessageSenderProfileID: lastMessage?.senderProfileID.uuidString,
+            lastMessageCreatedAt: lastMessage?.createdAt,
+            lastMessageDeletedAt: lastMessage?.deletedAt,
             lastSyncedAt: syncedAt,
             localUpdatedAt: syncedAt
         )
+    }
+
+    private static func lastMessagePreviewFields(from message: MessageDTO?) -> (kind: String?, body: String?) {
+        guard let message else { return (nil, nil) }
+        if message.deletedAt != nil {
+            return (message.kind.rawValue, nil)
+        }
+        if message.kind == .image {
+            return (message.kind.rawValue, String(localized: "chats.message.photo", defaultValue: "Photo"))
+        }
+        return (message.kind.rawValue, message.body)
     }
 
     static func mapMessage(
@@ -152,6 +170,11 @@ enum MessengerLocalMapping {
             otherParticipantPrimaryPhotoID: entity.otherParticipantPrimaryPhotoID,
             otherParticipantPrimaryPhotoDownloadURLExpiresAt: entity.otherParticipantPrimaryPhotoDownloadURLExpiresAt,
             lastMessageID: entity.lastMessageID,
+            lastMessageKind: entity.lastMessageKind,
+            lastMessageBody: entity.lastMessageBody,
+            lastMessageSenderProfileID: entity.lastMessageSenderProfileID,
+            lastMessageCreatedAt: entity.lastMessageCreatedAt,
+            lastMessageDeletedAt: entity.lastMessageDeletedAt,
             lastSyncedAt: entity.lastSyncedAt,
             localUpdatedAt: entity.localUpdatedAt
         )
@@ -237,6 +260,22 @@ enum MessengerLocalMapping {
         )
     }
 
+    static func applyLastMessage(
+        from message: MessageDTO,
+        to target: LocalMessengerConversation,
+        syncedAt: Date
+    ) {
+        let preview = lastMessagePreviewFields(from: message)
+        target.lastMessageID = message.id.uuidString
+        target.lastMessageKind = preview.kind
+        target.lastMessageBody = preview.body
+        target.lastMessageSenderProfileID = message.senderProfileID.uuidString
+        target.lastMessageCreatedAt = message.createdAt
+        target.lastMessageDeletedAt = message.deletedAt
+        target.lastSyncedAt = syncedAt
+        target.localUpdatedAt = syncedAt
+    }
+
     static func applyConversation(_ source: LocalMessengerConversation, to target: LocalMessengerConversation) {
         target.type = source.type
         target.status = source.status
@@ -251,6 +290,11 @@ enum MessengerLocalMapping {
         target.otherParticipantPrimaryPhotoID = source.otherParticipantPrimaryPhotoID
         target.otherParticipantPrimaryPhotoDownloadURLExpiresAt = source.otherParticipantPrimaryPhotoDownloadURLExpiresAt
         target.lastMessageID = source.lastMessageID
+        target.lastMessageKind = source.lastMessageKind
+        target.lastMessageBody = source.lastMessageBody
+        target.lastMessageSenderProfileID = source.lastMessageSenderProfileID
+        target.lastMessageCreatedAt = source.lastMessageCreatedAt
+        target.lastMessageDeletedAt = source.lastMessageDeletedAt
         target.lastSyncedAt = source.lastSyncedAt
         target.localUpdatedAt = source.localUpdatedAt
     }

@@ -51,6 +51,8 @@ Connection stops on:
 
 Realtime failure does not block login and does not log the user out by itself. REST remains the source of truth.
 
+PR15B: realtime and delta handlers update both the in-memory conversation list and the local conversation cache (`MessengerConversationCacheService`). Realtime is still not a durable source of truth; durable backend delta + REST remain repair/baseline mechanisms.
+
 ## Event handling
 
 `RealtimeEventDTO` decodes:

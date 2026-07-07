@@ -387,6 +387,59 @@ enum ChatUIMapping {
         )
     }
 
+    static func conversationPreview(
+        from snapshot: LocalConversationSnapshot,
+        currentProfileID: UUID
+    ) -> ChatConversationPreview? {
+        guard let conversationID = UUID(uuidString: snapshot.id) else { return nil }
+
+        let otherName = snapshot.otherParticipantDisplayName
+            ?? String(localized: "chats.unknownParticipant")
+        let otherProfileID = snapshot.otherParticipantProfileID.flatMap(UUID.init(uuidString:))
+        let avatarPhotoID = snapshot.otherParticipantPrimaryPhotoID.flatMap(UUID.init(uuidString:))
+
+        return ChatConversationPreview(
+            id: conversationID,
+            title: otherName,
+            otherParticipantProfileID: otherProfileID,
+            avatarURL: nil,
+            avatarPhotoID: avatarPhotoID,
+            lastMessageText: cachedLastMessagePreview(from: snapshot),
+            lastSenderName: cachedLastSenderLabel(
+                from: snapshot,
+                currentProfileID: currentProfileID,
+                otherName: otherName
+            ),
+            lastMessageAt: snapshot.lastMessageAt ?? snapshot.lastMessageCreatedAt,
+            unreadCount: snapshot.unreadCount
+        )
+    }
+
+    private static func cachedLastMessagePreview(from snapshot: LocalConversationSnapshot) -> String? {
+        if snapshot.lastMessageDeletedAt != nil {
+            return String(localized: "chats.messageDeleted")
+        }
+        if snapshot.lastMessageKind == MessageKind.image.rawValue {
+            return imageMessagePreviewText
+        }
+        return snapshot.lastMessageBody
+    }
+
+    private static func cachedLastSenderLabel(
+        from snapshot: LocalConversationSnapshot,
+        currentProfileID: UUID,
+        otherName: String
+    ) -> String? {
+        guard snapshot.lastMessageID != nil else { return nil }
+        guard let senderID = snapshot.lastMessageSenderProfileID,
+              let senderUUID = UUID(uuidString: senderID) else {
+            return otherName
+        }
+        return senderUUID == currentProfileID
+            ? String(localized: "chats.you")
+            : otherName
+    }
+
     static let imageMessagePreviewText = String(localized: "chats.message.photo", defaultValue: "Photo")
 
     static func message(

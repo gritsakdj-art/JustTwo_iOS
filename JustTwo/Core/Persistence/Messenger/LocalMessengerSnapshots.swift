@@ -23,6 +23,11 @@ struct LocalConversationSnapshot: Sendable, Equatable, Identifiable {
     let otherParticipantPrimaryPhotoID: String?
     let otherParticipantPrimaryPhotoDownloadURLExpiresAt: Date?
     let lastMessageID: String?
+    let lastMessageKind: String?
+    let lastMessageBody: String?
+    let lastMessageSenderProfileID: String?
+    let lastMessageCreatedAt: Date?
+    let lastMessageDeletedAt: Date?
     let lastSyncedAt: Date?
     let localUpdatedAt: Date
 }

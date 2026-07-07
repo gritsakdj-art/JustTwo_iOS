@@ -209,6 +209,21 @@ enum MessengerDiagnosticEvent: String, Sendable {
     case messengerLocalReceiptApplied
     case messengerLocalSyncMetadataUpdated
     case messengerLocalMappingFailed
+
+    case messengerConversationCacheLoadStarted
+    case messengerConversationCacheLoadSucceeded
+    case messengerConversationCacheLoadFailed
+    case messengerConversationCacheHydratedUI
+    case messengerConversationCacheEmpty
+    case messengerConversationCacheNetworkRefreshStarted
+    case messengerConversationCacheNetworkRefreshSucceeded
+    case messengerConversationCacheNetworkRefreshFailed
+    case messengerConversationCacheUpsertStarted
+    case messengerConversationCacheUpsertSucceeded
+    case messengerConversationCacheUpsertFailed
+    case messengerConversationCacheDeltaApplied
+    case messengerConversationCacheRealtimeApplied
+    case messengerConversationCacheSkippedStale
 }
 
 enum MessengerDiagnostics {

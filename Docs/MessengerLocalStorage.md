@@ -1,159 +1,167 @@
-# Messenger Local Storage (PR15A)
+# Messenger Local Storage
 
-Foundation for on-device messenger persistence using SwiftData. This PR adds schema, mapping, store API, logout reset wiring, and tests. UI and sync pipelines still read from in-memory caches; local reads are disabled behind a feature flag.
+On-device messenger persistence using SwiftData.
 
-## Goals
+## Roadmap
 
-1. Define a privacy-safe SwiftData schema for conversations, messages, attachments, reaction aggregates, receipts, and sync metadata.
-2. Provide a typed store API (`MessengerLocalStore`) with DTO → entity mapping and snapshot read models.
-3. Reset local messenger data on logout without racing a fast re-login.
-4. Add diagnostics and unit tests without changing current user-visible behavior.
+| PR | Scope | Status |
+|----|-------|--------|
+| PR15A | SwiftData schema foundation, store API, logout reset | ✅ |
+| PR15B | Cached conversation list (read + write from REST/delta/realtime) | ✅ |
+| PR15C | Cached per-conversation message history | planned |
+| PR16 | Persistent outbox | planned |
+| PR17 | Full sync engine | planned |
 
-## Non-goals (PR15A)
+## PR15B — Cached conversation list
 
-- UI does **not** read from the local DB yet (`MessengerLocalStorageFeatureFlags.isLocalReadEnabled = false`).
-- Delta sync / realtime handlers do **not** write to the local DB yet.
-- Signed `downloadUrl` / `uploadUrl` values are **not** persisted.
-- PR14B in-memory delta cursor behavior is unchanged.
+Conversation list can hydrate from local DB on app/tab open, then refresh from REST. Delta and realtime keep the local conversation cache updated. Chat message screens still use REST + in-memory `MessageCacheStore` (PR15C).
 
-## Architecture
+### Behavior
 
 ```text
-JustTwoApp.sharedModelContainer (SwiftData)
-  └─ MessengerLocalStore.configureShared(modelContainer:)
-        └─ MessengerLocalStore (@MainActor facade)
-              ├─ sessionGeneration + isResetInFlight guards
-              └─ SwiftDataMessengerLocalStore (@MainActor)
-                    └─ ModelContext(modelContainer) per operation
+1. User opens app / conversations tab.
+2. ConversationListViewModel loads cached conversations from MessengerLocalStore (if enabled).
+3. If cache exists, UI shows it immediately (no empty spinner).
+4. REST GET /conversations runs as before and remains authoritative on success.
+5. REST success updates in-memory list and upserts local DB snapshots.
+6. Delta/realtime updates in-memory list and patch/upsert local conversation cache.
+7. Logout reset clears local conversation cache (PR15A hardening preserved).
 ```
+
+### Offline / network failure
+
+- If network fails but cache exists, cached conversations remain visible.
+- Network failure does **not** wipe local cache.
+- `refreshGeneration` prevents stale REST refresh calls from overwriting a newer refresh cycle.
+- `listContentGeneration` prevents cache hydrate from overwriting fresher realtime/delta state that arrived during hydrate.
+- REST apply merges per-conversation previews, keeping newer in-memory `lastMessageAt` when REST response is older.
+
+### Feature flags
+
+```swift
+enum MessengerLocalStorageFeatureFlags {
+    static let isLocalReadEnabled = false              // PR15C: message history reads
+    static let isCachedConversationListEnabled = true // PR15B: conversation list
+}
+```
+
+### Architecture
+
+```text
+ConversationListViewModel.performRefresh
+  ├─ MessengerConversationCacheService.hydrateCachedPreviews
+  │     └─ MessengerLocalStore.fetchLocalConversations
+  │     └─ ChatUIMapping.conversationPreview(from: LocalConversationSnapshot)
+  ├─ ConversationService.fetchConversations (REST baseline)
+  └─ MessengerConversationCacheService.persistRESTConversations
+
+MessengerDeltaSyncService.applyEvent
+  └─ MessengerConversationCacheService.persistDeltaConversation
+
+ConversationListViewModel realtime helpers
+  └─ MessengerConversationCacheService.persistRealtimeMessage / persistRealtimeConversationRead / Updated
+```
+
+SwiftUI never reads `@Model` entities directly:
+
+```text
+LocalMessengerConversation → LocalConversationSnapshot → ChatConversationPreview → UI
+```
+
+### Local DB usage in PR15B
+
+| Data | Persisted | Used for UI |
+|------|-----------|-------------|
+| Conversation list snapshots | yes | yes (hydration) |
+| Denormalized lastMessage preview fields | yes | yes (list preview text) |
+| lastMessage row in message table | yes (metadata only) | no (chat screen) |
+| Full message history | no (beyond lastMessage) | no |
+| Signed photo/message URLs | no | no |
+| Persistent sync cursor | no | no |
+
+### Privacy
+
+- Signed `downloadUrl` / `uploadUrl` are **not** persisted in local messenger DB.
+- Cached list avatars use `avatarPhotoID` only; `avatarURL` is nil until REST refresh.
+- Diagnostics export must not include message bodies, signed URLs, JWT/Bearer, storage keys, or local file paths.
+- Allowed diagnostic metadata: `count`, `durationMs`, `source`, sanitized IDs, `unreadCount`, `eventType`, `hasLastMessage`.
+
+### Diagnostics (PR15B)
+
+- `messengerConversationCacheLoadStarted` / `Succeeded` / `Failed` / `Empty`
+- `messengerConversationCacheHydratedUI`
+- `messengerConversationCacheNetworkRefreshStarted` / `Succeeded` / `Failed`
+- `messengerConversationCacheUpsertStarted` / `Succeeded` / `Failed`
+- `messengerConversationCacheDeltaApplied`
+- `messengerConversationCacheRealtimeApplied`
+- `messengerConversationCacheSkippedStale`
+
+### Known limitations
+
+- Cached avatars may show placeholder until REST provides fresh signed URL.
+- Realtime partial `conversation.updated` patches only `lastMessageAt` locally (no full DTO).
+- Reaction events do not change list preview unless backend includes updated `ConversationDTO`.
+- PR14B in-memory delta cursor remains runtime source of truth (not persistent `LocalMessengerSyncMetadata` cursor).
+- MainActor SwiftData writes are acceptable for conversation-list volume; no `ModelActor` refactor in PR15B.
+
+### Manual smoke checklist (PR15B)
+
+1. Fresh install/login → conversations load from network as before.
+2. Open chat → messages still load from REST/current cache (not local DB history).
+3. Load conversations, kill/relaunch → cached list appears quickly before/during network refresh.
+4. Disable network after first load → relaunch → cached conversations still visible.
+5. Device B sends message → Device A list updates → relaunch A → updated lastMessage in cache.
+6. Image last message → list shows safe "Photo" preview; no signed URL in cache after relaunch.
+7. Logout A, login B → B must not see A's cached conversations.
+8. Export diagnostics → no signed URL/JWT/Bearer/message body/local paths.
+
+## PR15A foundation
+
+### SwiftData schema
+
+Six messenger entities (plus `Item.self` in app container):
+
+| Entity | Key fields | Notes |
+|--------|------------|-------|
+| `LocalMessengerConversation` | participant preview, `lastMessageAt`, denormalized lastMessage preview, `unreadCount` | No signed photo URLs |
+| `LocalMessengerMessage` | `id`, `clientMessageID`, tombstone fields | lastMessage metadata only in PR15B |
+| `LocalMessengerAttachment` | metadata only | no signed URL |
+| `LocalMessengerReactionAggregate` | `id = messageID:emoji`, `count`, `reactedByMe` | |
+| `LocalMessengerReceipt` | delivery/read watermarks | |
+| `LocalMessengerSyncMetadata` | `lastAppliedRevision` | not used as runtime cursor yet |
+
+### Thread / actor confinement
+
+- `MessengerLocalStore` stack is `@MainActor`.
+- Fresh `ModelContext` per operation; no concurrent context sharing.
+
+### Logout reset
+
+- `scheduleLogoutReset` / `waitForLogoutReset` + session generation guard (see [Startup loading](StartupLoading.md)).
 
 ### File map
 
 | Path | Responsibility |
 |------|----------------|
-| `Core/Persistence/Messenger/MessengerPersistence.swift` | Schema, `ModelContainer` factory, entity type list |
-| `Core/Persistence/Messenger/Entities/*.swift` | SwiftData `@Model` entities |
-| `Core/Persistence/Messenger/LocalMessengerSnapshots.swift` | Sendable read snapshots returned by the store |
-| `Core/Persistence/Messenger/MessengerLocalMapping.swift` | DTO ↔ entity mapping, privacy filtering |
-| `Core/Persistence/Messenger/MessengerLocalStoreProtocol.swift` | `@MainActor` store contract |
-| `Core/Persistence/Messenger/MessengerLocalStore.swift` | Shared facade, session guards, diagnostics |
-| `Core/Persistence/Messenger/SwiftDataMessengerLocalStore.swift` | SwiftData implementation |
-| `JustTwoApp.swift` | Registers messenger models in app `ModelContainer` |
-| `JustTwoTests/MessengerLocalStoreTests.swift` | Store mapping, upsert, reset, guard tests |
+| `Core/Persistence/Messenger/MessengerConversationCacheService.swift` | PR15B cache hydrate/persist orchestration |
+| `Core/Persistence/Messenger/MessengerLocalStore.swift` | Facade + feature flags |
+| `Core/Persistence/Messenger/MessengerLocalMapping.swift` | DTO ↔ entity mapping |
+| `Shared/Views/Chats/ViewModels/ConversationListViewModel.swift` | Cache-first list load |
+| `Shared/Views/Chats/MessengerDeltaSyncService.swift` | Delta → local cache writes |
+| `JustTwoTests/MessengerConversationCacheTests.swift` | PR15B focused tests |
+| `JustTwoTests/MessengerLocalStoreTests.swift` | Store foundation tests |
 
-## SwiftData schema
-
-Six messenger entities (plus existing template `Item.self` in the app container):
-
-| Entity | Key fields | Notes |
-|--------|------------|-------|
-| `LocalMessengerConversation` | `id`, participant preview, `lastMessageAt`, `unreadCount` | No signed photo URLs |
-| `LocalMessengerMessage` | `id`, `clientMessageID`, tombstone fields, `localState` | Supports client/server ID reconciliation |
-| `LocalMessengerAttachment` | metadata only | `localCacheKey`, `downloadURLExpiresAt`; no signed URL |
-| `LocalMessengerReactionAggregate` | `id = messageID:emoji`, `count`, `reactedByMe` | Matches backend aggregate DTO |
-| `LocalMessengerReceipt` | per-profile delivery/read watermarks | |
-| `LocalMessengerSyncMetadata` | `lastAppliedRevision`, `schemaVersion` | Global row id `global` |
-
-`MessengerPersistence.schemaVersion = 1`.
-
-## Thread / actor confinement
-
-- `MessengerLocalStore`, `SwiftDataMessengerLocalStore`, and `MessengerLocalStoreProtocol` are `@MainActor`.
-- `ModelContainer` is created once in `JustTwoApp` (disk-backed) or via `MessengerPersistence.makeModelContainer(inMemoryOnly:)` in tests.
-- Each store operation creates a **fresh** `ModelContext` and runs fetch/mutate/save synchronously on MainActor with no `await` in the middle.
-- Arbitrary `Task` callers are serialized by MainActor; concurrent use of the same `ModelContext` does not occur.
-
-## Store API
-
-Public write/read entry points on `MessengerLocalStore.shared`:
-
-- `resetAllMessengerData()`
-- `upsertConversations(_:)`
-- `fetchLocalConversations()`
-- `upsertMessages(_:conversationID:)`
-- `fetchLocalMessages(conversationID:limit:before:)`
-- `markMessageDeleted(messageID:deletedAt:)`
-- `upsertReactions(from:)`
-- `applyReceipt(_:)`
-- `upsertSyncMetadata(_:)` / `fetchSyncMetadata()`
-
-Errors:
-
-| Error | Meaning |
-|-------|---------|
-| `storeUnavailable` | Reset in flight; reads/writes rejected |
-| `staleSession` | Operation started before reset and finished after generation bump |
-| `conversationMismatch` | Message upsert batch targets wrong conversation |
-
-## Logout reset and race hardening
-
-Problem: fire-and-forget async DB reset could overlap with a very fast re-login.
-
-Solution (both layers):
-
-1. **Awaited reset path**
-   - `SessionStore.clearSession()` → `AppStartupCoordinator.scheduleLogoutReset()`
-   - `runCriticalWarmup()` → `await waitForLogoutReset()` before new-session warmup
-   - `performReset()` → `try await MessengerLocalStore.shared.resetAllMessengerData()`
-
-2. **Session generation guard** on `MessengerLocalStore`
-   - `sessionGeneration` increments at reset start
-   - `isResetInFlight` blocks concurrent access
-   - stale reset completions are ignored if superseded
-
-```text
-logout → scheduleLogoutReset (Task @MainActor)
-              └─ performReset → await resetAllMessengerData()
-
-next login → runCriticalWarmup
-              └─ await waitForLogoutReset()   // blocks until logout reset finishes
-              └─ ... critical loaders ...
-```
-
-## Feature flag
-
-```swift
-enum MessengerLocalStorageFeatureFlags {
-    static let isLocalReadEnabled = false  // PR15B
-}
-```
-
-## Diagnostics
-
-Privacy-safe events in `MessengerDiagnostics`:
-
-- `messengerLocalStoreInitialized`
-- `messengerLocalStoreResetStarted` / `ResetSucceeded` / `ResetFailed`
-- `messengerLocalConversationUpserted`
-- `messengerLocalMessagesUpserted`
-- `messengerLocalMessageDeleted`
-- `messengerLocalReceiptApplied`
-- `messengerLocalSyncMetadataUpdated`
-- `messengerLocalMappingFailed`
-
-Metadata avoids signed URLs, tokens, and message bodies.
-
-## Tests
-
-`JustTwoTests/MessengerLocalStoreTests.swift` — mapping, upsert idempotency, tombstones, reactions, receipts, sync metadata monotonicity, reset, in-flight guard, session generation.
-
-`JustTwoTests/AppStartupCoordinatorTests.swift` — `waitForLogoutResetBlocksUntilLocalStoreIsCleared`.
-
-Run:
+### Tests
 
 ```bash
 xcodebuild test -scheme JustTwo \
   -destination 'platform=iOS Simulator,name=iPhone 16' \
+  -only-testing:JustTwoTests/MessengerConversationCacheTests \
   -only-testing:JustTwoTests/MessengerLocalStoreTests \
   -only-testing:JustTwoTests/AppStartupCoordinatorTests
 ```
 
-## Next steps (PR15B+)
-
-- Wire delta sync / conversation list writes into `MessengerLocalStore`.
-- Flip `isLocalReadEnabled` and serve conversation list from local snapshots.
-- Consider `ModelActor` if sync writes move off MainActor at volume.
-
 ## Related docs
 
 - [Startup loading and reset flow](StartupLoading.md)
+- [Realtime](Realtime.md)

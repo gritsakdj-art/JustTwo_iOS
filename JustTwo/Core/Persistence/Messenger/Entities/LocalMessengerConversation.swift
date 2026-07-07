@@ -17,6 +17,11 @@ final class LocalMessengerConversation {
     var otherParticipantPrimaryPhotoID: String?
     var otherParticipantPrimaryPhotoDownloadURLExpiresAt: Date?
     var lastMessageID: String?
+    var lastMessageKind: String?
+    var lastMessageBody: String?
+    var lastMessageSenderProfileID: String?
+    var lastMessageCreatedAt: Date?
+    var lastMessageDeletedAt: Date?
     var lastSyncedAt: Date?
     var localUpdatedAt: Date
 
@@ -35,6 +40,11 @@ final class LocalMessengerConversation {
         otherParticipantPrimaryPhotoID: String?,
         otherParticipantPrimaryPhotoDownloadURLExpiresAt: Date?,
         lastMessageID: String?,
+        lastMessageKind: String?,
+        lastMessageBody: String?,
+        lastMessageSenderProfileID: String?,
+        lastMessageCreatedAt: Date?,
+        lastMessageDeletedAt: Date?,
         lastSyncedAt: Date?,
         localUpdatedAt: Date
     ) {
@@ -52,6 +62,11 @@ final class LocalMessengerConversation {
         self.otherParticipantPrimaryPhotoID = otherParticipantPrimaryPhotoID
         self.otherParticipantPrimaryPhotoDownloadURLExpiresAt = otherParticipantPrimaryPhotoDownloadURLExpiresAt
         self.lastMessageID = lastMessageID
+        self.lastMessageKind = lastMessageKind
+        self.lastMessageBody = lastMessageBody
+        self.lastMessageSenderProfileID = lastMessageSenderProfileID
+        self.lastMessageCreatedAt = lastMessageCreatedAt
+        self.lastMessageDeletedAt = lastMessageDeletedAt
         self.lastSyncedAt = lastSyncedAt
         self.localUpdatedAt = localUpdatedAt
     }

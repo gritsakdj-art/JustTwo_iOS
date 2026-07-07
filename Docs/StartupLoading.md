@@ -77,6 +77,9 @@ Limits live in `StartupLoadingLimits`.
 ### Chats
 
 * `ChatsView` uses `ConversationListViewModel.shared`.
+* `ConversationListViewModel.performRefresh` hydrates from `MessengerLocalStore` when `isCachedConversationListEnabled`, then runs REST `GET /conversations`.
+* REST success upserts conversation snapshots into local DB via `MessengerConversationCacheService`.
+* Delta/realtime list updates also write local conversation cache (PR15B).
 * `ChatAvatarView` reads `ProfilePhotoImageCache` by `avatarPhotoID` before any network request.
 * Loader appears only when conversations are empty and list VM is loading.
 * `.task` keeps a safety `loadIfNeeded`, which is a no-op after startup.

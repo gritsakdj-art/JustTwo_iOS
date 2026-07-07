@@ -3,6 +3,7 @@ import SwiftData
 import Testing
 @testable import JustTwo
 
+@Suite(.serialized)
 @MainActor
 struct MessengerLocalStoreTests {
     private let conversationID = UUID(uuidString: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")!

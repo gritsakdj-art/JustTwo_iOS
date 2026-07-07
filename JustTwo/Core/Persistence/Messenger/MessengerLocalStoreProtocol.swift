@@ -6,6 +6,13 @@ protocol MessengerLocalStoreProtocol: AnyObject {
 
     func upsertConversations(_ conversations: [ConversationDTO]) async throws
     func fetchLocalConversations() async throws -> [LocalConversationSnapshot]
+    func patchConversationFromMessage(_ message: MessageDTO, unreadCount: Int?) async throws
+    func patchConversationActivity(
+        conversationID: UUID,
+        lastMessageAt: Date?,
+        unreadCount: Int?
+    ) async throws
+    func upsertLastMessageSnapshot(_ message: MessageDTO) async throws
 
     func upsertMessages(
         _ messages: [MessageDTO],

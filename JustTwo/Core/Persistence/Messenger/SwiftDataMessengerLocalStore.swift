@@ -52,6 +52,51 @@ final class SwiftDataMessengerLocalStore: MessengerLocalStoreProtocol {
         return try context.fetch(descriptor).map(MessengerLocalMapping.conversationSnapshot(from:))
     }
 
+    func patchConversationFromMessage(_ message: MessageDTO, unreadCount: Int?) async throws {
+        let context = modelContext
+        let syncedAt = Date()
+        let conversationKey = message.conversationID.uuidString
+
+        guard let existing = try fetchConversationEntity(id: conversationKey, context: context) else {
+            return
+        }
+
+        MessengerLocalMapping.applyLastMessage(from: message, to: existing, syncedAt: syncedAt)
+        if let unreadCount {
+            existing.unreadCount = unreadCount
+        }
+        existing.lastMessageAt = message.createdAt ?? existing.lastMessageAt
+        existing.localUpdatedAt = syncedAt
+        try context.save()
+    }
+
+    func patchConversationActivity(
+        conversationID: UUID,
+        lastMessageAt: Date?,
+        unreadCount: Int?
+    ) async throws {
+        let context = modelContext
+        let syncedAt = Date()
+        let conversationKey = conversationID.uuidString
+
+        guard let existing = try fetchConversationEntity(id: conversationKey, context: context) else {
+            return
+        }
+
+        if let lastMessageAt {
+            existing.lastMessageAt = lastMessageAt
+        }
+        if let unreadCount {
+            existing.unreadCount = unreadCount
+        }
+        existing.localUpdatedAt = syncedAt
+        try context.save()
+    }
+
+    func upsertLastMessageSnapshot(_ message: MessageDTO) async throws {
+        try await upsertMessages([message], conversationID: message.conversationID)
+    }
+
     func upsertMessages(
         _ messages: [MessageDTO],
         conversationID: UUID

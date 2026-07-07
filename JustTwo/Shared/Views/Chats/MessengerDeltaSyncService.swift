@@ -372,6 +372,11 @@ final class MessengerDeltaSyncService {
                     conversationID: conversation.id,
                     metadata: ["type": event.type.rawValue]
                 )
+                persistDeltaConversationCache(
+                    conversation: conversation,
+                    message: message,
+                    eventType: event.type.rawValue
+                )
             }
 
         case .messageDeleted:
@@ -399,6 +404,11 @@ final class MessengerDeltaSyncService {
                     conversation,
                     currentProfileID: profileID,
                     activeConversationID: activeConversationID
+                )
+                persistDeltaConversationCache(
+                    conversation: conversation,
+                    message: event.message,
+                    eventType: event.type.rawValue
                 )
             }
 
@@ -433,6 +443,11 @@ final class MessengerDeltaSyncService {
                     currentProfileID: profileID,
                     activeConversationID: activeConversationID
                 )
+                persistDeltaConversationCache(
+                    conversation: conversation,
+                    message: event.message,
+                    eventType: event.type.rawValue
+                )
             }
 
         case .conversationDelivered:
@@ -448,6 +463,11 @@ final class MessengerDeltaSyncService {
                     currentProfileID: profileID,
                     activeConversationID: activeConversationID
                 )
+                persistDeltaConversationCache(
+                    conversation: conversation,
+                    message: event.message,
+                    eventType: event.type.rawValue
+                )
             }
 
         case .conversationUpdated:
@@ -462,7 +482,26 @@ final class MessengerDeltaSyncService {
                     conversationID: conversation.id,
                     metadata: ["type": event.type.rawValue]
                 )
+                persistDeltaConversationCache(
+                    conversation: conversation,
+                    message: event.message,
+                    eventType: event.type.rawValue
+                )
             }
+        }
+    }
+
+    private func persistDeltaConversationCache(
+        conversation: ConversationDTO,
+        message: MessageDTO?,
+        eventType: String
+    ) {
+        Task {
+            await MessengerConversationCacheService.persistDeltaConversation(
+                conversation,
+                message: message,
+                eventType: eventType
+            )
         }
     }
 

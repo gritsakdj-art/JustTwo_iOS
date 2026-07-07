@@ -142,6 +142,32 @@ final class MessengerLocalStore: MessengerLocalStoreProtocol {
         }
     }
 
+    func patchConversationFromMessage(_ message: MessageDTO, unreadCount: Int?) async throws {
+        try await performSessionBoundOperation(operation: "patchConversationFromMessage") {
+            try await backingStore.patchConversationFromMessage(message, unreadCount: unreadCount)
+        }
+    }
+
+    func patchConversationActivity(
+        conversationID: UUID,
+        lastMessageAt: Date?,
+        unreadCount: Int?
+    ) async throws {
+        try await performSessionBoundOperation(operation: "patchConversationActivity") {
+            try await backingStore.patchConversationActivity(
+                conversationID: conversationID,
+                lastMessageAt: lastMessageAt,
+                unreadCount: unreadCount
+            )
+        }
+    }
+
+    func upsertLastMessageSnapshot(_ message: MessageDTO) async throws {
+        try await performSessionBoundOperation(operation: "upsertLastMessageSnapshot") {
+            try await backingStore.upsertLastMessageSnapshot(message)
+        }
+    }
+
     func upsertMessages(
         _ messages: [MessageDTO],
         conversationID: UUID
@@ -276,6 +302,8 @@ final class MessengerLocalStore: MessengerLocalStoreProtocol {
 }
 
 enum MessengerLocalStorageFeatureFlags {
-    /// PR15B will enable local reads for conversation list.
+    /// PR15C will enable local reads for per-conversation message history.
     static let isLocalReadEnabled = false
+    /// PR15B enables cached conversation list hydration and persistence.
+    static let isCachedConversationListEnabled = true
 }

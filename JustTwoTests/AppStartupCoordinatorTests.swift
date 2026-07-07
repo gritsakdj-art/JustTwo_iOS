@@ -2,6 +2,7 @@ import Foundation
 import Testing
 @testable import JustTwo
 
+@Suite(.serialized)
 @MainActor
 struct AppStartupCoordinatorTests {
 

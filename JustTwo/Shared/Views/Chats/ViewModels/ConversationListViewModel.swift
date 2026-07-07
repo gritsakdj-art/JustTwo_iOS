@@ -15,6 +15,8 @@ final class ConversationListViewModel {
     }
     private var didLoad = false
     private var refreshTask: Task<Void, Never>?
+    private var refreshGeneration = 0
+    private var listContentGeneration = 0
     private var appliedRealtimeMessageIDs: Set<UUID> = []
 
     func reset() {
@@ -25,6 +27,8 @@ final class ConversationListViewModel {
         errorMessage = nil
         didLoad = false
         appliedRealtimeMessageIDs = []
+        refreshGeneration += 1
+        listContentGeneration += 1
         syncMessengerBadge()
     }
 
@@ -82,6 +86,9 @@ final class ConversationListViewModel {
     }
 
     private func performRefresh(session: SessionStore, router: AppRouter) async {
+        refreshGeneration += 1
+        let generation = refreshGeneration
+
         let showLoading = conversations.isEmpty
         if showLoading {
             isLoading = true
@@ -90,28 +97,110 @@ final class ConversationListViewModel {
 
         do {
             let profileID = try await MessengerSessionSupport.resolveCurrentProfileID(session: session)
+            let contentGenerationAtStart = listContentGeneration
+            let cached = await MessengerConversationCacheService.hydrateCachedPreviews(
+                currentProfileID: profileID
+            )
+
+            if let cached,
+               !cached.isEmpty,
+               generation == refreshGeneration,
+               contentGenerationAtStart == listContentGeneration {
+                conversations = cached
+                syncMessengerBadge()
+                if showLoading {
+                    isLoading = false
+                }
+                MessengerDiagnostics.event(
+                    .messengerConversationCacheHydratedUI,
+                    metadata: ["count": "\(cached.count)"]
+                )
+            } else if let cached,
+                      !cached.isEmpty,
+                      generation == refreshGeneration,
+                      contentGenerationAtStart != listContentGeneration {
+                MessengerDiagnostics.event(
+                    .messengerConversationCacheSkippedStale,
+                    metadata: ["source": "cache"]
+                )
+            }
+
+            let networkStartedAt = Date()
+            MessengerDiagnostics.event(.messengerConversationCacheNetworkRefreshStarted)
+
             let response = try await ConversationService.fetchConversations()
-            conversations = response.conversations.map {
+
+            guard generation == refreshGeneration else {
+                MessengerDiagnostics.event(
+                    .messengerConversationCacheSkippedStale,
+                    metadata: ["source": "rest"]
+                )
+                return
+            }
+
+            let restPreviews = response.conversations.map {
                 ChatUIMapping.conversationPreview(from: $0, currentProfileID: profileID)
             }
+            conversations = mergeRESTPreviews(restPreviews, with: conversations)
+            bumpListContentGeneration()
             await ConversationDeliveryAckCoordinator.shared.acknowledgeDeliveredForConversations(
                 response.conversations,
                 currentProfileID: profileID,
                 session: session,
                 router: router
             )
+            await MessengerConversationCacheService.persistRESTConversations(response.conversations)
             syncMessengerBadge()
             didLoad = true
             ConversationAvatarsStartupLoader.shared.preloadRemainingIfNeeded(for: conversations)
+
+            MessengerDiagnostics.event(
+                .messengerConversationCacheNetworkRefreshSucceeded,
+                metadata: [
+                    "count": "\(response.conversations.count)",
+                    "durationMs": "\(durationMilliseconds(since: networkStartedAt))"
+                ]
+            )
         } catch let error as NetworkError {
-            if let message = MessengerSessionSupport.handleNetworkError(error, session: session, router: router) {
+            guard generation == refreshGeneration else { return }
+
+            if conversations.isEmpty,
+               let message = MessengerSessionSupport.handleNetworkError(error, session: session, router: router) {
+                errorMessage = message
+            } else if conversations.isEmpty {
+                errorMessage = error.localizedDescription
+            } else if let message = MessengerSessionSupport.handleNetworkError(error, session: session, router: router) {
                 errorMessage = message
             }
+
+            MessengerDiagnostics.event(
+                .messengerConversationCacheNetworkRefreshFailed,
+                metadata: [
+                    "errorCategory": MessengerDiagnostics.sanitizeError(error),
+                    "cachedCount": "\(conversations.count)"
+                ]
+            )
         } catch {
-            errorMessage = error.localizedDescription
+            guard generation == refreshGeneration else { return }
+
+            if conversations.isEmpty {
+                errorMessage = error.localizedDescription
+            }
+
+            MessengerDiagnostics.event(
+                .messengerConversationCacheNetworkRefreshFailed,
+                metadata: [
+                    "errorCategory": MessengerDiagnostics.sanitizeError(error),
+                    "cachedCount": "\(conversations.count)"
+                ]
+            )
         }
 
         isLoading = false
+    }
+
+    private func durationMilliseconds(since startDate: Date) -> Int {
+        max(0, Int(Date().timeIntervalSince(startDate) * 1_000))
     }
 
     func refreshFromRealtime(session: SessionStore, router: AppRouter) async {
@@ -140,6 +229,7 @@ final class ConversationListViewModel {
         conversations.remove(at: index)
         conversations.insert(updated, at: 0)
         sortConversations()
+        bumpListContentGeneration()
         return true
     }
 
@@ -167,6 +257,13 @@ final class ConversationListViewModel {
         conversations.remove(at: index)
         conversations.insert(updated, at: 0)
         sortConversations()
+        Task {
+            await MessengerConversationCacheService.persistRealtimeMessage(
+                message,
+                unreadCount: updated.unreadCount
+            )
+        }
+        bumpListContentGeneration()
         return true
     }
 
@@ -220,6 +317,14 @@ final class ConversationListViewModel {
             }
         }
 
+        Task {
+            await MessengerConversationCacheService.persistRealtimeMessage(
+                dto,
+                unreadCount: updated.unreadCount
+            )
+        }
+
+        bumpListContentGeneration()
         return true
     }
 
@@ -236,6 +341,10 @@ final class ConversationListViewModel {
 
         conversations[index] = conversations[index].replacingActivity(unreadCount: 0)
         syncMessengerBadge()
+        Task {
+            await MessengerConversationCacheService.persistRealtimeConversationRead(conversationID: conversationID)
+        }
+        bumpListContentGeneration()
         return true
     }
 
@@ -251,6 +360,10 @@ final class ConversationListViewModel {
 
         conversations[index] = conversations[index].replacingActivity(unreadCount: 0)
         syncMessengerBadge()
+        Task {
+            await MessengerConversationCacheService.persistRealtimeConversationRead(conversationID: conversationID)
+        }
+        bumpListContentGeneration()
         return true
     }
 
@@ -264,6 +377,13 @@ final class ConversationListViewModel {
             lastMessageAt: payload.lastMessageAt ?? payload.updatedAt
         )
         sortConversations()
+        Task {
+            await MessengerConversationCacheService.persistRealtimeConversationUpdated(
+                conversationID: payload.conversationID,
+                lastMessageAt: payload.lastMessageAt ?? payload.updatedAt
+            )
+        }
+        bumpListContentGeneration()
         return true
     }
 
@@ -292,7 +412,39 @@ final class ConversationListViewModel {
         }
         sortConversations()
         syncMessengerBadge()
+        bumpListContentGeneration()
         return true
+    }
+
+    private func mergeRESTPreviews(
+        _ restPreviews: [ChatConversationPreview],
+        with existing: [ChatConversationPreview]
+    ) -> [ChatConversationPreview] {
+        let existingByID = Dictionary(uniqueKeysWithValues: existing.map { ($0.id, $0) })
+        return restPreviews.map { restPreview in
+            guard let existingPreview = existingByID[restPreview.id] else {
+                return restPreview
+            }
+
+            let existingAt = existingPreview.lastMessageAt ?? .distantPast
+            let restAt = restPreview.lastMessageAt ?? .distantPast
+            let unreadCount = max(existingPreview.unreadCount, restPreview.unreadCount)
+
+            guard existingAt > restAt else {
+                return restPreview.replacingActivity(unreadCount: unreadCount)
+            }
+
+            return restPreview.replacingActivity(
+                lastMessageText: existingPreview.lastMessageText,
+                lastSenderName: existingPreview.lastSenderName,
+                lastMessageAt: existingPreview.lastMessageAt,
+                unreadCount: unreadCount
+            )
+        }
+    }
+
+    private func bumpListContentGeneration() {
+        listContentGeneration += 1
     }
 
     private func sortConversations() {

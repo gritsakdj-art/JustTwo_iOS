@@ -165,6 +165,20 @@
 - Added `JustTwoTests/MessengerLocalStoreTests.swift` and extended `AppStartupCoordinatorTests` for reset/wait coverage.
 - Added `Docs/MessengerLocalStorage.md`; updated `Docs/StartupLoading.md` reset section.
 
+## 2026-07-07 (PR15B)
+
+### Cached messenger conversation list
+
+- Enabled cache-first conversation list hydration via `MessengerConversationCacheService`.
+- `ConversationListViewModel` loads local cache before REST; network failure keeps cached rows visible.
+- REST success upserts conversations into `MessengerLocalStore`; delta/realtime patch local cache.
+- Extended `LocalMessengerConversation` with denormalized lastMessage preview fields (no signed URLs).
+- Added `ChatUIMapping.conversationPreview(from: LocalConversationSnapshot)`.
+- Feature flag: `MessengerLocalStorageFeatureFlags.isCachedConversationListEnabled = true`.
+- Message history UI remains REST/in-memory (`isLocalReadEnabled = false`).
+- Added PR15B diagnostics events and `JustTwoTests/MessengerConversationCacheTests.swift`.
+- Updated `Docs/MessengerLocalStorage.md`, `Docs/StartupLoading.md`, `Docs/Realtime.md`.
+
 ## Notes
 
 - Continue adding completed changes here after each meaningful update.
