@@ -75,6 +75,14 @@ struct PrivateChatView: View {
                 bottomChrome
             }
             .ignoresSafeArea(.keyboard, edges: .bottom)
+            #if canImport(UIKit)
+            .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillChangeFrameNotification)) { notification in
+                updateKeyboardHeight(from: notification)
+            }
+            .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { _ in
+                keyboardHeight = 0
+            }
+            #endif
             .navigationBarTitleDisplayMode(.inline)
             .navigationStackHostingBackgroundClear()
             .toolbar(.hidden, for: .tabBar)
@@ -392,14 +400,6 @@ struct PrivateChatView: View {
                 )
                 scheduleScrollToLatest(proxy, animated: false, delays: [0], force: true)
             }
-            #if canImport(UIKit)
-            .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillChangeFrameNotification)) { notification in
-                updateKeyboardHeight(from: notification)
-            }
-            .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { _ in
-                keyboardHeight = 0
-            }
-            #endif
             .onAppear {
                 if usesPreviewData {
                     didCompleteInitialPositioning = true
