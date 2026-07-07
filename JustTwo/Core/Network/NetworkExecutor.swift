@@ -17,13 +17,36 @@ actor NetworkExecutor {
         try? await Task.sleep(nanoseconds: 300_000_000)
     }
 
-    func run<T>(
+    func run<T: Sendable>(
         strategies: [NetworkStrategy] = NetworkStrategy.defaultFlow,
         delay: UInt64 = 500_000_000,
+        operationTimeout: TimeInterval? = nil,
         operation: @escaping @Sendable (URLSession) async throws -> T
     ) async throws -> T {
         precondition(!strategies.isEmpty, "strategies must not be empty")
 
+        if let operationTimeout {
+            return try await withTimeout(seconds: operationTimeout) {
+                try await self.runWithoutOperationTimeout(
+                    strategies: strategies,
+                    delay: delay,
+                    operation: operation
+                )
+            }
+        }
+
+        return try await runWithoutOperationTimeout(
+            strategies: strategies,
+            delay: delay,
+            operation: operation
+        )
+    }
+
+    private func runWithoutOperationTimeout<T: Sendable>(
+        strategies: [NetworkStrategy],
+        delay: UInt64,
+        operation: @escaping @Sendable (URLSession) async throws -> T
+    ) async throws -> T {
         let opID = UUID().uuidString
         NetworkDebug.log("🌐 [\(opID)] operation start, strategies=\(strategies.map(\.name))")
 
@@ -114,9 +137,13 @@ actor NetworkExecutor {
     func send<R: APIRequest>(
         _ request: R,
         strategies: [NetworkStrategy] = NetworkStrategy.defaultFlow,
-        configuration: APIConfiguration = .current
+        configuration: APIConfiguration = .current,
+        operationTimeout: TimeInterval? = nil
     ) async throws -> R.Response where R.Response: Decodable {
-        try await run(strategies: strategies) { session in
+        try await run(
+            strategies: strategies,
+            operationTimeout: operationTimeout ?? configuration.operationTimeout
+        ) { session in
             let client = HTTPClient(session: session, configuration: configuration)
             return try await client.send(request)
         }

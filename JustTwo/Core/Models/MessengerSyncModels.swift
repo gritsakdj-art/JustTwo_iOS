@@ -1,18 +1,18 @@
 import Foundation
 
-struct MessengerSyncStateResponse: Decodable, Sendable {
+nonisolated struct MessengerSyncStateResponse: Decodable, Sendable {
     let revision: Int64
     let serverTime: Date
 }
 
-struct MessengerSyncEventsResponse: Decodable, Sendable {
+nonisolated struct MessengerSyncEventsResponse: Decodable, Sendable {
     let events: [MessengerSyncEventDTO]
     let nextRevision: Int64
     let currentRevision: Int64
     let hasMore: Bool
 }
 
-struct MessengerSyncEventDTO: Decodable, Sendable, Identifiable {
+nonisolated struct MessengerSyncEventDTO: Decodable, Sendable, Identifiable {
     var id: Int64 { revision }
 
     let revision: Int64
@@ -62,7 +62,7 @@ enum MessengerSyncEventType: String, Decodable, Sendable {
     case conversationUpdated = "conversation.updated"
 }
 
-struct MessengerReceiptDTO: Decodable, Sendable {
+nonisolated struct MessengerReceiptDTO: Decodable, Sendable {
     let profileID: UUID
     let conversationID: UUID
     let messageID: UUID?

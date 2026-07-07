@@ -9,7 +9,7 @@ enum HTTPMethod: String, Sendable {
 }
 
 protocol APIRequest {
-    associatedtype Response: Decodable
+    associatedtype Response: Decodable & Sendable
 
     var path: String { get }
     var method: HTTPMethod { get }
@@ -39,7 +39,7 @@ extension EncodableAPIRequest {
     }
 }
 
-struct EmptyResponse: Decodable, Sendable {}
+nonisolated struct EmptyResponse: Decodable, Sendable {}
 
 enum JSONCoding {
     static let encoder: JSONEncoder = {
@@ -89,7 +89,7 @@ private extension ISO8601DateFormatter {
     }()
 }
 
-enum APIErrorCode: String {
+enum APIErrorCode: String, Sendable {
     case emailAlreadyExists = "email_already_exists"
     case invalidEmail = "invalid_email"
     case weakPassword = "weak_password"
@@ -131,7 +131,7 @@ enum APIErrorCode: String {
     case messagePrivacyRestricted = "message_privacy_restricted"
 }
 
-struct APIErrorResponse: Decodable, Error {
+nonisolated struct APIErrorResponse: Decodable, Error, Sendable {
     let success: Bool
     let code: String
     let message: String
@@ -217,7 +217,7 @@ struct APIErrorResponse: Decodable, Error {
     }
 }
 
-struct HealthResponse: Decodable {
+nonisolated struct HealthResponse: Decodable, Sendable {
     let status: String
     let service: String
 }

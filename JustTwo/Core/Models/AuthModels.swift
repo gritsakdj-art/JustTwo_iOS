@@ -1,29 +1,29 @@
 import Foundation
 
-struct LoginRequestBody: Encodable {
+nonisolated struct LoginRequestBody: Encodable {
     let email: String
     let password: String
 }
 
-struct RegisterRequestBody: Encodable {
+nonisolated struct RegisterRequestBody: Encodable {
     let email: String
     let password: String
 }
 
-struct ForgotPasswordRequestBody: Encodable {
+nonisolated struct ForgotPasswordRequestBody: Encodable {
     let email: String
 }
 
-struct ResetPasswordRequestBody: Encodable {
+nonisolated struct ResetPasswordRequestBody: Encodable {
     let token: String
     let newPassword: String
 }
 
-struct DeleteAccountRequestBody: Encodable {
+nonisolated struct DeleteAccountRequestBody: Encodable {
     let password: String
 }
 
-struct AuthResponse: Decodable {
+nonisolated struct AuthResponse: Decodable, Sendable {
     let success: Bool
     let message: String
     let token: String?
@@ -80,15 +80,15 @@ nonisolated struct UserResponse: Decodable, Sendable {
     }
 }
 
-struct ResendVerificationRequestBody: Encodable {
+nonisolated struct ResendVerificationRequestBody: Encodable {
     let email: String
 }
 
-struct VerifyEmailSessionRequestBody: Encodable {
+nonisolated struct VerifyEmailSessionRequestBody: Encodable {
     let token: String
 }
 
-struct MessageResponse: Decodable {
+nonisolated struct MessageResponse: Decodable, Sendable {
     let success: Bool
     let message: String
 }

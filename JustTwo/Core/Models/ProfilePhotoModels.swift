@@ -1,6 +1,6 @@
 import Foundation
 
-struct AvatarPresentationDTO: Codable, Equatable, Sendable {
+nonisolated struct AvatarPresentationDTO: Codable, Equatable, Sendable {
     let offsetX: Double
     let offsetY: Double
     let scale: Double
@@ -8,7 +8,7 @@ struct AvatarPresentationDTO: Codable, Equatable, Sendable {
     static let identity = AvatarPresentationDTO(offsetX: 0, offsetY: 0, scale: 1)
 }
 
-struct ProfilePhotoDTO: Decodable, Identifiable, Equatable, Sendable {
+nonisolated struct ProfilePhotoDTO: Decodable, Identifiable, Equatable, Sendable {
     let id: UUID
     let position: Int
     let isPrimary: Bool
@@ -22,21 +22,21 @@ struct ProfilePhotoDTO: Decodable, Identifiable, Equatable, Sendable {
     let updatedAt: Date?
 }
 
-struct ProfilePhotosResponse: Decodable {
+nonisolated struct ProfilePhotosResponse: Decodable, Sendable {
     let photos: [ProfilePhotoDTO]
 }
 
-struct ReorderProfilePhotosRequestBody: Encodable {
+nonisolated struct ReorderProfilePhotosRequestBody: Encodable {
     let photoIds: [UUID]
 }
 
-struct UpdateAvatarPresentationRequestBody: Encodable {
+nonisolated struct UpdateAvatarPresentationRequestBody: Encodable {
     let offsetX: Double
     let offsetY: Double
     let scale: Double
 }
 
-struct CreateProfilePhotoUploadURLRequestBody: Encodable {
+nonisolated struct CreateProfilePhotoUploadURLRequestBody: Encodable {
     let contentType: String
     let byteSize: Int64
     let width: Int?
@@ -45,7 +45,7 @@ struct CreateProfilePhotoUploadURLRequestBody: Encodable {
     let isPrimary: Bool?
 }
 
-struct ProfilePhotoUploadDTO: Decodable {
+nonisolated struct ProfilePhotoUploadDTO: Decodable, Sendable {
     let id: UUID
     let photoId: UUID
     let storageKey: String
@@ -55,31 +55,31 @@ struct ProfilePhotoUploadDTO: Decodable {
     let expiresAt: Date
 }
 
-struct CreateProfilePhotoUploadURLResponse: Decodable {
+nonisolated struct CreateProfilePhotoUploadURLResponse: Decodable, Sendable {
     let upload: ProfilePhotoUploadDTO
 }
 
-struct CompleteProfilePhotoUploadResponse: Decodable {
+nonisolated struct CompleteProfilePhotoUploadResponse: Decodable, Sendable {
     let photo: ProfilePhotoDTO
 }
 
-struct ProfilePhotoDownloadURLDTO: Decodable {
+nonisolated struct ProfilePhotoDownloadURLDTO: Decodable, Sendable {
     let id: UUID
     let downloadUrl: String
     let expiresAt: Date
 }
 
-struct ProfilePhotoDownloadURLResponse: Decodable {
+nonisolated struct ProfilePhotoDownloadURLResponse: Decodable, Sendable {
     let photo: ProfilePhotoDownloadURLDTO
 }
 
-struct DeleteProfilePhotoResponse: Decodable {
+nonisolated struct DeleteProfilePhotoResponse: Decodable, Sendable {
     let success: Bool
 }
 
-struct EmptyRequestBody: Encodable {}
+nonisolated struct EmptyRequestBody: Encodable {}
 
-struct PreparedProfilePhoto {
+nonisolated struct PreparedProfilePhoto {
     let data: Data
     let contentType: String
     let byteSize: Int64

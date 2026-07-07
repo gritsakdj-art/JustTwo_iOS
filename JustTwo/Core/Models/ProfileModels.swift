@@ -79,7 +79,7 @@ nonisolated struct UserProfileDTO: Decodable, Sendable {
     }
 }
 
-struct UpsertProfileRequestBody: Encodable {
+nonisolated struct UpsertProfileRequestBody: Encodable {
     let displayName: String?
     let birthDate: String?
     let gender: String?
@@ -116,7 +116,7 @@ struct UpsertProfileRequestBody: Encodable {
     }
 }
 
-struct ProfileEnvelopeResponse: Decodable {
+nonisolated struct ProfileEnvelopeResponse: Decodable, Sendable {
     let success: Bool
     let message: String?
     let profile: UserProfileDTO

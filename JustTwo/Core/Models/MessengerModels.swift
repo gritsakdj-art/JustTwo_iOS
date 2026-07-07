@@ -1,15 +1,15 @@
 import Foundation
 
-struct ConversationsResponseDTO: Decodable, Sendable {
+nonisolated struct ConversationsResponseDTO: Decodable, Sendable {
     let conversations: [ConversationDTO]
     let nextCursor: String?
 }
 
-struct ConversationResponseDTO: Decodable, Sendable {
+nonisolated struct ConversationResponseDTO: Decodable, Sendable {
     let conversation: ConversationDTO
 }
 
-struct ConversationDTO: Decodable, Identifiable, Sendable {
+nonisolated struct ConversationDTO: Decodable, Identifiable, Sendable {
     let id: UUID
     let type: String
     let status: String
@@ -23,7 +23,7 @@ struct ConversationDTO: Decodable, Identifiable, Sendable {
     let updatedAt: Date?
 }
 
-struct ConversationParticipantDTO: Decodable, Sendable {
+nonisolated struct ConversationParticipantDTO: Decodable, Sendable {
     let profile: MessengerProfileSummaryDTO
     let role: String
     let joinedAt: Date
@@ -31,7 +31,7 @@ struct ConversationParticipantDTO: Decodable, Sendable {
     let lastDeliveredAt: Date?
 }
 
-struct MessengerProfileSummaryDTO: Decodable, Identifiable, Sendable {
+nonisolated struct MessengerProfileSummaryDTO: Decodable, Identifiable, Sendable {
     let id: UUID
     let displayName: String
     let bio: String?
@@ -39,18 +39,18 @@ struct MessengerProfileSummaryDTO: Decodable, Identifiable, Sendable {
     let primaryPhoto: MessengerProfilePhotoSummaryDTO?
 }
 
-struct MessengerProfilePhotoSummaryDTO: Decodable, Identifiable, Sendable {
+nonisolated struct MessengerProfilePhotoSummaryDTO: Decodable, Identifiable, Sendable {
     let id: UUID
     let downloadUrl: String
     let avatarPresentation: AvatarPresentationDTO
 }
 
-struct MessagesResponseDTO: Decodable, Sendable {
+nonisolated struct MessagesResponseDTO: Decodable, Sendable {
     let messages: [MessageDTO]
     let nextCursor: String?
 }
 
-struct MessageResponseDTO: Decodable, Sendable {
+nonisolated struct MessageResponseDTO: Decodable, Sendable {
     let message: MessageDTO
 }
 
@@ -86,7 +86,7 @@ enum MessageKind: Equatable, Hashable, Sendable, Codable {
     }
 }
 
-struct MessageAttachmentDTO: Decodable, Equatable, Sendable {
+nonisolated struct MessageAttachmentDTO: Decodable, Equatable, Sendable {
     let id: UUID
     let contentType: String
     let byteSize: Int
@@ -96,7 +96,7 @@ struct MessageAttachmentDTO: Decodable, Equatable, Sendable {
     let downloadUrlExpiresAt: Date?
 }
 
-struct MessageDTO: Decodable, Identifiable, Sendable {
+nonisolated struct MessageDTO: Decodable, Identifiable, Sendable {
     let id: UUID
     let conversationID: UUID
     let senderProfileID: UUID
@@ -166,13 +166,13 @@ enum MessageDeliveryStatus: String, Codable, Equatable, Sendable, Hashable {
     }
 }
 
-struct MessageReplyDTO: Decodable, Sendable {
+nonisolated struct MessageReplyDTO: Decodable, Sendable {
     let id: UUID
     let body: String?
     let senderProfileID: UUID
 }
 
-struct MessageReactionDTO: Decodable, Sendable, Hashable {
+nonisolated struct MessageReactionDTO: Decodable, Sendable, Hashable {
     let emoji: String
     let count: Int
     let reactedByMe: Bool
@@ -203,7 +203,7 @@ enum ReactionEmoji {
     }
 }
 
-struct SendMessageRequestBody: Encodable, Sendable {
+nonisolated struct SendMessageRequestBody: Encodable, Sendable {
     let kind: MessageKind?
     let body: String?
     let replyToID: UUID?
@@ -246,18 +246,18 @@ struct SendMessageRequestBody: Encodable, Sendable {
     }
 }
 
-struct CreateMessageAttachmentUploadRequestBody: Encodable, Sendable {
+nonisolated struct CreateMessageAttachmentUploadRequestBody: Encodable, Sendable {
     let contentType: String
     let byteSize: Int
     let width: Int
     let height: Int
 }
 
-struct CreateMessageAttachmentUploadResponse: Decodable, Sendable {
+nonisolated struct CreateMessageAttachmentUploadResponse: Decodable, Sendable {
     let upload: MessageAttachmentUploadDTO
 }
 
-struct MessageAttachmentUploadDTO: Decodable, Sendable {
+nonisolated struct MessageAttachmentUploadDTO: Decodable, Sendable {
     let id: UUID
     let uploadUrl: URL
     let method: String
@@ -265,24 +265,24 @@ struct MessageAttachmentUploadDTO: Decodable, Sendable {
     let expiresAt: Date
 }
 
-struct EditMessageRequestBody: Encodable, Sendable {
+nonisolated struct EditMessageRequestBody: Encodable, Sendable {
     let body: String
 }
 
-struct MarkConversationReadRequestBody: Encodable, Sendable {
+nonisolated struct MarkConversationReadRequestBody: Encodable, Sendable {
     let lastReadMessageID: UUID?
 }
 
-struct MarkConversationDeliveredRequestBody: Encodable, Sendable {
+nonisolated struct MarkConversationDeliveredRequestBody: Encodable, Sendable {
     let messageID: UUID
 }
 
-struct MessageSearchResponseDTO: Decodable, Sendable {
+nonisolated struct MessageSearchResponseDTO: Decodable, Sendable {
     let messages: [MessageDTO]
     let nextCursor: String?
 }
 
-struct InviteDTO: Decodable, Identifiable, Sendable {
+nonisolated struct InviteDTO: Decodable, Identifiable, Sendable {
     let id: UUID
     let type: String
     let status: String
@@ -293,27 +293,27 @@ struct InviteDTO: Decodable, Identifiable, Sendable {
     let createdAt: Date?
 }
 
-struct InviteResponseDTO: Decodable, Sendable {
+nonisolated struct InviteResponseDTO: Decodable, Sendable {
     let invite: InviteDTO
 }
 
-struct InvitePreviewDTO: Decodable, Sendable {
+nonisolated struct InvitePreviewDTO: Decodable, Sendable {
     let type: String
     let status: String
     let expiresAt: Date?
     let creatorProfile: MessengerProfileSummaryDTO
 }
 
-struct InvitePreviewResponseDTO: Decodable, Sendable {
+nonisolated struct InvitePreviewResponseDTO: Decodable, Sendable {
     let invite: InvitePreviewDTO
 }
 
-struct AcceptInviteResponseDTO: Decodable, Sendable {
+nonisolated struct AcceptInviteResponseDTO: Decodable, Sendable {
     let connection: ConnectionDTO
     let conversation: ConversationDTO
 }
 
-struct ConnectionDTO: Decodable, Identifiable, Sendable {
+nonisolated struct ConnectionDTO: Decodable, Identifiable, Sendable {
     let id: UUID
     let profileAID: UUID
     let profileBID: UUID
@@ -324,7 +324,7 @@ struct ConnectionDTO: Decodable, Identifiable, Sendable {
     let endedAt: Date?
 }
 
-struct CreateInviteRequestBody: Encodable, Sendable {
+nonisolated struct CreateInviteRequestBody: Encodable, Sendable {
     let expiresInSeconds: Int?
     let maxUses: Int?
 }

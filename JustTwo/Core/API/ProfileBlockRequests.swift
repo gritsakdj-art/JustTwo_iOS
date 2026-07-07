@@ -4,7 +4,7 @@ struct BlockProfileRequestBody: Encodable, Sendable {
     let reason: String?
 }
 
-struct ProfileBlockDTO: Decodable, Identifiable, Sendable {
+nonisolated struct ProfileBlockDTO: Decodable, Identifiable, Sendable {
     let id: UUID
     let blockedProfileID: UUID
     let reason: String?
