@@ -90,6 +90,7 @@ struct ChatsView: View {
                 }
             }
             .toolbarBackground(.hidden, for: .navigationBar)
+            .toolbar(route == nil ? .visible : .hidden, for: .tabBar)
         }
         .background {
             Color.discoverBackgroundGradient

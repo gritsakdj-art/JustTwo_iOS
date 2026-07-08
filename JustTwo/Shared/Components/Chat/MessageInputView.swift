@@ -15,7 +15,6 @@ struct MessageInputView: View {
     var isAttachmentDisabled: Bool = false
 
     @FocusState private var isInputFocused: Bool
-    @State private var textSelection: TextSelection?
 
     private enum UI {
         static let controlSize: CGFloat = 44
@@ -56,7 +55,7 @@ struct MessageInputView: View {
                     .padding(.bottom, 6)
             }
 
-            TextField("chats.messagePlaceholder", text: $text, selection: $textSelection, axis: .vertical)
+            TextField("chats.messagePlaceholder", text: $text, axis: .vertical)
                 .font(Font.App.body())
                 .foregroundStyle(Color.primaryText)
                 .lineLimit(1...4)
@@ -84,12 +83,6 @@ struct MessageInputView: View {
     private func focusInputAtEnd() async {
         try? await Task.sleep(for: .milliseconds(32))
         isInputFocused = true
-        moveCaretToEnd()
-    }
-
-    private func moveCaretToEnd() {
-        let end = text.endIndex
-        textSelection = TextSelection(range: end..<end)
     }
 
     @ViewBuilder

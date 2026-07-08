@@ -15,6 +15,9 @@ struct JustTwoApp: App {
         PushRegistrationService.shared.configure()
         AppBuildEnvironment.beginTestFlightResolutionIfNeeded()
         MessengerLocalStore.configureShared(modelContainer: sharedModelContainer)
+        #if DEBUG
+        MainThreadHangDiagnostics.start()
+        #endif
     }
 
     var body: some Scene {

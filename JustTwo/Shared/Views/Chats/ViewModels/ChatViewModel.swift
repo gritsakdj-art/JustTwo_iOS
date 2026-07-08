@@ -330,7 +330,7 @@ final class ChatViewModel {
             router: router,
             loadGeneration: messageLoadGeneration
         )
-        messages = messageCache.messages(for: conversation.id) ?? messages
+        syncMessagesFromCache()
         syncPaginationStateFromCache()
         NetworkDebug.log("Chat older messages load finished didLoad=\(didLoad) count=\(messages.count) hasMore=\(hasMoreOlderMessages)")
     }
@@ -414,8 +414,12 @@ final class ChatViewModel {
         isSending && editingMessage != nil
     }
 
-    func syncMessagesFromCache() {
-        messages = messageCache.messages(for: conversation.id) ?? messages
+    @discardableResult
+    func syncMessagesFromCache() -> Bool {
+        guard let cached = messageCache.messages(for: conversation.id) else { return false }
+        guard cached != messages else { return false }
+        messages = cached
+        return true
     }
 
     /// Listens for cache updates that this ChatViewModel didn't itself trigger (e.g. a load that
@@ -452,14 +456,15 @@ final class ChatViewModel {
 
     private func handleCacheNotification() {
         let countBefore = messages.count
-        syncMessagesFromCache()
+        let didChangeMessages = syncMessagesFromCache()
         syncPaginationStateFromCache()
         MessengerDiagnostics.event(
             .chatCacheNotificationReceived,
             conversationID: conversation.id,
             metadata: [
                 "messageCountBefore": "\(countBefore)",
-                "messageCountAfter": "\(messages.count)"
+                "messageCountAfter": "\(messages.count)",
+                "didChangeMessages": "\(didChangeMessages)"
             ]
         )
     }

@@ -7,7 +7,7 @@ import UIKit
 private final class TabBarInstantRevealOnPopController: UIViewController {
     override func willMove(toParent parent: UIViewController?) {
         super.willMove(toParent: parent)
-        guard parent == nil else { return }
+        guard parent == nil, isLeavingNavigationStack else { return }
         revealTabBarWithoutAnimation()
     }
 
@@ -35,6 +35,22 @@ private final class TabBarInstantRevealOnPopController: UIViewController {
             tabBar.layoutIfNeeded()
             tabBar.superview?.layoutIfNeeded()
         }
+    }
+
+    private var isLeavingNavigationStack: Bool {
+        if isMovingFromParent || isBeingDismissed {
+            return true
+        }
+
+        var current = parent
+        while let controller = current {
+            if controller.isMovingFromParent || controller.isBeingDismissed {
+                return true
+            }
+            current = controller.parent
+        }
+
+        return false
     }
 
     private var resolvedTabBar: UITabBar? {
