@@ -552,7 +552,7 @@ final class MessengerRealtimeCoordinator {
         presenceStore.clearAll()
 
         if let session, let router {
-            await MessengerDeltaSyncService.shared.syncDeltas(
+            await MessengerSyncEngine.shared.runGlobalSync(
                 reason: .realtimeReconnect,
                 session: session,
                 router: router

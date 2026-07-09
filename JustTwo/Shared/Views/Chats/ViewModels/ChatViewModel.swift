@@ -216,8 +216,8 @@ final class ChatViewModel {
         markDeliveredAndReadInBackground(session: session, router: router)
 
         Task {
-            await MessengerDeltaSyncService.shared.syncDeltas(
-                reason: .chatOpened,
+            await MessengerSyncEngine.shared.repairConversation(
+                conversationID: conversation.id,
                 session: session,
                 router: router
             )

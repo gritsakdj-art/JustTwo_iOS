@@ -241,6 +241,13 @@ struct MessengerLocalStoreTests {
             lastAppliedRevision: 200,
             lastSuccessfulSyncAt: Date(),
             lastFullRefreshAt: nil,
+            lastAttemptedSyncAt: nil,
+            lastFailedAt: nil,
+            lastErrorCode: nil,
+            state: MessengerSyncEngineState.idle.rawValue,
+            needsFullRefresh: false,
+            lastBootstrapAt: nil,
+            lastKnownServerRevision: nil,
             schemaVersion: MessengerPersistence.schemaVersion,
             localUpdatedAt: Date()
         )
@@ -249,6 +256,13 @@ struct MessengerLocalStoreTests {
             lastAppliedRevision: 150,
             lastSuccessfulSyncAt: Date(),
             lastFullRefreshAt: nil,
+            lastAttemptedSyncAt: nil,
+            lastFailedAt: nil,
+            lastErrorCode: nil,
+            state: MessengerSyncEngineState.idle.rawValue,
+            needsFullRefresh: false,
+            lastBootstrapAt: nil,
+            lastKnownServerRevision: nil,
             schemaVersion: MessengerPersistence.schemaVersion,
             localUpdatedAt: Date()
         )
@@ -271,6 +285,13 @@ struct MessengerLocalStoreTests {
                 lastAppliedRevision: 10,
                 lastSuccessfulSyncAt: Date(),
                 lastFullRefreshAt: nil,
+                lastAttemptedSyncAt: nil,
+                lastFailedAt: nil,
+                lastErrorCode: nil,
+                state: MessengerSyncEngineState.idle.rawValue,
+                needsFullRefresh: false,
+                lastBootstrapAt: nil,
+                lastKnownServerRevision: nil,
                 schemaVersion: MessengerPersistence.schemaVersion,
                 localUpdatedAt: Date()
             )

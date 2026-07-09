@@ -107,12 +107,12 @@ final class AppStartupCoordinator {
         let startedAt = Date()
         MessengerDiagnostics.event(.startupBackgroundNetworkWarmupScheduled)
 
-        var baselineRevision: Int64?
-        do {
-            baselineRevision = try await MessengerDeltaSyncService.shared.prepareBaselineRevision()
-        } catch {
-            NetworkDebug.logError(error, prefix: "Startup sync baseline failed")
-        }
+        await MessengerSyncEngine.shared.hydrateFromLocalStore()
+
+        let baselineRevision = await MessengerSyncEngine.shared.prepareStartupBaselineIfNeeded(
+            session: session,
+            router: router
+        )
 
         MessengerDiagnostics.event(.startupProfilePhotosDeferred)
         MessengerDiagnostics.event(.startupConversationAvatarsDeferred)
@@ -131,8 +131,8 @@ final class AppStartupCoordinator {
             await group.waitForAll()
         }
 
-        if let baselineRevision {
-            MessengerDeltaSyncService.shared.finishBaseline(revision: baselineRevision)
+        if MessengerSyncStateStore.shared.currentRevision == nil, let baselineRevision {
+            await MessengerSyncEngine.shared.finishBootstrap(revision: baselineRevision)
         }
 
         ConversationsStartupLoader.shared.activateRealtime(session: session, router: router)
@@ -142,12 +142,17 @@ final class AppStartupCoordinator {
         let conversations = ConversationListViewModel.shared.conversations
         await ConversationAvatarsStartupLoader.shared.preloadCritical(for: conversations)
 
+        MessengerSyncEngine.shared.activate(session: session, router: router)
+        MessengerOutboxProcessor.shared.activate(session: session, router: router)
         Task {
-            await MessengerDeltaSyncService.shared.syncDeltas(
+            await MessengerSyncEngine.shared.runGlobalSync(
                 reason: .bootstrap,
                 session: session,
                 router: router
             )
+        }
+        Task {
+            await MessengerOutboxProcessor.shared.processReadyItems(session: session, router: router)
         }
 
         ConversationAvatarsStartupLoader.shared.preloadRemainingIfNeeded(for: conversations)
@@ -157,11 +162,6 @@ final class AppStartupCoordinator {
             router: router,
             force: force
         )
-
-        MessengerOutboxProcessor.shared.activate(session: session, router: router)
-        Task {
-            await MessengerOutboxProcessor.shared.processReadyItems(session: session, router: router)
-        }
 
         Task {
             await MessengerMediaCacheService.runCleanupIfNeeded()
@@ -219,7 +219,7 @@ final class AppStartupCoordinator {
         MessageCacheStore.shared.reset()
         MessengerOutbox.shared.clear()
         MessengerOutboxProcessor.shared.deactivate()
-        MessengerDeltaSyncService.shared.reset()
+        MessengerSyncEngine.shared.reset()
         ConversationListViewModel.shared.reset()
 
         await StartupSessionSnapshotStore.shared.clear()

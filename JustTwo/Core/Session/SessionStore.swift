@@ -169,7 +169,7 @@ final class SessionStore {
         syncPushRegistrationIfEligible()
 
         Task { @MainActor in
-            await MessengerDeltaSyncService.shared.syncDeltas(
+            await MessengerSyncEngine.shared.runGlobalSync(
                 reason: .appForeground,
                 session: self,
                 router: AppRouter.shared

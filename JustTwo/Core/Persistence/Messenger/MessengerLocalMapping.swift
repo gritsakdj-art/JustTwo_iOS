@@ -150,6 +150,13 @@ enum MessengerLocalMapping {
             lastAppliedRevision: snapshot.lastAppliedRevision,
             lastSuccessfulSyncAt: snapshot.lastSuccessfulSyncAt,
             lastFullRefreshAt: snapshot.lastFullRefreshAt,
+            lastAttemptedSyncAt: snapshot.lastAttemptedSyncAt,
+            lastFailedAt: snapshot.lastFailedAt,
+            lastErrorCode: snapshot.lastErrorCode,
+            state: snapshot.state,
+            needsFullRefresh: snapshot.needsFullRefresh,
+            lastBootstrapAt: snapshot.lastBootstrapAt,
+            lastKnownServerRevision: snapshot.lastKnownServerRevision,
             schemaVersion: snapshot.schemaVersion,
             localUpdatedAt: syncedAt
         )
@@ -262,6 +269,13 @@ enum MessengerLocalMapping {
             lastAppliedRevision: entity.lastAppliedRevision,
             lastSuccessfulSyncAt: entity.lastSuccessfulSyncAt,
             lastFullRefreshAt: entity.lastFullRefreshAt,
+            lastAttemptedSyncAt: entity.lastAttemptedSyncAt,
+            lastFailedAt: entity.lastFailedAt,
+            lastErrorCode: entity.lastErrorCode,
+            state: entity.state,
+            needsFullRefresh: entity.needsFullRefresh,
+            lastBootstrapAt: entity.lastBootstrapAt,
+            lastKnownServerRevision: entity.lastKnownServerRevision,
             schemaVersion: entity.schemaVersion,
             localUpdatedAt: entity.localUpdatedAt
         )

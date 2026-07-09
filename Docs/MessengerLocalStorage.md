@@ -15,7 +15,7 @@ On-device messenger persistence using SwiftData.
 | PR16A | Persistent text outbox | ✅ (pending manual smoke) |
 | PR16B | Persistent image outbox + composer preview | ✅ (pending manual smoke) |
 | PR16C | Outbox retry UI + network restore polish | ✅ (pending manual smoke) |
-| PR17 | Full sync engine | planned |
+| PR17 | Persistent sync engine + durable cursor | ✅ (pending manual smoke) |
 
 ## PR15D — Offline-friendly startup
 
@@ -300,7 +300,7 @@ LocalMessengerConversation → LocalConversationSnapshot → ChatConversationPre
 - Cached avatars may show placeholder until REST provides fresh signed URL.
 - Realtime partial `conversation.updated` patches only `lastMessageAt` locally (no full DTO).
 - Reaction events do not change list preview unless backend includes updated `ConversationDTO`.
-- PR14B in-memory delta cursor remains runtime source of truth (not persistent `LocalMessengerSyncMetadata` cursor).
+- PR17: `LocalMessengerSyncMetadata` is the **runtime persistent global cursor** (hydrated into `MessengerSyncStateStore` on startup). See [Messenger Sync Engine](MessengerSyncEngine.md).
 - MainActor SwiftData writes are acceptable for conversation-list volume; no `ModelActor` refactor in PR15B.
 
 ### Manual smoke checklist (PR15B)
@@ -327,7 +327,7 @@ Six messenger entities (plus `Item.self` in app container):
 | `LocalMessengerAttachment` | metadata only | no signed URL |
 | `LocalMessengerReactionAggregate` | `id = messageID:emoji`, `count`, `reactedByMe` | |
 | `LocalMessengerReceipt` | delivery/read watermarks | |
-| `LocalMessengerSyncMetadata` | `lastAppliedRevision` | not used as runtime cursor yet |
+| `LocalMessengerSyncMetadata` | `lastAppliedRevision`, sync health fields | runtime global cursor (PR17) |
 
 ### Thread / actor confinement
 

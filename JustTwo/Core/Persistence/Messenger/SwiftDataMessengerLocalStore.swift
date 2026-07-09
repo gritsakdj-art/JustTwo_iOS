@@ -213,11 +213,25 @@ final class SwiftDataMessengerLocalStore: MessengerLocalStoreProtocol {
                incomingRevision < currentRevision {
                 existing.lastSuccessfulSyncAt = mapped.lastSuccessfulSyncAt ?? existing.lastSuccessfulSyncAt
                 existing.lastFullRefreshAt = mapped.lastFullRefreshAt ?? existing.lastFullRefreshAt
+                existing.lastAttemptedSyncAt = mapped.lastAttemptedSyncAt ?? existing.lastAttemptedSyncAt
+                existing.lastFailedAt = mapped.lastFailedAt ?? existing.lastFailedAt
+                existing.lastErrorCode = mapped.lastErrorCode ?? existing.lastErrorCode
+                existing.state = mapped.state ?? existing.state
+                existing.needsFullRefresh = mapped.needsFullRefresh
+                existing.lastBootstrapAt = mapped.lastBootstrapAt ?? existing.lastBootstrapAt
+                existing.lastKnownServerRevision = mapped.lastKnownServerRevision ?? existing.lastKnownServerRevision
                 existing.localUpdatedAt = syncedAt
             } else {
                 existing.lastAppliedRevision = mapped.lastAppliedRevision ?? existing.lastAppliedRevision
                 existing.lastSuccessfulSyncAt = mapped.lastSuccessfulSyncAt ?? existing.lastSuccessfulSyncAt
                 existing.lastFullRefreshAt = mapped.lastFullRefreshAt ?? existing.lastFullRefreshAt
+                existing.lastAttemptedSyncAt = mapped.lastAttemptedSyncAt ?? existing.lastAttemptedSyncAt
+                existing.lastFailedAt = mapped.lastFailedAt ?? existing.lastFailedAt
+                existing.lastErrorCode = mapped.lastErrorCode ?? existing.lastErrorCode
+                existing.state = mapped.state ?? existing.state
+                existing.needsFullRefresh = mapped.needsFullRefresh
+                existing.lastBootstrapAt = mapped.lastBootstrapAt ?? existing.lastBootstrapAt
+                existing.lastKnownServerRevision = mapped.lastKnownServerRevision ?? existing.lastKnownServerRevision
                 existing.schemaVersion = mapped.schemaVersion
                 existing.localUpdatedAt = syncedAt
             }

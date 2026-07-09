@@ -100,6 +100,13 @@ struct LocalMessengerSyncMetadataSnapshot: Sendable, Equatable {
     let lastAppliedRevision: Int64?
     let lastSuccessfulSyncAt: Date?
     let lastFullRefreshAt: Date?
+    let lastAttemptedSyncAt: Date?
+    let lastFailedAt: Date?
+    let lastErrorCode: String?
+    let state: String?
+    let needsFullRefresh: Bool
+    let lastBootstrapAt: Date?
+    let lastKnownServerRevision: Int64?
     let schemaVersion: Int
     let localUpdatedAt: Date
 }

@@ -15,6 +15,11 @@ final class MessengerDeltaSyncService {
     private var pendingBaselineRevision: Int64?
     private var sessionGeneration = 0
 
+    var onGlobalCursorAdvanced: ((Int64) async -> Void)?
+    var autoFullRefreshFallback = true
+    private(set) var lastFailureError: Error?
+    private(set) var lastRunHadMorePages = false
+
     private let minimumInterval: TimeInterval = 3
 
     init(
@@ -65,28 +70,33 @@ final class MessengerDeltaSyncService {
                 "reason": MessengerDeltaSyncReason.bootstrap.rawValue
             ]
         )
+        if let onGlobalCursorAdvanced {
+            Task { await onGlobalCursorAdvanced(baseline) }
+        }
     }
 
     func syncDeltas(
         reason: MessengerDeltaSyncReason,
         session: SessionStore,
         router: AppRouter
-    ) async {
+    ) async -> Bool {
         guard !isInFlight else {
             MessengerDiagnostics.event(
                 .deltaSyncSkippedAlreadyInFlight,
                 metadata: ["reason": reason.rawValue]
             )
-            return
+            return false
         }
 
         if shouldThrottle(reason: reason) {
-            return
+            return false
         }
 
         guard let afterRevision = syncState.currentRevision else {
-            await fullRefreshAndBootstrap(reason: reason, session: session, router: router)
-            return
+            if autoFullRefreshFallback {
+                await fullRefreshAndBootstrap(reason: reason, session: session, router: router)
+            }
+            return false
         }
 
         let generation = sessionGeneration
@@ -98,7 +108,7 @@ final class MessengerDeltaSyncService {
             }
         }
 
-        guard generation == sessionGeneration else { return }
+        guard generation == sessionGeneration else { return false }
 
         MessengerDiagnostics.event(
             .deltaSyncStarted,
@@ -109,11 +119,14 @@ final class MessengerDeltaSyncService {
         )
 
         do {
+            lastFailureError = nil
+            lastRunHadMorePages = false
             let profileID = try await MessengerSessionSupport.resolveCurrentProfileID(session: session)
             var cursor = afterRevision
+            var pageCount = 0
 
-            while true {
-                guard generation == sessionGeneration else { return }
+            while pageCount < MessengerSyncEngineLimits.maxPagesPerRun {
+                guard generation == sessionGeneration else { return false }
 
                 let page = try await MessengerSyncService.fetchSyncEvents(afterRevision: cursor)
                 MessengerDiagnostics.event(
@@ -123,9 +136,12 @@ final class MessengerDeltaSyncService {
                         "afterRevision": "\(cursor)",
                         "eventCount": "\(page.events.count)",
                         "nextRevision": "\(page.nextRevision)",
-                        "hasMore": page.hasMore ? "true" : "false"
+                        "hasMore": page.hasMore ? "true" : "false",
+                        "pageCount": "\(pageCount + 1)"
                     ]
                 )
+
+                try validateRevisionOrder(events: page.events, afterRevision: cursor)
 
                 try await apply(
                     events: page.events,
@@ -135,10 +151,13 @@ final class MessengerDeltaSyncService {
                     sessionGeneration: generation
                 )
 
-                guard generation == sessionGeneration else { return }
+                guard generation == sessionGeneration else { return false }
 
                 cursor = page.nextRevision
                 syncState.advance(to: cursor)
+                if let onGlobalCursorAdvanced {
+                    await onGlobalCursorAdvanced(cursor)
+                }
                 MessengerDiagnostics.event(
                     .deltaSyncCursorAdvanced,
                     metadata: [
@@ -147,11 +166,21 @@ final class MessengerDeltaSyncService {
                     ]
                 )
 
+                pageCount += 1
+
                 if !page.hasMore {
-                    break
+                    return true
+                }
+
+                if pageCount >= MessengerSyncEngineLimits.maxPagesPerRun {
+                    lastRunHadMorePages = true
+                    return true
                 }
             }
+
+            return true
         } catch {
+            lastFailureError = error
             MessengerDiagnostics.event(
                 .deltaSyncFailed,
                 metadata: [
@@ -160,8 +189,95 @@ final class MessengerDeltaSyncService {
                 ]
             )
 
-            if reason != .fullRefreshFallback {
+            if autoFullRefreshFallback, reason != .fullRefreshFallback {
                 await fullRefreshAndBootstrap(reason: .fullRefreshFallback, session: session, router: router)
+            }
+            return false
+        }
+    }
+
+    func syncConversationRepair(
+        conversationID: UUID,
+        session: SessionStore,
+        router: AppRouter
+    ) async -> Bool {
+        guard session.isFullyAuthenticated else { return false }
+
+        let generation = sessionGeneration
+        let afterRevision = syncState.currentRevision ?? 0
+
+        MessengerDiagnostics.event(
+            .syncConversationRepairStarted,
+            conversationID: conversationID,
+            metadata: [
+                "afterRevision": "\(afterRevision)",
+                "trigger": MessengerDeltaSyncReason.chatOpened.rawValue
+            ]
+        )
+
+        do {
+            let profileID = try await MessengerSessionSupport.resolveCurrentProfileID(session: session)
+            var cursor = afterRevision
+            var pageCount = 0
+            var appliedEventCount = 0
+
+            while pageCount < MessengerSyncEngineLimits.maxPagesPerRun {
+                guard generation == sessionGeneration else { return false }
+
+                let page = try await MessengerSyncService.fetchSyncEvents(
+                    afterRevision: cursor,
+                    conversationID: conversationID
+                )
+
+                try await apply(
+                    events: page.events,
+                    profileID: profileID,
+                    session: session,
+                    router: router,
+                    sessionGeneration: generation
+                )
+                appliedEventCount += page.events.count
+                cursor = page.nextRevision
+                pageCount += 1
+
+                if !page.hasMore {
+                    break
+                }
+            }
+
+            MessengerDiagnostics.event(
+                .syncConversationRepairApplied,
+                conversationID: conversationID,
+                metadata: [
+                    "eventCount": "\(appliedEventCount)",
+                    "pageCount": "\(pageCount)"
+                ]
+            )
+            return true
+        } catch {
+            MessengerDiagnostics.event(
+                .syncApplyFailed,
+                conversationID: conversationID,
+                metadata: [
+                    "errorCode": MessengerDiagnostics.sanitizeError(error),
+                    "trigger": MessengerDeltaSyncReason.chatOpened.rawValue
+                ]
+            )
+            return false
+        }
+    }
+
+    private func validateRevisionOrder(events: [MessengerSyncEventDTO], afterRevision: Int64) throws {
+        guard !events.isEmpty else { return }
+
+        let sorted = events.sorted { $0.revision < $1.revision }
+        if let first = sorted.first, first.revision > afterRevision + 1 {
+            throw MessengerSyncEngineError.revisionGapDetected
+        }
+
+        for index in 1..<sorted.count {
+            if sorted[index].revision <= sorted[index - 1].revision {
+                throw MessengerSyncEngineError.outOfOrderRevision
             }
         }
     }
@@ -251,7 +367,7 @@ final class MessengerDeltaSyncService {
 
         if let baselineRevision {
             finishBaseline(revision: baselineRevision)
-            await syncDeltas(reason: .fullRefreshFallback, session: session, router: router)
+            _ = await syncDeltas(reason: .fullRefreshFallback, session: session, router: router)
         }
     }
 

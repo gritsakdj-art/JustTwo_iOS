@@ -20,7 +20,7 @@ enum MessengerOutboxErrorCode: String, Sendable, Equatable {
         }
     }
 
-  nonisolated static func classify(_ error: Error) -> MessengerOutboxErrorCode {
+    nonisolated static func classify(_ error: Error) -> MessengerOutboxErrorCode {
         if error is CancellationError {
             return .cancelled
         }

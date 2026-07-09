@@ -191,6 +191,15 @@ Diagnostics events (PR16B additions): `outboxImageComposerPreviewSelected`, `out
 
 `AppStartupCoordinator.performReset()` → `MessengerLocalStore.resetAllMessengerData()` deletes all messenger entities including outbox + pending media metadata, and clears the pending media directory. In-memory `MessengerOutbox` is cleared separately.
 
+## PR17 — Sync engine interaction
+
+- Pending outgoing text/image survive global delta sync and full refresh fallback.
+- Confirmed delta/REST/realtime message with same `clientMessageID` reconciles outbox (clears row + pending media).
+- `message.deleted` for server ID does not remove unrelated pending outbox items.
+- Logout still clears all outbox + pending media.
+
+See [Messenger Sync Engine](MessengerSyncEngine.md).
+
 ## PR16C TODO
 
 _Implemented — pending manual smoke._

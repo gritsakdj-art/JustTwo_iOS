@@ -33,7 +33,6 @@ enum ChatImagePreparationError: LocalizedError, Equatable {
 enum ChatImagePreparer {
     private nonisolated static let maxDimension: CGFloat = 1_600
     private nonisolated static let jpegQuality: CGFloat = 0.80
-    private nonisolated static let directoryName = "justtwo-chat-images"
 
     static func prepare(_ item: PhotosPickerItem, clientMessageID: String) async throws -> PreparedChatImage {
         guard let data = try await item.loadTransferable(type: Data.self) else {
@@ -120,7 +119,7 @@ enum ChatImagePreparer {
     }
 
     private nonisolated static func temporaryDirectoryURL() -> URL {
-        FileManager.default.temporaryDirectory.appendingPathComponent(directoryName, isDirectory: true)
+        FileManager.default.temporaryDirectory.appendingPathComponent("justtwo-chat-images", isDirectory: true)
     }
 
     private nonisolated static func safeFileName(for clientMessageID: String) -> String {

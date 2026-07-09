@@ -211,6 +211,26 @@ enum MessengerDiagnosticEvent: String, Sendable {
     case deltaSyncFailed
     case deltaSyncFullRefreshFallback
 
+    case syncEngineStarted
+    case syncEngineSkipped
+    case syncBootstrapStarted
+    case syncBootstrapSucceeded
+    case syncBootstrapFailed
+    case syncDeltaPageRequested
+    case syncDeltaPageApplied
+    case syncCursorAdvanced
+    case syncApplyFailed
+    case syncNeedsFullRefresh
+    case syncFullRefreshStarted
+    case syncFullRefreshSucceeded
+    case syncFullRefreshFailed
+    case syncNetworkUnavailable
+    case syncBackoffScheduled
+    case syncGenerationMismatchIgnored
+    case syncConversationRepairStarted
+    case syncConversationRepairApplied
+    case syncStateChanged
+
     case deltaEventReceived
     case deltaEventApplied
     case deltaEventSkippedDuplicateRevision
@@ -427,7 +447,7 @@ enum MessengerDiagnostics {
         return String(value.prefix(8)) + "..."
     }
 
-    static func sanitizeError(_ error: Error) -> String {
+    nonisolated static func sanitizeError(_ error: Error) -> String {
         if error is CancellationError {
             return "cancelled"
         }

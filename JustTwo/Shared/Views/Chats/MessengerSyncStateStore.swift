@@ -11,6 +11,15 @@ final class MessengerSyncStateStore {
 
     private init() {}
 
+    func hydrate(revision: Int64?, lastSyncAt: Date?) {
+        if let revision {
+            setRevision(revision)
+        }
+        if let lastSyncAt {
+            self.lastSyncAt = lastSyncAt
+        }
+    }
+
     func setRevision(_ revision: Int64) {
         if let currentRevision {
             self.currentRevision = max(currentRevision, revision)

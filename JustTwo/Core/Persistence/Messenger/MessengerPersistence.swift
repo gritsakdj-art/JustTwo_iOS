@@ -3,7 +3,7 @@ import SwiftData
 
 enum MessengerPersistence {
     static let syncMetadataGlobalID = "global"
-    static let schemaVersion = 4
+    static let schemaVersion = 5
 
     static var messengerSchema: Schema {
         Schema([

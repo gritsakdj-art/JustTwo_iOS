@@ -24,7 +24,7 @@ SplashViewModel
 
 After MainTabView (background):
   AppStartupCoordinator.runBackgroundNetworkWarmup
-        ├─ GET /sync/state baseline
+        ├─ MessengerSyncEngine hydrate + background delta sync
         ├─ ProfilePhotosStartupLoader
         ├─ ConversationsStartupLoader.refreshNetworkIfNeeded
         ├─ realtime connect + delta bootstrap

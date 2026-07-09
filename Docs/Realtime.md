@@ -53,7 +53,11 @@ Realtime failure does not block login and does not log the user out by itself. R
 
 PR15B: realtime and delta handlers update both the in-memory conversation list and the local conversation cache (`MessengerConversationCacheService`).
 
-PR15C: realtime and delta message handlers also persist per-conversation message history to local DB (`MessengerMessageCacheService`). Realtime is still not a durable source of truth; durable backend delta + REST remain repair/baseline mechanisms.
+PR15C: realtime and delta message handlers also persist per-conversation message history to local DB (`MessengerMessageCacheService`).
+
+**PR15C limitation:** realtime `reaction.added` / `reaction.removed` events without a full `MessageDTO` snapshot update in-memory reaction UI only; local reaction aggregates are repaired on the next delta event with message snapshot or REST refresh.
+
+PR17: realtime remains a **foreground accelerator** only. The persistent global sync cursor is owned by `MessengerSyncEngine` delta loop — realtime does not advance `lastAppliedRevision`. Delta sync repairs missed events after reconnect/relaunch.
 
 **PR15C limitation:** realtime `reaction.added` / `reaction.removed` events without a full `MessageDTO` snapshot update in-memory reaction UI only; local reaction aggregates are repaired on the next delta event with message snapshot or REST refresh.
 
@@ -97,7 +101,8 @@ PR15C: realtime and delta message handlers also persist per-conversation message
 When splash routes to `MainTabView` using a cached session snapshot:
 
 * realtime connect is **deferred** until `StartupSessionValidationService` succeeds;
-* delta bootstrap runs in background network warmup after validation;
+* `MessengerSyncEngine` hydrates persisted cursor, runs background global delta sync (non-blocking);
+* startup does not block `MainTabView` on sync completion;
 * transient network loss during an active session keeps existing realtime behavior unchanged.
 
 ## Image attachments offline (PR15E)

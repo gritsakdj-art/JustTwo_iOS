@@ -282,6 +282,20 @@
 - **Manual smoke:** not run (checklist in PR16C report).
 - Out of scope: full sync engine (PR17), PR18 offline UX polish.
 
+## 2026-07-09 (PR17)
+
+- Branch: `ios-messenger-pr17-sync-engine`.
+- `MessengerSyncEngine` with persistent `LocalMessengerSyncMetadata` cursor (schema v5).
+- Global delta page loop with cursor persist-after-apply, max 20 pages/run.
+- Conversation-filtered repair (`repairConversation`) does not advance global cursor.
+- Full refresh fallback for invalid/gap cursor; startup hydrates persisted cursor before bootstrap.
+- Wired startup/foreground/network restore/realtime reconnect; chat open uses conversation repair.
+- Logout clears sync metadata via existing reset.
+- Added `Docs/MessengerSyncEngine.md`; updated local storage, realtime, startup, outbox docs.
+- Added `MessengerSyncEngineTests`.
+- **Manual smoke:** not run.
+- Out of scope: backend retention/metrics (PR20), PR18 offline UX polish.
+
 ## Notes
 
 - Continue adding completed changes here after each meaningful update.
