@@ -44,4 +44,37 @@ protocol MessengerLocalStoreProtocol: AnyObject {
     ) async throws
     func clearAttachmentMediaCacheMetadata(attachmentID: String) async throws
     func fetchAttachmentLocalCacheKeys() async throws -> Set<String>
+
+    func createTextOutboxItem(
+        conversationID: UUID,
+        clientMessageID: String,
+        body: String,
+        replyToMessageID: UUID?
+    ) async throws -> MessengerOutboxItemSnapshot
+
+    func fetchPendingOutboxItems() async throws -> [MessengerOutboxItemSnapshot]
+
+    func fetchOutboxItems(conversationID: UUID) async throws -> [MessengerOutboxItemSnapshot]
+
+    func fetchOutboxItem(clientMessageID: String) async throws -> MessengerOutboxItemSnapshot?
+
+    func markOutboxSending(clientMessageID: String) async throws
+
+    func markOutboxFailed(
+        clientMessageID: String,
+        errorCode: String?,
+        nextRetryAt: Date?
+    ) async throws
+
+    func markOutboxPending(clientMessageID: String) async throws
+
+    func markOutboxSent(clientMessageID: String, serverMessageID: UUID) async throws
+
+    func deleteOutboxItem(clientMessageID: String) async throws
+
+    func deleteOutboxItems(conversationID: UUID) async throws
+
+    func resetStaleOutboxSendingItems() async throws -> Int
+
+    func clearOutbox() async throws
 }

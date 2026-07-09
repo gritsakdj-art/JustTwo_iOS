@@ -36,6 +36,13 @@ final class MessengerOutbox {
             }
         }
 
+        var textBody: String? {
+            switch self {
+            case .text(let payload): return payload.body
+            case .image: return nil
+            }
+        }
+
         var localFileURL: URL? {
             switch self {
             case .text: return nil
@@ -95,13 +102,51 @@ final class MessengerOutbox {
         session: SessionStore,
         router: AppRouter
     ) {
-        enqueueEntry(
-            conversationID: conversationID,
-            payload: .text(TextPayload(body: body, replyToID: replyToID)),
-            clientMessageID: clientMessageID,
+        registerPersistedTextEntry(
+            snapshot: MessengerOutboxItemSnapshot(
+                id: UUID().uuidString,
+                conversationID: conversationID.uuidString,
+                clientMessageID: clientMessageID,
+                kind: .text,
+                body: body,
+                replyToMessageID: replyToID?.uuidString,
+                status: .pending,
+                attemptCount: 0,
+                lastErrorCode: nil,
+                nextRetryAt: .now,
+                createdAt: .now,
+                updatedAt: .now,
+                lastAttemptAt: nil,
+                serverMessageID: nil
+            ),
             localMessageID: localMessageID,
             session: session,
             router: router
+        )
+    }
+
+    func registerPersistedTextEntry(
+        snapshot: MessengerOutboxItemSnapshot,
+        localMessageID: UUID,
+        session: SessionStore,
+        router: AppRouter
+    ) {
+        guard snapshot.kind == .text,
+              let conversationID = UUID(uuidString: snapshot.conversationID) else {
+            return
+        }
+
+        enqueueEntry(
+            conversationID: conversationID,
+            payload: .text(TextPayload(
+                body: snapshot.body,
+                replyToID: snapshot.replyToMessageID.flatMap(UUID.init(uuidString:))
+            )),
+            clientMessageID: snapshot.clientMessageID,
+            localMessageID: localMessageID,
+            session: session,
+            router: router,
+            skipTextPersistence: true
         )
     }
 
@@ -131,7 +176,8 @@ final class MessengerOutbox {
         clientMessageID: String,
         localMessageID: UUID,
         session: SessionStore,
-        router: AppRouter
+        router: AppRouter,
+        skipTextPersistence: Bool = false
     ) {
         guard entries[clientMessageID] == nil else { return }
 
@@ -159,13 +205,44 @@ final class MessengerOutbox {
             ]
         )
 
-        pumpConversationQueue(conversationID: conversationID, session: session, router: router)
+        if case .text = payload, !skipTextPersistence {
+            Task {
+                do {
+                    _ = try await MessengerLocalStore.shared.createTextOutboxItem(
+                        conversationID: conversationID,
+                        clientMessageID: clientMessageID,
+                        body: payload.textBody ?? "",
+                        replyToMessageID: payload.replyToID
+                    )
+                    MessengerDiagnostics.event(
+                        .outboxItemCreated,
+                        conversationID: conversationID,
+                        clientMessageID: clientMessageID,
+                        metadata: ["kind": "text"]
+                    )
+                } catch {
+                    MessengerDiagnostics.event(
+                        .outboxItemCreated,
+                        conversationID: conversationID,
+                        clientMessageID: clientMessageID,
+                        metadata: [
+                            "kind": "text",
+                            "errorCategory": MessengerDiagnostics.sanitizeError(error)
+                        ]
+                    )
+                }
+                pumpConversationQueueInternal(conversationID: conversationID, session: session, router: router)
+            }
+        } else {
+            pumpConversationQueueInternal(conversationID: conversationID, session: session, router: router)
+        }
     }
 
     func retry(
         clientMessageID: String,
         session: SessionStore,
-        router: AppRouter
+        router: AppRouter,
+        isManual: Bool = false
     ) {
         guard var entry = entries[clientMessageID], entry.state == .failed else { return }
         guard sendTasks[clientMessageID] == nil else {
@@ -187,14 +264,69 @@ final class MessengerOutbox {
         )
         MessengerConversationNotification.postMessagesDidChange(conversationID: entry.conversationID)
 
+        let event: MessengerDiagnosticEvent = isManual
+            ? .outboxManualRetry
+            : (entry.payload.kindName == "image" ? .imageOutboxRetryRequested : .outboxRetryRequested)
         MessengerDiagnostics.event(
-            entry.payload.kindName == "image" ? .imageOutboxRetryRequested : .outboxRetryRequested,
+            event,
             conversationID: entry.conversationID,
             clientMessageID: clientMessageID,
             metadata: ["kind": entry.payload.kindName]
         )
 
-        pumpConversationQueue(conversationID: entry.conversationID, session: session, router: router)
+        Task {
+            try? await MessengerLocalStore.shared.markOutboxPending(clientMessageID: clientMessageID)
+            pumpConversationQueue(conversationID: entry.conversationID, session: session, router: router)
+        }
+    }
+
+    func rehydrateTextItem(
+        snapshot: MessengerOutboxItemSnapshot,
+        localMessageID: UUID,
+        session: SessionStore,
+        router: AppRouter
+    ) {
+        guard snapshot.kind == .text else { return }
+        guard entries[snapshot.clientMessageID] == nil else { return }
+        guard let conversationID = UUID(uuidString: snapshot.conversationID) else { return }
+
+        let state: State
+        switch snapshot.status {
+        case .pending:
+            state = .queued
+        case .sending:
+            state = .sending
+        case .failed:
+            state = .failed
+        case .sent, .cancelled:
+            return
+        }
+
+        let entry = Entry(
+            clientMessageID: snapshot.clientMessageID,
+            conversationID: conversationID,
+            payload: .text(TextPayload(
+                body: snapshot.body,
+                replyToID: snapshot.replyToMessageID.flatMap(UUID.init(uuidString:))
+            )),
+            localMessageID: localMessageID,
+            createdAt: snapshot.createdAt,
+            state: state,
+            lastError: snapshot.lastErrorCode,
+            serverMessageID: snapshot.serverMessageID.flatMap(UUID.init(uuidString:))
+        )
+        entries[snapshot.clientMessageID] = entry
+        if !conversationQueues[conversationID, default: []].contains(snapshot.clientMessageID) {
+            conversationQueues[conversationID, default: []].append(snapshot.clientMessageID)
+        }
+    }
+
+    func pumpConversationQueue(
+        conversationID: UUID,
+        session: SessionStore,
+        router: AppRouter
+    ) {
+        pumpConversationQueueInternal(conversationID: conversationID, session: session, router: router)
     }
 
     func markSent(clientMessageID: String, serverMessageID: UUID) {
@@ -233,11 +365,12 @@ final class MessengerOutbox {
         )
     }
 
-    private func pumpConversationQueue(
+    private func pumpConversationQueueInternal(
         conversationID: UUID,
         session: SessionStore,
         router: AppRouter
     ) {
+        guard session.isFullyAuthenticated else { return }
         guard sendTasks.values.allSatisfy({ !$0.isCancelled }) else { return }
 
         let hasInFlight = entries.values.contains {
@@ -246,7 +379,7 @@ final class MessengerOutbox {
         guard !hasInFlight else { return }
 
         guard let nextClientMessageID = conversationQueues[conversationID]?.first(where: { id in
-            entries[id]?.state == .queued
+            entries[id]?.state == .queued && sendTasks[id] == nil
         }) else {
             return
         }
@@ -259,6 +392,7 @@ final class MessengerOutbox {
         session: SessionStore,
         router: AppRouter
     ) {
+        guard session.isFullyAuthenticated else { return }
         guard let entry = entries[clientMessageID], entry.state != .sent else { return }
         guard sendTasks[clientMessageID] == nil else { return }
 
@@ -268,6 +402,12 @@ final class MessengerOutbox {
             conversationID: entry.conversationID,
             state: .sending
         )
+
+        if entry.payload.kindName == "text" {
+            Task {
+                try? await MessengerLocalStore.shared.markOutboxSending(clientMessageID: clientMessageID)
+            }
+        }
 
         MessengerDiagnostics.event(
             .outboxSendStarted,
@@ -302,6 +442,31 @@ final class MessengerOutbox {
                 )
 
                 self.markSent(clientMessageID: clientMessageID, serverMessageID: mapped.id)
+
+                if currentEntry.payload.kindName == "text" {
+                    Task {
+                        do {
+                            try await MessengerLocalStore.shared.deleteOutboxItem(clientMessageID: clientMessageID)
+                            MessengerDiagnostics.event(
+                                .outboxItemCleared,
+                                conversationID: currentEntry.conversationID,
+                                clientMessageID: clientMessageID,
+                                metadata: ["reason": "sendSucceeded"]
+                            )
+                        } catch {
+                            MessengerDiagnostics.event(
+                                .outboxItemCleared,
+                                conversationID: currentEntry.conversationID,
+                                clientMessageID: clientMessageID,
+                                metadata: [
+                                    "reason": "sendSucceededDeleteFailed",
+                                    "errorCategory": MessengerDiagnostics.sanitizeError(error)
+                                ]
+                            )
+                        }
+                    }
+                }
+
                 ConversationListViewModel.shared.applyOutgoingConfirmed(
                     conversationID: currentEntry.conversationID,
                     message: dto,
@@ -340,7 +505,7 @@ final class MessengerOutbox {
 
                 MessengerConversationNotification.postMessagesDidChange(conversationID: currentEntry.conversationID)
 
-                self.pumpConversationQueue(
+                self.pumpConversationQueueInternal(
                     conversationID: currentEntry.conversationID,
                     session: session,
                     router: router
@@ -496,6 +661,37 @@ final class MessengerOutbox {
             state: .failed
         )
 
+        if entry.payload.kindName == "text" {
+            let errorCode = MessengerDiagnostics.sanitizeError(error)
+            Task {
+                do {
+                    try await MessengerLocalStore.shared.markOutboxFailed(
+                        clientMessageID: clientMessageID,
+                        errorCode: errorCode,
+                        nextRetryAt: nil
+                    )
+                    if let snapshot = try await MessengerLocalStore.shared.fetchOutboxItem(clientMessageID: clientMessageID) {
+                        MessengerDiagnostics.event(
+                            .outboxRetryScheduled,
+                            conversationID: entry.conversationID,
+                            clientMessageID: clientMessageID,
+                            metadata: [
+                                "attemptCount": "\(snapshot.attemptCount)",
+                                "errorCode": errorCode
+                            ]
+                        )
+                    }
+                } catch {
+                    MessengerDiagnostics.event(
+                        .outboxRetryScheduled,
+                        conversationID: entry.conversationID,
+                        clientMessageID: clientMessageID,
+                        metadata: ["errorCategory": MessengerDiagnostics.sanitizeError(error)]
+                    )
+                }
+            }
+        }
+
         MessengerDiagnostics.event(
             .outboxSendFailed,
             conversationID: entry.conversationID,
@@ -513,6 +709,30 @@ final class MessengerOutbox {
             _ = MessengerSessionSupport.handleNetworkError(networkError, session: session, router: router)
         }
 
-        pumpConversationQueue(conversationID: entry.conversationID, session: session, router: router)
+        pumpConversationQueueInternal(conversationID: entry.conversationID, session: session, router: router)
+    }
+
+    static func clearPersistedOutboxItem(clientMessageID: String, conversationID: UUID, reason: String) {
+        Task {
+            do {
+                try await MessengerLocalStore.shared.deleteOutboxItem(clientMessageID: clientMessageID)
+                MessengerDiagnostics.event(
+                    .outboxItemCleared,
+                    conversationID: conversationID,
+                    clientMessageID: clientMessageID,
+                    metadata: ["reason": reason]
+                )
+            } catch {
+                MessengerDiagnostics.event(
+                    .outboxItemCleared,
+                    conversationID: conversationID,
+                    clientMessageID: clientMessageID,
+                    metadata: [
+                        "reason": "\(reason)Failed",
+                        "errorCategory": MessengerDiagnostics.sanitizeError(error)
+                    ]
+                )
+            }
+        }
     }
 }

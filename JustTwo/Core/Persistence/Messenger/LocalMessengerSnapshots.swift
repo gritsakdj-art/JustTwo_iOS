@@ -103,3 +103,50 @@ struct LocalMessengerSyncMetadataSnapshot: Sendable, Equatable {
     let schemaVersion: Int
     let localUpdatedAt: Date
 }
+
+enum MessengerOutboxItemKind: String, Sendable, Equatable {
+    case text
+}
+
+enum MessengerOutboxItemStatus: String, Sendable, Equatable {
+    case pending
+    case sending
+    case failed
+    case sent
+    case cancelled
+}
+
+struct MessengerOutboxItemSnapshot: Sendable, Equatable, Identifiable {
+    let id: String
+    let conversationID: String
+    let clientMessageID: String
+    let kind: MessengerOutboxItemKind
+    let body: String
+    let replyToMessageID: String?
+    let status: MessengerOutboxItemStatus
+    let attemptCount: Int
+    let lastErrorCode: String?
+    let nextRetryAt: Date?
+    let createdAt: Date
+    let updatedAt: Date
+    let lastAttemptAt: Date?
+    let serverMessageID: String?
+}
+
+enum MessengerOutboxRetryPolicy {
+    /// Stale `sending` jobs older than this are reset to `pending` on relaunch.
+    static let staleSendingThreshold: TimeInterval = 120
+
+    static func nextRetryDate(afterAttemptCount attemptCount: Int, from now: Date = .now) -> Date {
+        switch attemptCount {
+        case 0, 1:
+            return now
+        case 2:
+            return now.addingTimeInterval(5)
+        case 3:
+            return now.addingTimeInterval(15)
+        default:
+            return now.addingTimeInterval(60)
+        }
+    }
+}

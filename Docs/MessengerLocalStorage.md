@@ -12,7 +12,9 @@ On-device messenger persistence using SwiftData.
 | PR15D | Offline-friendly splash + startup session snapshot | ✅ |
 | PR15E | Persistent media disk cache for message attachments | ✅ |
 | PR15F | Messenger startup/request optimization | ✅ |
-| PR16 | Persistent outbox | planned |
+| PR16A | Persistent text outbox | ✅ (pending manual smoke) |
+| PR16B | Persistent image outbox | planned |
+| PR16C | Outbox retry polish / scheduler | planned |
 | PR17 | Full sync engine | planned |
 
 ## PR15D — Offline-friendly startup
@@ -347,6 +349,36 @@ Six messenger entities (plus `Item.self` in app container):
 | `Shared/Views/Chats/ViewModels/ConversationListViewModel.swift` | Cache-first list load |
 | `Shared/Views/Chats/ViewModels/ChatViewModel.swift` | Cache-first chat load + resilient loading |
 | `Shared/Views/Chats/MessageCacheStore.swift` | In-memory cache + REST persist hooks |
+
+## PR16A — Persistent text outbox
+
+Text-only durable send queue stored alongside messenger SwiftData cache.
+
+### Relationship to local message cache
+
+| Layer | Role |
+|-------|------|
+| `LocalMessengerMessage` | Confirmed/hydrated server messages (+ optional `localState` for UI) |
+| `LocalMessengerOutboxItem` | Pending/failed **outgoing text** jobs with resend `body` |
+| `MessageCacheStore` | Runtime optimistic bubbles + merge/reconcile |
+| `MessengerOutbox` | In-memory send coordinator (text jobs persisted before pump) |
+
+Outbox rows are **not** a replacement for confirmed message cache. On success, outbox row is deleted and confirmed `MessageDTO` is persisted via existing `MessengerMessageCacheService` paths.
+
+### Schema note (v3)
+
+PR16A adds `LocalMessengerOutboxItem`. Schema version is `3` (`MessengerPersistence.schemaVersion`). If the on-device store cannot open, `AppModelContainerFactory` recreates it once (same policy as PR15E v2 migration).
+
+See [Messenger Outbox](MessengerOutbox.md) for lifecycle, retry, reconciliation, and privacy rules.
+
+### File map (PR16A additions)
+
+| Path | Responsibility |
+|------|----------------|
+| `Core/Persistence/Messenger/Entities/LocalMessengerOutboxItem.swift` | SwiftData outbox entity |
+| `Shared/Views/Chats/MessengerOutboxProcessor.swift` | Recovery, rehydrate, auto-retry |
+| `Shared/Views/Chats/MessengerOutbox.swift` | Send queue + text persistence hooks |
+| `JustTwoTests/MessengerOutboxTests.swift` | Outbox store + reconcile tests |
 | `Shared/Views/Chats/MessengerDeltaSyncService.swift` | Delta → local cache writes |
 | `JustTwoTests/MessengerConversationCacheTests.swift` | PR15B focused tests |
 | `JustTwoTests/MessengerMessageCacheTests.swift` | PR15C focused tests |

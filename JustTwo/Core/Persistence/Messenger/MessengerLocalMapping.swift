@@ -411,6 +411,73 @@ enum MessengerLocalMapping {
     static func receiptIdentity(conversationID: String, profileID: String) -> String {
         "\(conversationID):\(profileID)"
     }
+
+    static func mapOutboxItem(
+        conversationID: UUID,
+        clientMessageID: String,
+        body: String,
+        replyToMessageID: UUID?,
+        status: MessengerOutboxItemStatus,
+        attemptCount: Int,
+        lastErrorCode: String?,
+        nextRetryAt: Date?,
+        createdAt: Date,
+        updatedAt: Date,
+        lastAttemptAt: Date?,
+        serverMessageID: UUID?
+    ) -> LocalMessengerOutboxItem {
+        LocalMessengerOutboxItem(
+            id: UUID().uuidString,
+            conversationID: conversationID.uuidString,
+            clientMessageID: clientMessageID,
+            kind: MessengerOutboxItemKind.text.rawValue,
+            body: body,
+            replyToMessageID: replyToMessageID?.uuidString,
+            status: status.rawValue,
+            attemptCount: attemptCount,
+            lastErrorCode: lastErrorCode,
+            nextRetryAt: nextRetryAt,
+            createdAt: createdAt,
+            updatedAt: updatedAt,
+            lastAttemptAt: lastAttemptAt,
+            serverMessageID: serverMessageID?.uuidString
+        )
+    }
+
+    static func outboxSnapshot(from entity: LocalMessengerOutboxItem) -> MessengerOutboxItemSnapshot {
+        MessengerOutboxItemSnapshot(
+            id: entity.id,
+            conversationID: entity.conversationID,
+            clientMessageID: entity.clientMessageID,
+            kind: MessengerOutboxItemKind(rawValue: entity.kind) ?? .text,
+            body: entity.body,
+            replyToMessageID: entity.replyToMessageID,
+            status: MessengerOutboxItemStatus(rawValue: entity.status) ?? .pending,
+            attemptCount: entity.attemptCount,
+            lastErrorCode: entity.lastErrorCode,
+            nextRetryAt: entity.nextRetryAt,
+            createdAt: entity.createdAt,
+            updatedAt: entity.updatedAt,
+            lastAttemptAt: entity.lastAttemptAt,
+            serverMessageID: entity.serverMessageID
+        )
+    }
+
+    static func applyOutboxSnapshot(_ snapshot: MessengerOutboxItemSnapshot, to entity: LocalMessengerOutboxItem) {
+        entity.conversationID = snapshot.conversationID
+        entity.clientMessageID = snapshot.clientMessageID
+        entity.kind = snapshot.kind.rawValue
+        entity.body = snapshot.body
+        entity.replyToMessageID = snapshot.replyToMessageID
+        entity.status = snapshot.status.rawValue
+        entity.attemptCount = snapshot.attemptCount
+        entity.lastErrorCode = snapshot.lastErrorCode
+        entity.nextRetryAt = snapshot.nextRetryAt
+        entity.createdAt = snapshot.createdAt
+        entity.updatedAt = snapshot.updatedAt
+        entity.lastAttemptAt = snapshot.lastAttemptAt
+        entity.serverMessageID = snapshot.serverMessageID
+    }
 }
 
 #if DEBUG

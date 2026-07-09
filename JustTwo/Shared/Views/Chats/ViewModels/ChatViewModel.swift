@@ -218,6 +218,19 @@ final class ChatViewModel {
             )
         }
 
+        Task {
+            if let profileID = try? await MessengerSessionSupport.resolveCurrentProfileID(session: session) {
+                await MessengerOutboxProcessor.shared.reconcileConversation(
+                    conversationID: conversation.id,
+                    currentProfileID: profileID,
+                    session: session,
+                    router: router
+                )
+                guard generation == lifecycleGeneration, isOpen else { return }
+                syncMessagesFromCache()
+            }
+        }
+
         MessengerDiagnostics.event(
             .chatOpenCompleted,
             conversationID: conversation.id,
@@ -471,12 +484,14 @@ final class ChatViewModel {
 
     func retryFailedMessage(_ message: ChatMessage, session: SessionStore, router: AppRouter) {
         guard let clientMessageID = message.clientMessageID, message.canRetrySend else { return }
-        MessengerOutbox.shared.retry(
-            clientMessageID: clientMessageID,
-            session: session,
-            router: router
-        )
-        syncMessagesFromCache()
+        Task {
+            await MessengerOutboxProcessor.shared.manualRetry(
+                clientMessageID: clientMessageID,
+                session: session,
+                router: router
+            )
+            syncMessagesFromCache()
+        }
     }
 
     func send(session: SessionStore, router: AppRouter) {
@@ -501,46 +516,74 @@ final class ChatViewModel {
         let clientMessageID = UUID().uuidString
         let replyPreview = currentReplyPreview()
 
-        let optimistic = ChatMessage.optimisticOutgoing(
-            clientMessageID: clientMessageID,
-            body: trimmed,
-            replyPreview: replyPreview
-        )
-
-        messageCache.insertOptimisticMessage(optimistic, for: conversation.id)
-        syncMessagesFromCache()
-
         draftText = ""
         replyTarget = nil
         errorMessage = nil
         typingEmitter.messageSent()
 
-        MessengerDiagnostics.event(
-            .sendStarted,
-            conversationID: conversation.id,
-            clientMessageID: clientMessageID,
-            metadata: [
-                "draftCleared": "true",
-                "hasReply": "\(activeReplyTarget != nil)",
-                "optimistic": "true"
-            ]
-        )
+        Task {
+            do {
+                let snapshot = try await MessengerLocalStore.shared.createTextOutboxItem(
+                    conversationID: conversation.id,
+                    clientMessageID: clientMessageID,
+                    body: trimmed,
+                    replyToMessageID: activeReplyTarget?.id
+                )
 
-        ConversationListViewModel.shared.applyOptimisticOutgoing(
-            conversationID: conversation.id,
-            previewText: trimmed,
-            sentAt: optimistic.createdAt
-        )
+                MessengerDiagnostics.event(
+                    .outboxItemCreated,
+                    conversationID: conversation.id,
+                    clientMessageID: snapshot.clientMessageID,
+                    metadata: ["kind": "text", "status": snapshot.status.rawValue]
+                )
 
-        MessengerOutbox.shared.enqueue(
-            conversationID: conversation.id,
-            body: trimmed,
-            replyToID: activeReplyTarget?.id,
-            clientMessageID: clientMessageID,
-            localMessageID: optimistic.id,
-            session: session,
-            router: router
-        )
+                let optimistic = ChatMessage.optimisticOutgoing(
+                    clientMessageID: snapshot.clientMessageID,
+                    body: snapshot.body,
+                    replyPreview: replyPreview,
+                    createdAt: snapshot.createdAt
+                )
+
+                messageCache.insertOptimisticMessage(optimistic, for: conversation.id)
+                syncMessagesFromCache()
+
+                MessengerDiagnostics.event(
+                    .sendStarted,
+                    conversationID: conversation.id,
+                    clientMessageID: snapshot.clientMessageID,
+                    metadata: [
+                        "draftCleared": "true",
+                        "hasReply": "\(activeReplyTarget != nil)",
+                        "optimistic": "true"
+                    ]
+                )
+
+                ConversationListViewModel.shared.applyOptimisticOutgoing(
+                    conversationID: conversation.id,
+                    previewText: snapshot.body,
+                    sentAt: optimistic.createdAt
+                )
+
+                MessengerOutbox.shared.registerPersistedTextEntry(
+                    snapshot: snapshot,
+                    localMessageID: optimistic.id,
+                    session: session,
+                    router: router
+                )
+            } catch {
+                draftText = trimmed
+                if activeReplyTarget != nil {
+                    replyTarget = activeReplyTarget
+                }
+                errorMessage = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+                MessengerDiagnostics.event(
+                    .sendFailed,
+                    conversationID: conversation.id,
+                    clientMessageID: clientMessageID,
+                    metadata: ["errorCategory": MessengerDiagnostics.sanitizeError(error)]
+                )
+            }
+        }
     }
 
 

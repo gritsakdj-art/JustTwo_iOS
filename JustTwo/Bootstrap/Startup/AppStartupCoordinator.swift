@@ -52,6 +52,8 @@ final class AppStartupCoordinator {
         MessengerDiagnostics.event(.startupCriticalLocalWarmupStarted)
 
         let task = Task { @MainActor in
+            await MessengerOutboxProcessor.shared.recoverOnLaunch()
+
             let cachedConversationCount = await ConversationsStartupLoader.shared.loadLocalWarmupIfNeeded(
                 session: session,
                 router: router
@@ -156,6 +158,11 @@ final class AppStartupCoordinator {
             force: force
         )
 
+        MessengerOutboxProcessor.shared.activate(session: session, router: router)
+        Task {
+            await MessengerOutboxProcessor.shared.processReadyItems(session: session, router: router)
+        }
+
         Task {
             await MessengerMediaCacheService.runCleanupIfNeeded()
         }
@@ -211,6 +218,7 @@ final class AppStartupCoordinator {
         MessagesStartupLoader.shared.reset()
         MessageCacheStore.shared.reset()
         MessengerOutbox.shared.clear()
+        MessengerOutboxProcessor.shared.deactivate()
         MessengerDeltaSyncService.shared.reset()
         ConversationListViewModel.shared.reset()
 

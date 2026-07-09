@@ -235,6 +235,22 @@
 - Updated `Docs/StartupLoading.md`, `Docs/MessengerLocalStorage.md`, `Docs/MessengerMediaCache.md`, `Docs/Realtime.md`.
 - Out of scope: persistent outbox, sync cursor, backend changes.
 
+## 2026-07-09 (PR16A)
+
+### Persistent text outbox foundation
+
+- Added `LocalMessengerOutboxItem` SwiftData entity (schema v3) for durable text send jobs with stable `clientMessageID`.
+- Extended `MessengerLocalStore` with outbox CRUD, stale `sending` recovery, and logout reset via `resetAllMessengerData`.
+- `MessengerOutbox` persists text jobs before pump, updates status on send/fail, deletes row on success.
+- Added `MessengerOutboxProcessor` for relaunch recovery, chat rehydrate, manual retry, and network-restore auto-retry.
+- `ChatViewModel` reconciles outbox on chat open; failed bubble retry routes through processor.
+- Reconciliation clears outbox when REST/realtime/delta confirms same `clientMessageID`.
+- Added privacy-safe outbox diagnostics events; message body never exported.
+- Added `Docs/MessengerOutbox.md`, updated `Docs/MessengerLocalStorage.md`.
+- Added `JustTwoTests/MessengerOutboxTests.swift`.
+- **Manual smoke:** not run (checklist in PR16A report).
+- Out of scope: image outbox, upload retry, full sync engine (PR16B/PR16C).
+
 ## Notes
 
 - Continue adding completed changes here after each meaningful update.

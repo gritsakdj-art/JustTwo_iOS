@@ -139,6 +139,12 @@ enum MessengerDiagnosticEvent: String, Sendable {
     case outboxReconciledFromRealtime
     case outboxPreservedDuringFetch
     case outboxClearedOnLogout
+    case outboxItemCreated
+    case outboxRetryScheduled
+    case outboxManualRetry
+    case outboxItemCleared
+    case outboxReset
+    case outboxRehydrated
 
     case imagePicked
     case imagePrepareStarted

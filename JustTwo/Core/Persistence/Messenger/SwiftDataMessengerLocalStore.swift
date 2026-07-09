@@ -302,6 +302,196 @@ final class SwiftDataMessengerLocalStore: MessengerLocalStoreProtocol {
         let attachments = try context.fetch(descriptor)
         return Set(attachments.compactMap { $0.localCacheKey ?? $0.id })
     }
+
+    func createTextOutboxItem(
+        conversationID: UUID,
+        clientMessageID: String,
+        body: String,
+        replyToMessageID: UUID?
+    ) async throws -> MessengerOutboxItemSnapshot {
+        let context = modelContext
+        let now = Date()
+
+        if let existing = try fetchOutboxEntity(clientMessageID: clientMessageID, context: context) {
+            return MessengerLocalMapping.outboxSnapshot(from: existing)
+        }
+
+        let mapped = MessengerLocalMapping.mapOutboxItem(
+            conversationID: conversationID,
+            clientMessageID: clientMessageID,
+            body: body,
+            replyToMessageID: replyToMessageID,
+            status: .pending,
+            attemptCount: 0,
+            lastErrorCode: nil,
+            nextRetryAt: now,
+            createdAt: now,
+            updatedAt: now,
+            lastAttemptAt: nil,
+            serverMessageID: nil
+        )
+        context.insert(mapped)
+        try context.save()
+        return MessengerLocalMapping.outboxSnapshot(from: mapped)
+    }
+
+    func fetchPendingOutboxItems() async throws -> [MessengerOutboxItemSnapshot] {
+        let context = modelContext
+        let now = Date()
+        let pendingStatus = MessengerOutboxItemStatus.pending.rawValue
+        let failedStatus = MessengerOutboxItemStatus.failed.rawValue
+        let sendingStatus = MessengerOutboxItemStatus.sending.rawValue
+
+        let descriptor = FetchDescriptor<LocalMessengerOutboxItem>(
+            predicate: #Predicate { item in
+                item.status == pendingStatus
+                    || item.status == failedStatus
+                    || item.status == sendingStatus
+            },
+            sortBy: [SortDescriptor(\.createdAt, order: .forward)]
+        )
+
+        return try context.fetch(descriptor)
+            .map(MessengerLocalMapping.outboxSnapshot(from:))
+            .filter { snapshot in
+                switch snapshot.status {
+                case .pending, .sending:
+                    return true
+                case .failed:
+                    guard let nextRetryAt = snapshot.nextRetryAt else { return true }
+                    return nextRetryAt <= now
+                case .sent, .cancelled:
+                    return false
+                }
+            }
+    }
+
+    func fetchOutboxItems(conversationID: UUID) async throws -> [MessengerOutboxItemSnapshot] {
+        let context = modelContext
+        let conversationKey = conversationID.uuidString
+        let descriptor = FetchDescriptor<LocalMessengerOutboxItem>(
+            predicate: #Predicate { $0.conversationID == conversationKey },
+            sortBy: [SortDescriptor(\.createdAt, order: .forward)]
+        )
+        return try context.fetch(descriptor).map(MessengerLocalMapping.outboxSnapshot(from:))
+    }
+
+    func fetchOutboxItem(clientMessageID: String) async throws -> MessengerOutboxItemSnapshot? {
+        let context = modelContext
+        guard let entity = try fetchOutboxEntity(clientMessageID: clientMessageID, context: context) else {
+            return nil
+        }
+        return MessengerLocalMapping.outboxSnapshot(from: entity)
+    }
+
+    func markOutboxSending(clientMessageID: String) async throws {
+        let context = modelContext
+        guard let entity = try fetchOutboxEntity(clientMessageID: clientMessageID, context: context) else {
+            return
+        }
+        let now = Date()
+        entity.status = MessengerOutboxItemStatus.sending.rawValue
+        entity.lastAttemptAt = now
+        entity.updatedAt = now
+        try context.save()
+    }
+
+    func markOutboxFailed(
+        clientMessageID: String,
+        errorCode: String?,
+        nextRetryAt: Date?
+    ) async throws {
+        let context = modelContext
+        guard let entity = try fetchOutboxEntity(clientMessageID: clientMessageID, context: context) else {
+            return
+        }
+        let now = Date()
+        entity.attemptCount += 1
+        entity.status = MessengerOutboxItemStatus.failed.rawValue
+        entity.lastErrorCode = errorCode
+        entity.nextRetryAt = nextRetryAt ?? MessengerOutboxRetryPolicy.nextRetryDate(
+            afterAttemptCount: entity.attemptCount,
+            from: now
+        )
+        entity.updatedAt = now
+        try context.save()
+    }
+
+    func markOutboxPending(clientMessageID: String) async throws {
+        let context = modelContext
+        guard let entity = try fetchOutboxEntity(clientMessageID: clientMessageID, context: context) else {
+            return
+        }
+        let now = Date()
+        entity.status = MessengerOutboxItemStatus.pending.rawValue
+        entity.nextRetryAt = now
+        entity.updatedAt = now
+        try context.save()
+    }
+
+    func markOutboxSent(clientMessageID: String, serverMessageID: UUID) async throws {
+        let context = modelContext
+        guard let entity = try fetchOutboxEntity(clientMessageID: clientMessageID, context: context) else {
+            return
+        }
+        let now = Date()
+        entity.status = MessengerOutboxItemStatus.sent.rawValue
+        entity.serverMessageID = serverMessageID.uuidString
+        entity.updatedAt = now
+        try context.save()
+    }
+
+    func deleteOutboxItem(clientMessageID: String) async throws {
+        let context = modelContext
+        guard let entity = try fetchOutboxEntity(clientMessageID: clientMessageID, context: context) else {
+            return
+        }
+        context.delete(entity)
+        try context.save()
+    }
+
+    func deleteOutboxItems(conversationID: UUID) async throws {
+        let context = modelContext
+        let conversationKey = conversationID.uuidString
+        let descriptor = FetchDescriptor<LocalMessengerOutboxItem>(
+            predicate: #Predicate { $0.conversationID == conversationKey }
+        )
+        for entity in try context.fetch(descriptor) {
+            context.delete(entity)
+        }
+        try context.save()
+    }
+
+    func resetStaleOutboxSendingItems() async throws -> Int {
+        let context = modelContext
+        let sendingStatus = MessengerOutboxItemStatus.sending.rawValue
+        let descriptor = FetchDescriptor<LocalMessengerOutboxItem>(
+            predicate: #Predicate { $0.status == sendingStatus }
+        )
+        let threshold = Date().addingTimeInterval(-MessengerOutboxRetryPolicy.staleSendingThreshold)
+        var resetCount = 0
+        let now = Date()
+
+        for entity in try context.fetch(descriptor) {
+            let referenceDate = entity.lastAttemptAt ?? entity.updatedAt
+            guard referenceDate <= threshold else { continue }
+            entity.status = MessengerOutboxItemStatus.pending.rawValue
+            entity.nextRetryAt = now
+            entity.updatedAt = now
+            resetCount += 1
+        }
+
+        if resetCount > 0 {
+            try context.save()
+        }
+        return resetCount
+    }
+
+    func clearOutbox() async throws {
+        let context = modelContext
+        try context.delete(model: LocalMessengerOutboxItem.self)
+        try context.save()
+    }
 }
 
 // MARK: - Private helpers
@@ -493,6 +683,17 @@ private extension SwiftDataMessengerLocalStore {
         for reaction in try context.fetch(descriptor) {
             context.delete(reaction)
         }
+    }
+
+    func fetchOutboxEntity(
+        clientMessageID: String,
+        context: ModelContext
+    ) throws -> LocalMessengerOutboxItem? {
+        var descriptor = FetchDescriptor<LocalMessengerOutboxItem>(
+            predicate: #Predicate { $0.clientMessageID == clientMessageID }
+        )
+        descriptor.fetchLimit = 1
+        return try context.fetch(descriptor).first
     }
 }
 

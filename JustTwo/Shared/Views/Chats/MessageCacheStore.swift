@@ -123,6 +123,12 @@ final class MessageCacheStore {
             metadata: ["source": source.rawValue]
         )
 
+        MessengerOutbox.clearPersistedOutboxItem(
+            clientMessageID: clientMessageID,
+            conversationID: conversationID,
+            reason: source == .realtime ? "reconciledFromRealtime" : "reconciledFromREST"
+        )
+
         return true
     }
 
@@ -892,6 +898,11 @@ final class MessageCacheStore {
                 )
                 mergedByID[message.id] = merged
                 MessengerOutbox.shared.markSent(clientMessageID: clientMessageID, serverMessageID: message.id)
+                MessengerOutbox.clearPersistedOutboxItem(
+                    clientMessageID: clientMessageID,
+                    conversationID: conversationID,
+                    reason: "reconciledFromFetch"
+                )
                 continue
             }
 

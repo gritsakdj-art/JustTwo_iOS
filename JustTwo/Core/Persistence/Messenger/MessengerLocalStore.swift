@@ -301,6 +301,99 @@ final class MessengerLocalStore: MessengerLocalStoreProtocol {
         }
     }
 
+    func createTextOutboxItem(
+        conversationID: UUID,
+        clientMessageID: String,
+        body: String,
+        replyToMessageID: UUID?
+    ) async throws -> MessengerOutboxItemSnapshot {
+        try await performSessionBoundOperation(operation: "createTextOutboxItem") {
+            try await backingStore.createTextOutboxItem(
+                conversationID: conversationID,
+                clientMessageID: clientMessageID,
+                body: body,
+                replyToMessageID: replyToMessageID
+            )
+        }
+    }
+
+    func fetchPendingOutboxItems() async throws -> [MessengerOutboxItemSnapshot] {
+        try await performSessionBoundOperation(operation: "fetchPendingOutboxItems") {
+            try await backingStore.fetchPendingOutboxItems()
+        }
+    }
+
+    func fetchOutboxItems(conversationID: UUID) async throws -> [MessengerOutboxItemSnapshot] {
+        try await performSessionBoundOperation(operation: "fetchOutboxItems") {
+            try await backingStore.fetchOutboxItems(conversationID: conversationID)
+        }
+    }
+
+    func fetchOutboxItem(clientMessageID: String) async throws -> MessengerOutboxItemSnapshot? {
+        try await performSessionBoundOperation(operation: "fetchOutboxItem") {
+            try await backingStore.fetchOutboxItem(clientMessageID: clientMessageID)
+        }
+    }
+
+    func markOutboxSending(clientMessageID: String) async throws {
+        try await performSessionBoundOperation(operation: "markOutboxSending") {
+            try await backingStore.markOutboxSending(clientMessageID: clientMessageID)
+        }
+    }
+
+    func markOutboxFailed(
+        clientMessageID: String,
+        errorCode: String?,
+        nextRetryAt: Date?
+    ) async throws {
+        try await performSessionBoundOperation(operation: "markOutboxFailed") {
+            try await backingStore.markOutboxFailed(
+                clientMessageID: clientMessageID,
+                errorCode: errorCode,
+                nextRetryAt: nextRetryAt
+            )
+        }
+    }
+
+    func markOutboxPending(clientMessageID: String) async throws {
+        try await performSessionBoundOperation(operation: "markOutboxPending") {
+            try await backingStore.markOutboxPending(clientMessageID: clientMessageID)
+        }
+    }
+
+    func markOutboxSent(clientMessageID: String, serverMessageID: UUID) async throws {
+        try await performSessionBoundOperation(operation: "markOutboxSent") {
+            try await backingStore.markOutboxSent(
+                clientMessageID: clientMessageID,
+                serverMessageID: serverMessageID
+            )
+        }
+    }
+
+    func deleteOutboxItem(clientMessageID: String) async throws {
+        try await performSessionBoundOperation(operation: "deleteOutboxItem") {
+            try await backingStore.deleteOutboxItem(clientMessageID: clientMessageID)
+        }
+    }
+
+    func deleteOutboxItems(conversationID: UUID) async throws {
+        try await performSessionBoundOperation(operation: "deleteOutboxItems") {
+            try await backingStore.deleteOutboxItems(conversationID: conversationID)
+        }
+    }
+
+    func resetStaleOutboxSendingItems() async throws -> Int {
+        try await performSessionBoundOperation(operation: "resetStaleOutboxSendingItems") {
+            try await backingStore.resetStaleOutboxSendingItems()
+        }
+    }
+
+    func clearOutbox() async throws {
+        try await performSessionBoundOperation(operation: "clearOutbox") {
+            try await backingStore.clearOutbox()
+        }
+    }
+
     private func performSessionBoundOperation<T>(
         operation: String,
         _ work: () async throws -> T

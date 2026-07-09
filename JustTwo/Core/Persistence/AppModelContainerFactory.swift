@@ -12,6 +12,7 @@ enum AppModelContainerFactory {
             LocalMessengerReactionAggregate.self,
             LocalMessengerReceipt.self,
             LocalMessengerSyncMetadata.self,
+            LocalMessengerOutboxItem.self,
         ])
 
         let storeURL = persistentStoreURL
