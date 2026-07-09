@@ -143,6 +143,7 @@ struct PrivateChatView: View {
                 ChatMessageContextMenuOverlay(
                     message: message,
                     anchor: viewModel.actionMenuAnchor,
+                    currentReactionEmoji: message.reactions.first(where: { $0.reactedByMe })?.emoji,
                     onReply: { viewModel.startReply(to: message) },
                     onCopy: { viewModel.copyMessage(message) },
                     onEdit: { viewModel.startEdit(message: message) },
@@ -347,10 +348,13 @@ struct PrivateChatView: View {
                     .padding(.top, 8)
                 }
                 .contentShape(Rectangle())
-                .onTapGesture {
-                    dismissKeyboard()
-                }
+                .simultaneousGesture(
+                    TapGesture().onEnded {
+                        dismissKeyboard()
+                    }
+                )
                 .scrollDismissesKeyboard(.interactively)
+                .scrollBounceBehavior(.always, axes: .vertical)
                 .scrollIndicators(.hidden)
                 .refreshable {
                     guard !usesPreviewData, viewModel.hasMoreOlderMessages else { return }
@@ -537,6 +541,7 @@ struct PrivateChatView: View {
             message: message,
             senderName: message.isMine ? nil : viewModel.conversation.title,
             onLongPress: { frame in
+                dismissKeyboard()
                 viewModel.openActionMenu(for: message, anchor: frame)
             },
             onRetry: message.canRetrySend ? {

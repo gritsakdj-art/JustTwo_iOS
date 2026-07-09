@@ -773,13 +773,24 @@ enum ChatMessageDateFormatting {
 }
 
 enum ChatQuickReactions {
-    static let rows: [[String]] = [
+    static let baseRows: [[String]] = [
         ["👍", "❤️", "😂", "😮", "😢", "🙏"],
         ["🔥", "👏", "🎉", "🤔", "😍", "🥰"],
         ["😡", "👎", "💯", "✨", "🫶", "😭"],
+        ["🤣", "😊", "😘", "😎", "🤩", "🙌"],
+        ["👌", "🤝", "💪", "🤯", "😱", "🥺"],
+        ["😅", "😆", "😋", "😜", "🤗", "😇"],
+        ["😏", "🙈", "🤷‍♀️", "🤷‍♂️", "🤦‍♀️", "🤦‍♂️"],
+        ["💔", "💖", "🌟", "⚡️", "🍾", "🎂"],
+        ["🥳", "😌", "🙄", "😬", "🤭", "🫡"],
+        ["🫠", "😤", "🤬", "😈", "👀", "💅"],
+        ["🤤", "😴", "🤐", "🤨", "😶", "😵‍💫"],
+        ["🌹", "💐", "🎁", "🏆", "✅", "☝️"],
     ]
 
     static let compactPreviewCount = 5
+    static let rowSize = 6
+    static let maxEmojiCount = 72
 
     static var compactPreview: [String] {
         Array(rows[0].prefix(compactPreviewCount))
@@ -788,4 +799,37 @@ enum ChatQuickReactions {
     static var allEmojis: [String] {
         rows.flatMap { $0 }
     }
+
+    static var rows: [[String]] {
+        stride(from: 0, to: orderedEmojis.count, by: rowSize).map { startIndex in
+            Array(orderedEmojis[startIndex..<min(startIndex + rowSize, orderedEmojis.count)])
+        }
+    }
+
+    static func recordUsage(_ emoji: String) {
+        guard baseEmojis.contains(emoji) else { return }
+        let recent = [emoji] + usageOrder.filter { $0 != emoji }
+        usageOrder = Array(recent.prefix(maxEmojiCount))
+    }
+
+    private static var orderedEmojis: [String] {
+        let recent = usageOrder.filter { baseEmojis.contains($0) }
+        let remaining = baseEmojis.filter { !recent.contains($0) }
+        return Array((recent + remaining).prefix(maxEmojiCount))
+    }
+
+    private static var baseEmojis: [String] {
+        baseRows.flatMap { $0 }
+    }
+
+    private static var usageOrder: [String] {
+        get {
+            UserDefaults.standard.stringArray(forKey: usageOrderKey) ?? []
+        }
+        set {
+            UserDefaults.standard.set(newValue, forKey: usageOrderKey)
+        }
+    }
+
+    private static let usageOrderKey = "chat.quickReactions.usageOrder.v1"
 }

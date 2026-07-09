@@ -6,6 +6,9 @@ import UIKit
 struct ChatMessageContextMenuOverlay: View {
     let message: ChatMessage
     let anchor: CGRect
+    /// Эмодзи текущей реакции пользователя на это сообщение (если есть).
+    /// Прокинь сюда, например, `message.reactions.first(where: { $0.reactedByMe })?.emoji`.
+    var currentReactionEmoji: String? = nil
     let onReply: () -> Void
     let onCopy: () -> Void
     let onEdit: () -> Void
@@ -16,55 +19,36 @@ struct ChatMessageContextMenuOverlay: View {
     @Environment(\.colorScheme) private var colorScheme
     @State private var areReactionsExpanded = false
 
+    // MARK: - Magnify gesture state (Пункт 3)
+
+    @State private var reactionFrames: [String: CGRect] = [:]
+    @State private var dragLocation: CGPoint? = nil
+    @State private var activeMagnifiedID: String? = nil
+
     private var reactionColumns: [GridItem] {
         Array(repeating: GridItem(.flexible(), spacing: Metrics.reactionsGridSpacing), count: 6)
     }
 
+    private var resolvedCurrentReactionEmoji: String? {
+        if let currentReactionEmoji {
+            return ReactionEmoji.normalized(currentReactionEmoji)
+        }
+        return message.reactions.first(where: { $0.reactedByMe }).map {
+            ReactionEmoji.normalized($0.emoji)
+        }
+    }
+
     var body: some View {
         GeometryReader { geometry in
-            let localAnchor = anchorInLocalSpace(anchor, container: geometry)
-            let contentTop = effectiveContentTop(in: geometry)
-            let contentBottom = effectiveContentBottom(in: geometry)
-            let panelLeadingX = panelLeadingX(in: geometry, localAnchor: localAnchor)
-            let placement = menuPlacement(
-                anchor: localAnchor,
-                contentTop: contentTop,
-                contentBottom: contentBottom,
-                containerHeight: geometry.size.height
-            )
-            let positions = panelPositions(
-                placement: placement,
-                anchor: localAnchor,
-                contentTop: contentTop,
-                contentBottom: contentBottom,
-                containerHeight: geometry.size.height
-            )
-            let cutout = messageCutoutRect(for: localAnchor)
-
-            ZStack(alignment: .topLeading) {
-                dimmingBackground(cutout: cutout)
+            ZStack {
+                dimmingBackground
                     .onTapGesture(perform: onDismiss)
 
-                messageCutoutGlow(cutout: cutout)
-
-                if message.canReact, let reactionsY = positions.reactionsCenterY {
-                    reactionsPanel
-                        .frame(width: Metrics.panelWidth)
-                        .position(
-                            x: panelLeadingX + Metrics.panelWidth / 2,
-                            y: reactionsY
-                        )
-                }
-
-                actionsPanel
-                    .frame(width: Metrics.panelWidth)
-                    .position(
-                        x: panelLeadingX + Metrics.panelWidth / 2,
-                        y: positions.actionsCenterY
-                    )
+                centeredContextMenu(in: geometry)
             }
+            .frame(width: geometry.size.width, height: geometry.size.height)
         }
-        .ignoresSafeArea()
+        .ignoresSafeArea(.all, edges: .all)
         .onAppear {
             areReactionsExpanded = false
         }
@@ -73,54 +57,75 @@ struct ChatMessageContextMenuOverlay: View {
 
     // MARK: - Background
 
-    private func dimmingBackground(cutout: CGRect) -> some View {
+    private var dimmingBackground: some View {
         ZStack {
             Rectangle()
                 .fill(.ultraThinMaterial)
             Rectangle()
                 .fill(colorScheme == .dark
                     ? Color.black.opacity(Metrics.dimmingTintDark)
-                    : Color.white.opacity(Metrics.dimmingTintLight))
+                    : Color.black.opacity(Metrics.dimmingTintLight))
         }
-        .mask {
-            Rectangle()
-                .fill(Color.white)
-                .overlay {
-                    RoundedRectangle(cornerRadius: Metrics.messageCutoutCornerRadius, style: .continuous)
-                        .frame(width: cutout.width, height: cutout.height)
-                        .position(x: cutout.midX, y: cutout.midY)
-                        .blendMode(.destinationOut)
-                }
-                .compositingGroup()
-        }
-        .ignoresSafeArea()
+        .ignoresSafeArea(.all, edges: .all)
     }
 
-    private func messageCutoutGlow(cutout: CGRect) -> some View {
-        RoundedRectangle(cornerRadius: Metrics.messageCutoutCornerRadius, style: .continuous)
-            .strokeBorder(
-                Color.white.opacity(colorScheme == .dark
-                    ? Metrics.messageCutoutStrokeOpacityDark
-                    : Metrics.messageCutoutStrokeOpacityLight),
-                lineWidth: Metrics.messageCutoutStrokeWidth
-            )
-            .shadow(
-                color: Color.black.opacity(colorScheme == .dark
-                    ? Metrics.messageCutoutShadowOpacityDark
-                    : Metrics.messageCutoutShadowOpacityLight),
-                radius: Metrics.messageCutoutShadowRadius,
-                y: Metrics.messageCutoutShadowYOffset
-            )
-            .frame(width: cutout.width, height: cutout.height)
-            .position(x: cutout.midX, y: cutout.midY)
-            .allowsHitTesting(false)
-    }
-
-    private func messageCutoutRect(for anchor: CGRect) -> CGRect {
-        anchor.insetBy(
-            dx: -Metrics.messageCutoutPadding,
-            dy: -Metrics.messageCutoutPadding
+    private func centeredContextMenu(in geometry: GeometryProxy) -> some View {
+        let bubbleMaxWidth = min(
+            geometry.size.width - Metrics.centerHorizontalPadding * 2,
+            Metrics.previewBubbleMaxWidth
         )
+        let topInset = geometry.safeAreaInsets.top + Metrics.centerVerticalPadding
+        let bottomInset = geometry.safeAreaInsets.bottom + Metrics.centerVerticalPadding
+        let visibleHeight = max(0, geometry.size.height - topInset - bottomInset)
+
+        return ScrollView(.vertical, showsIndicators: false) {
+            ZStack {
+                Color.clear
+                    .contentShape(Rectangle())
+                    .onTapGesture(perform: onDismiss)
+
+                VStack(spacing: Metrics.panelGap) {
+                    if message.canReact {
+                        reactionsPanel
+                            .frame(width: Metrics.panelWidth)
+                    }
+
+                    messagePreviewBubble(maxWidth: bubbleMaxWidth)
+
+                    actionsPanel
+                        .frame(width: Metrics.panelWidth)
+                }
+            }
+            .padding(.horizontal, Metrics.centerHorizontalPadding)
+            .frame(maxWidth: .infinity)
+            .frame(minHeight: visibleHeight, alignment: .center)
+            .padding(.top, topInset)
+            .padding(.bottom, bottomInset)
+        }
+        .scrollBounceBehavior(.basedOnSize, axes: .vertical)
+    }
+
+    private func messagePreviewBubble(maxWidth: CGFloat) -> some View {
+        ChatBubbleView(
+            text: message.displayText,
+            senderName: nil,
+            createdAt: message.createdAt,
+            isMine: message.isMine,
+            replyPreview: message.replyPreview?.isDeleted == false ? message.replyPreview?.body : nil,
+            replyImageAttachment: nil,
+            onReplyTap: nil,
+            imageAttachment: message.imageAttachment,
+            isEdited: message.isEdited,
+            isDeleted: message.isDeleted,
+            reactions: message.reactions,
+            deliveryStatus: message.deliveryStatus,
+            localSendState: message.localSendState,
+            onRetry: nil,
+            onReactionTap: nil,
+            onImageTap: nil
+        )
+        .frame(maxWidth: maxWidth, alignment: .center)
+        .allowsHitTesting(false)
     }
 
     // MARK: - Panels
@@ -128,14 +133,16 @@ struct ChatMessageContextMenuOverlay: View {
     private var reactionsPanel: some View {
         VStack(alignment: .leading, spacing: Metrics.reactionsVStackSpacing) {
             if areReactionsExpanded {
-                ForEach(Array(ChatQuickReactions.rows.enumerated()), id: \.offset) { _, row in
-                    LazyVGrid(columns: reactionColumns, spacing: Metrics.reactionsGridSpacing) {
-                        ForEach(row, id: \.self) { emoji in
-                            reactionButton(emoji)
+                ScrollView(.vertical, showsIndicators: false) {
+                    VStack(alignment: .leading, spacing: Metrics.reactionsVStackSpacing) {
+                        ForEach(Array(ChatQuickReactions.rows.enumerated()), id: \.offset) { rowIndex, row in
+                            reactionGridRow(row, rowIndex: rowIndex)
                         }
                     }
-                    .transition(.opacity.combined(with: .scale(scale: 0.92)))
                 }
+                .frame(maxHeight: Metrics.expandedReactionsMaxHeight)
+                .scrollBounceBehavior(.basedOnSize, axes: .vertical)
+                .transition(.opacity.combined(with: .scale(scale: 0.92)))
 
                 HStack {
                     Spacer(minLength: 0)
@@ -146,8 +153,8 @@ struct ChatMessageContextMenuOverlay: View {
                 .transition(.opacity)
             } else {
                 LazyVGrid(columns: reactionColumns, spacing: Metrics.reactionsGridSpacing) {
-                    ForEach(ChatQuickReactions.compactPreview, id: \.self) { emoji in
-                        reactionButton(emoji)
+                    ForEach(Array(ChatQuickReactions.compactPreview.enumerated()), id: \.offset) { index, emoji in
+                        reactionButton(emoji, id: "compact-\(index)", index: index)
                     }
                     expandReactionsButton
                 }
@@ -169,6 +176,56 @@ struct ChatMessageContextMenuOverlay: View {
             y: Metrics.shadowYOffset
         )
         .animation(Metrics.expansionAnimation, value: areReactionsExpanded)
+        // Пункт 3: собираем координаты всех кнопок и следим за драгом пальца поверх грида.
+        .coordinateSpace(name: Metrics.reactionsCoordinateSpace)
+        .onPreferenceChange(ReactionFramePreferenceKey.self) { anchors in
+            // Разворачивается ниже, в overlayPreferenceValue, где есть доступ к GeometryProxy.
+        }
+        .overlayPreferenceValue(ReactionFramePreferenceKey.self) { anchors in
+            GeometryReader { proxy in
+                Color.clear
+                    .onChange(of: anchors.count) { _, _ in
+                        updateFrames(anchors, proxy: proxy)
+                    }
+                    .onAppear {
+                        updateFrames(anchors, proxy: proxy)
+                    }
+            }
+        }
+        .simultaneousGesture(
+            DragGesture(minimumDistance: Metrics.magnifyDragActivationDistance, coordinateSpace: .named(Metrics.reactionsCoordinateSpace))
+                .onChanged { value in
+                    guard !areReactionsExpanded else {
+                        resetMagnifyState(animated: false)
+                        return
+                    }
+                    dragLocation = value.location
+                    updateActiveMagnifiedID(for: value.location)
+                }
+                .onEnded { _ in
+                    guard !areReactionsExpanded else {
+                        resetMagnifyState()
+                        return
+                    }
+                    if let activeMagnifiedID, let emoji = emoji(forID: activeMagnifiedID) {
+                        ChatQuickReactions.recordUsage(emoji)
+                        performMenuAction(onReact, emoji)
+                    }
+                    resetMagnifyState()
+                }
+        )
+    }
+
+    private func reactionGridRow(_ row: [String], rowIndex: Int) -> some View {
+        LazyVGrid(columns: reactionColumns, spacing: Metrics.reactionsGridSpacing) {
+            ForEach(Array(row.enumerated()), id: \.offset) { colIndex, emoji in
+                reactionButton(
+                    emoji,
+                    id: "row\(rowIndex)-col\(colIndex)",
+                    index: rowIndex * 6 + colIndex
+                )
+            }
+        }
     }
 
     private var expandReactionsButton: some View {
@@ -256,27 +313,24 @@ struct ChatMessageContextMenuOverlay: View {
         }
     }
 
-    private func reactionButton(_ emoji: String) -> some View {
-        Button {
+    // MARK: - Reaction button (Пункты 1, 2, 3, 4)
+
+    private func reactionButton(_ emoji: String, id: String, index: Int) -> some View {
+        ReactionEmojiButton(
+            emoji: emoji,
+            index: index,
+            isCurrentUserReaction: resolvedCurrentReactionEmoji == ReactionEmoji.normalized(emoji),
+            magnifyScale: magnifyScale(for: id),
+            size: Metrics.reactionButtonSize,
+            emojiFontSize: Metrics.reactionEmojiSize,
+            entranceDelayStep: Metrics.entranceStaggerStep
+        ) {
+            ChatQuickReactions.recordUsage(emoji)
             performMenuAction(onReact, emoji)
-        } label: {
-            Text(emoji)
-                .font(.system(size: Metrics.reactionEmojiSize))
-                .frame(maxWidth: .infinity)
-                .frame(height: Metrics.reactionButtonSize)
-                .background(
-                    Circle()
-                        .fill(Color.cardSurface.opacity(Metrics.reactionIconFillOpacity))
-                )
-                .overlay {
-                    Circle()
-                        .strokeBorder(
-                            Color.glassBorderHighlight.opacity(Metrics.reactionBorderOpacity),
-                            lineWidth: 1
-                        )
-                }
         }
-        .buttonStyle(.spring(pressedScale: Metrics.pressedScale))
+        .anchorPreference(key: ReactionFramePreferenceKey.self, value: .bounds) { anchor in
+            [id: anchor]
+        }
     }
 
     private func actionRow(
@@ -313,13 +367,85 @@ struct ChatMessageContextMenuOverlay: View {
             .frame(height: Metrics.hairlineHeight)
     }
 
+    // MARK: - Magnify helpers (Пункт 3)
+
+    private func updateFrames(_ anchors: [String: Anchor<CGRect>], proxy: GeometryProxy) {
+        var resolved: [String: CGRect] = [:]
+        for (id, anchor) in anchors {
+            resolved[id] = proxy[anchor]
+        }
+        reactionFrames = resolved
+    }
+
+    private func updateActiveMagnifiedID(for location: CGPoint) {
+        var closestID: String? = nil
+        var closestDistance: CGFloat = .greatestFiniteMagnitude
+
+        for (id, frame) in reactionFrames {
+            let center = CGPoint(x: frame.midX, y: frame.midY)
+            let distance = hypot(center.x - location.x, center.y - location.y)
+            if distance < closestDistance {
+                closestDistance = distance
+                closestID = id
+            }
+        }
+
+        let newActiveID = closestDistance < Metrics.magnifyRadius ? closestID : nil
+        if newActiveID != activeMagnifiedID {
+            triggerHaptic(style: .light)
+            activeMagnifiedID = newActiveID
+        }
+    }
+
+    private func magnifyScale(for id: String) -> CGFloat {
+        guard let dragLocation, let frame = reactionFrames[id] else { return 1.0 }
+        let center = CGPoint(x: frame.midX, y: frame.midY)
+        let distance = hypot(center.x - dragLocation.x, center.y - dragLocation.y)
+        guard distance < Metrics.magnifyRadius else { return 1.0 }
+        let proximity = 1 - (distance / Metrics.magnifyRadius)
+        return 1.0 + proximity * (Metrics.magnifyMaxScale - 1.0)
+    }
+
+    private func resetMagnifyState(animated: Bool = true) {
+        let reset = {
+            dragLocation = nil
+            activeMagnifiedID = nil
+        }
+
+        if animated {
+            withAnimation(.spring(response: 0.22, dampingFraction: 0.78), reset)
+        } else {
+            reset()
+        }
+    }
+
+    private func emoji(forID id: String) -> String? {
+        if id.hasPrefix("compact-"), let index = Int(id.dropFirst("compact-".count)) {
+            return ChatQuickReactions.compactPreview[safe: index]
+        }
+        if let range = id.range(of: "col") {
+            let colString = id[range.upperBound...]
+            if let colIndex = Int(colString),
+               let rowRange = id.range(of: "row"),
+               let dashRange = id.range(of: "-col") {
+                let rowString = id[rowRange.upperBound..<dashRange.lowerBound]
+                if let rowIndex = Int(rowString) {
+                    return ChatQuickReactions.rows[safe: rowIndex]?[safe: colIndex]
+                }
+            }
+        }
+        return nil
+    }
+
     // MARK: - Actions
 
-    private func triggerHaptic() {
-        #if canImport(UIKit)
-        HapticFeedback.impact(.light)
-        #endif
+    #if canImport(UIKit)
+    private func triggerHaptic(style: UIImpactFeedbackGenerator.FeedbackStyle = .light) {
+        HapticFeedback.impact(style)
     }
+    #else
+    private func triggerHaptic() {}
+    #endif
 
     private func performMenuAction(_ action: () -> Void) {
         triggerHaptic()
@@ -330,223 +456,72 @@ struct ChatMessageContextMenuOverlay: View {
         triggerHaptic()
         action(value)
     }
+}
 
-    // MARK: - Placement
+// MARK: - Reaction emoji button subview (Пункты 1, 2, 4)
 
-    private enum MenuPlacement {
-        case split
-        case bothBelow
-        case bothAbove
-    }
+private struct ReactionEmojiButton: View {
+    let emoji: String
+    let index: Int
+    let isCurrentUserReaction: Bool
+    let magnifyScale: CGFloat
+    let size: CGFloat
+    let emojiFontSize: CGFloat
+    let entranceDelayStep: Double
+    let action: () -> Void
 
-    private struct PanelPositions {
-        var reactionsCenterY: CGFloat?
-        var actionsCenterY: CGFloat
-    }
+    @State private var hasAppeared = false
 
-    private func menuPlacement(
-        anchor: CGRect,
-        contentTop: CGFloat,
-        contentBottom: CGFloat,
-        containerHeight: CGFloat
-    ) -> MenuPlacement {
-        let expandedReactionsHeight = reactionsPanelHeight(expanded: true)
-        let actionsHeight = actionsPanelHeight
-        let spaceAbove = anchor.minY - contentTop
-        let spaceBelow = containerHeight - contentBottom - anchor.maxY
-
-        if message.canReact, spaceAbove < expandedReactionsHeight + Metrics.panelGap {
-            return .bothBelow
-        }
-
-        let canFitSplit = message.canReact
-            ? spaceAbove >= expandedReactionsHeight + Metrics.panelGap
-                && spaceBelow >= actionsHeight + Metrics.panelGap
-            : spaceBelow >= actionsHeight + Metrics.panelGap
-
-        if canFitSplit {
-            return .split
-        }
-
-        let stackHeight = message.canReact
-            ? expandedReactionsHeight + Metrics.panelGap + actionsHeight
-            : actionsHeight
-
-        if spaceBelow >= stackHeight + Metrics.panelGap {
-            return .bothBelow
-        }
-
-        if spaceAbove >= stackHeight + Metrics.panelGap {
-            return .bothAbove
-        }
-
-        return spaceBelow >= spaceAbove ? .bothBelow : .bothAbove
-    }
-
-    private func panelPositions(
-        placement: MenuPlacement,
-        anchor: CGRect,
-        contentTop: CGFloat,
-        contentBottom: CGFloat,
-        containerHeight: CGFloat
-    ) -> PanelPositions {
-        let reactionsH = reactionsPanelHeight(expanded: areReactionsExpanded)
-        let actionsH = actionsPanelHeight
-
-        switch placement {
-        case .split:
-            let reactionsY = message.canReact
-                ? clampCenterY(
-                    anchor.minY - Metrics.panelGap - reactionsH / 2,
-                    panelHeight: reactionsH,
-                    contentTop: contentTop,
-                    contentBottom: contentBottom,
-                    containerHeight: containerHeight
+    var body: some View {
+        Button(action: action) {
+            Text(emoji)
+                .font(.system(size: emojiFontSize))
+                .frame(maxWidth: .infinity)
+                .frame(height: size)
+                // Пункт 4: тонкое кольцо-хайлайт вокруг реакции, которую уже поставил юзер.
+                .background(
+                    Circle()
+                        .fill(isCurrentUserReaction ? Color.discoverViolet.opacity(0.16) : Color.clear)
                 )
-                : nil
-            let actionsY = clampCenterY(
-                anchor.maxY + Metrics.panelGap + actionsH / 2,
-                panelHeight: actionsH,
-                contentTop: contentTop,
-                contentBottom: contentBottom,
-                containerHeight: containerHeight
-            )
-            return PanelPositions(reactionsCenterY: reactionsY, actionsCenterY: actionsY)
-
-        case .bothBelow:
-            var cursor = anchor.maxY + Metrics.panelGap
-            var reactionsY: CGFloat?
-            if message.canReact {
-                reactionsY = cursor + reactionsH / 2
-                cursor += reactionsH + Metrics.panelGap
+                .overlay {
+                    if isCurrentUserReaction {
+                        Circle()
+                            .strokeBorder(Color.discoverViolet, lineWidth: 1.5)
+                    }
+                }
+        }
+        .buttonStyle(.plain)
+        // Пункт 1: убрали серую подложку-круг — эмодзи "дышит" свободно.
+        // Пункт 3: локальный magnify-скейл, управляемый драгом пальца из родителя.
+        .scaleEffect(hasAppeared ? magnifyScale : 0.3)
+        .opacity(hasAppeared ? 1 : 0)
+        .animation(.interactiveSpring(response: 0.14, dampingFraction: 0.68), value: magnifyScale)
+        .onAppear {
+            // Пункт 2: staggered-появление — эмодзи выпрыгивают по очереди, а не разом.
+            withAnimation(
+                .spring(response: 0.22, dampingFraction: 0.72)
+                    .delay(Double(index) * entranceDelayStep)
+            ) {
+                hasAppeared = true
             }
-            let actionsY = cursor + actionsH / 2
-            return clampStack(
-                reactionsCenterY: reactionsY,
-                actionsCenterY: actionsY,
-                reactionsHeight: reactionsH,
-                actionsHeight: actionsH,
-                contentTop: contentTop,
-                contentBottom: contentBottom,
-                containerHeight: containerHeight
-            )
-
-        case .bothAbove:
-            var cursor = anchor.minY - Metrics.panelGap
-            let actionsY = cursor - actionsH / 2
-            cursor -= actionsH + Metrics.panelGap
-            var reactionsY: CGFloat?
-            if message.canReact {
-                reactionsY = cursor - reactionsH / 2
-            }
-            return clampStack(
-                reactionsCenterY: reactionsY,
-                actionsCenterY: actionsY,
-                reactionsHeight: reactionsH,
-                actionsHeight: actionsH,
-                contentTop: contentTop,
-                contentBottom: contentBottom,
-                containerHeight: containerHeight
-            )
         }
     }
+}
 
-    private func clampCenterY(
-        _ centerY: CGFloat,
-        panelHeight: CGFloat,
-        contentTop: CGFloat,
-        contentBottom: CGFloat,
-        containerHeight: CGFloat
-    ) -> CGFloat {
-        let minY = contentTop + panelHeight / 2
-        let maxY = containerHeight - contentBottom - panelHeight / 2
-        return min(max(centerY, minY), maxY)
+// MARK: - Preference key for magnify gesture (Пункт 3)
+
+private struct ReactionFramePreferenceKey: PreferenceKey {
+    static var defaultValue: [String: Anchor<CGRect>] = [:]
+    static func reduce(value: inout [String: Anchor<CGRect>], nextValue: () -> [String: Anchor<CGRect>]) {
+        value.merge(nextValue()) { _, new in new }
     }
+}
 
-    private func clampStack(
-        reactionsCenterY: CGFloat?,
-        actionsCenterY: CGFloat,
-        reactionsHeight: CGFloat,
-        actionsHeight: CGFloat,
-        contentTop: CGFloat,
-        contentBottom: CGFloat,
-        containerHeight: CGFloat
-    ) -> PanelPositions {
-        let stackTop: CGFloat
-        let stackBottom: CGFloat
+// MARK: - Safe array subscript helper
 
-        if let reactionsCenterY {
-            stackTop = reactionsCenterY - reactionsHeight / 2
-            stackBottom = actionsCenterY + actionsHeight / 2
-        } else {
-            stackTop = actionsCenterY - actionsHeight / 2
-            stackBottom = actionsCenterY + actionsHeight / 2
-        }
-
-        let minTop = contentTop
-        let maxBottom = containerHeight - contentBottom
-        var offset: CGFloat = 0
-
-        if stackBottom > maxBottom {
-            offset = maxBottom - stackBottom
-        } else if stackTop < minTop {
-            offset = minTop - stackTop
-        }
-
-        return PanelPositions(
-            reactionsCenterY: reactionsCenterY.map { $0 + offset },
-            actionsCenterY: actionsCenterY + offset
-        )
-    }
-
-    private func effectiveContentTop(in geometry: GeometryProxy) -> CGFloat {
-        let containerMinY = geometry.frame(in: .global).minY
-        let headerBottomY = geometry.safeAreaInsets.top + Metrics.navigationBarHeight
-        let obstructionInLocal = max(0, headerBottomY - containerMinY)
-        return obstructionInLocal + Metrics.safeAreaPadding
-    }
-
-    private func effectiveContentBottom(in geometry: GeometryProxy) -> CGFloat {
-        geometry.safeAreaInsets.bottom + Metrics.safeAreaPadding
-    }
-
-    private func anchorInLocalSpace(_ anchor: CGRect, container: GeometryProxy) -> CGRect {
-        let origin = container.frame(in: .global).origin
-        return anchor.offsetBy(dx: -origin.x, dy: -origin.y)
-    }
-
-    private func panelLeadingX(in geometry: GeometryProxy, localAnchor: CGRect) -> CGFloat {
-        let maxX = geometry.size.width - Metrics.panelWidth - Metrics.panelMargin
-
-        if message.isMine {
-            return max(Metrics.panelMargin, min(localAnchor.maxX - Metrics.panelWidth, maxX))
-        }
-        return max(Metrics.panelMargin, min(localAnchor.minX, maxX))
-    }
-
-    private func reactionsPanelHeight(expanded: Bool) -> CGFloat {
-        let verticalPadding = Metrics.reactionsPaddingVertical * 2
-
-        guard expanded else {
-            return verticalPadding + Metrics.reactionButtonSize
-        }
-
-        let rowCount = CGFloat(ChatQuickReactions.rows.count)
-        let gridRows = rowCount * Metrics.reactionButtonSize
-            + max(0, rowCount - 1) * Metrics.reactionsVStackSpacing
-        let expandRow = Metrics.reactionButtonSize
-        let interBlockSpacing = Metrics.reactionsVStackSpacing
-
-        return verticalPadding + gridRows + interBlockSpacing + expandRow
-    }
-
-    private var actionsPanelHeight: CGFloat {
-        var rows = 0
-        if message.canReply { rows += 1 }
-        if message.canCopy { rows += 1 }
-        if message.canEdit { rows += 1 }
-        if message.canDelete { rows += 1 }
-        return CGFloat(rows) * Metrics.actionRowHeight
+private extension Array {
+    subscript(safe index: Int) -> Element? {
+        indices.contains(index) ? self[index] : nil
     }
 }
 
@@ -556,9 +531,9 @@ private extension ChatMessageContextMenuOverlay {
     enum Metrics {
         static let panelWidth: CGFloat = 280
         static let panelGap: CGFloat = 10
-        static let panelMargin: CGFloat = 16
-        static let safeAreaPadding: CGFloat = 8
-        static let navigationBarHeight: CGFloat = 44
+        static let previewBubbleMaxWidth: CGFloat = 360
+        static let centerHorizontalPadding: CGFloat = 24
+        static let centerVerticalPadding: CGFloat = 24
 
         static let reactionsCornerRadius: CGFloat = 22
         static let reactionsGridSpacing: CGFloat = 6
@@ -567,9 +542,15 @@ private extension ChatMessageContextMenuOverlay {
         static let reactionsPaddingVertical: CGFloat = 12
 
         static let reactionButtonSize: CGFloat = 40
+        static let expandedReactionVisibleRows: CGFloat = 4
         static let reactionEmojiSize: CGFloat = 24
         static let expandButtonWidth: CGFloat = 46
         static let expandButtonIconSize: CGFloat = 14
+
+        static var expandedReactionsMaxHeight: CGFloat {
+            reactionButtonSize * expandedReactionVisibleRows
+                + reactionsVStackSpacing * max(0, expandedReactionVisibleRows - 1)
+        }
 
         static let actionRowSpacing: CGFloat = 12
         static let actionIconSize: CGFloat = 17
@@ -595,18 +576,17 @@ private extension ChatMessageContextMenuOverlay {
         static let panelGradientAccentLight: CGFloat = 0.10
 
         static let dimmingTintDark: CGFloat = 0.18
-        static let dimmingTintLight: CGFloat = 0.06
+        static let dimmingTintLight: CGFloat = 0.14
         static let hairlineOpacity: CGFloat = 0.85
 
-        static let messageCutoutPadding: CGFloat = 6
-        static let messageCutoutCornerRadius: CGFloat = 18
-        static let messageCutoutStrokeWidth: CGFloat = 1
-        static let messageCutoutStrokeOpacityDark: CGFloat = 0.14
-        static let messageCutoutStrokeOpacityLight: CGFloat = 0.38
-        static let messageCutoutShadowRadius: CGFloat = 10
-        static let messageCutoutShadowYOffset: CGFloat = 4
-        static let messageCutoutShadowOpacityDark: CGFloat = 0.32
-        static let messageCutoutShadowOpacityLight: CGFloat = 0.16
+        // Пункт 2: шаг задержки между появлением соседних эмодзи.
+        static let entranceStaggerStep: Double = 0.006
+
+        // Пункт 3: параметры magnify-эффекта.
+        static let reactionsCoordinateSpace: String = "reactionsGrid"
+        static let magnifyDragActivationDistance: CGFloat = 8
+        static let magnifyRadius: CGFloat = 46
+        static let magnifyMaxScale: CGFloat = 1.55
 
         static var hairlineHeight: CGFloat {
             #if canImport(UIKit)

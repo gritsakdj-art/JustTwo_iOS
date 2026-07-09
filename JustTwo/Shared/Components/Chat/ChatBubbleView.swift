@@ -21,6 +21,8 @@ struct ChatBubbleView: View {
     var onReactionTap: ((ChatMessageReaction) -> Void)?
     var onImageTap: ((ChatMessageAttachment) -> Void)?
 
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
     private enum UI {
         static let tailWidth: CGFloat = 12
         static let textHPad: CGFloat = 14
@@ -35,24 +37,32 @@ struct ChatBubbleView: View {
         static let editedLabelWidth: CGFloat = 52
         static let receiptWidth: CGFloat = 22
         static let reactionMetadataSpacing: CGFloat = 4
-        static let textToReactionsSpacing: CGFloat = 6
+        static let stackedMetadataSpacing: CGFloat = 6
     }
 
     @ScaledMetric(relativeTo: .caption) private var bottomForTime: CGFloat = 22
-    @ScaledMetric(relativeTo: .body) private var scaledTextToReactionsSpacing: CGFloat = UI.textToReactionsSpacing
     @ScaledMetric(relativeTo: .caption) private var scaledReactionMetadataSpacing: CGFloat = UI.reactionMetadataSpacing
+    @ScaledMetric(relativeTo: .caption) private var scaledStackedMetadataSpacing: CGFloat = UI.stackedMetadataSpacing
     @ScaledMetric(relativeTo: .caption) private var bottomInset: CGFloat = 8
+    @ScaledMetric(relativeTo: .caption) private var scaledTimeClusterWidth: CGFloat = UI.timeClusterWidth
+    @ScaledMetric(relativeTo: .caption) private var scaledDateTimeClusterWidth: CGFloat = UI.dateTimeClusterWidth
+    @ScaledMetric(relativeTo: .caption) private var scaledEditedLabelWidth: CGFloat = UI.editedLabelWidth
+    @ScaledMetric(relativeTo: .caption) private var scaledReceiptWidth: CGFloat = UI.receiptWidth
 
     private var bubbleMinWidth: CGFloat {
         let horizontalInsets = bottomLeadingInset + bottomTrailingInset
         let metadataWidth = metadataClusterWidth
-            + (isEdited ? UI.editedLabelWidth + 4 : 0)
-            + (deliveryStatus == nil ? 0 : UI.receiptWidth)
+            + (isEdited ? scaledEditedLabelWidth + scaledReactionMetadataSpacing : 0)
+            + (deliveryStatus == nil ? 0 : scaledReceiptWidth)
         return max(isEdited ? UI.minWidthEdited : UI.minWidth, horizontalInsets + metadataWidth + 12)
     }
 
     private var metadataClusterWidth: CGFloat {
-        ChatMessageDateFormatting.isToday(createdAt) ? UI.timeClusterWidth : UI.dateTimeClusterWidth
+        ChatMessageDateFormatting.isToday(createdAt) ? scaledTimeClusterWidth : scaledDateTimeClusterWidth
+    }
+
+    private var usesFlowMetadataLayout: Bool {
+        dynamicTypeSize > .xxLarge
     }
 
     var body: some View {
@@ -93,47 +103,43 @@ struct ChatBubbleView: View {
     private var bubbleBody: some View {
         Group {
             if reactions.isEmpty {
-                messageContent
-                    .padding(.top, UI.topPad)
-                    .padding(.bottom, contentBottomPadding)
-                    .padding(.leading, UI.textHPad + (isMine ? 0 : UI.tailWidth))
-                    .padding(.trailing, UI.textHPad + (isMine ? UI.tailWidth : 0))
+                if usesFlowMetadataLayout {
+                    VStack(alignment: .leading, spacing: scaledStackedMetadataSpacing) {
+                        messageContent
+                            .padding(.top, UI.topPad)
+                            .padding(.leading, UI.textHPad + (isMine ? 0 : UI.tailWidth))
+                            .padding(.trailing, UI.textHPad + (isMine ? UI.tailWidth : 0))
+
+                        standaloneMetadataRow
+                    }
                     .frame(minWidth: bubbleMinWidth, alignment: .leading)
                     .background(bubbleBackground)
-                    .overlay(alignment: .bottom) {
-                        HStack {
-                            Spacer(minLength: 0)
-                            metadataCluster
+                } else {
+                    messageContent
+                        .padding(.top, UI.topPad)
+                        .padding(.bottom, contentBottomPadding)
+                        .padding(.leading, UI.textHPad + (isMine ? 0 : UI.tailWidth))
+                        .padding(.trailing, UI.textHPad + (isMine ? UI.tailWidth : 0))
+                        .frame(minWidth: bubbleMinWidth, alignment: .leading)
+                        .background(bubbleBackground)
+                        .overlay(alignment: .bottom) {
+                            HStack {
+                                Spacer(minLength: 0)
+                                metadataCluster
+                            }
+                            .padding(.leading, bottomLeadingInset)
+                            .padding(.trailing, bottomTrailingInset)
+                            .padding(.bottom, bottomInset)
                         }
-                        .padding(.leading, bottomLeadingInset)
-                        .padding(.trailing, bottomTrailingInset)
-                        .padding(.bottom, bottomInset)
-                    }
+                }
             } else {
-                VStack(alignment: .leading, spacing: 0) {
+                VStack(alignment: .leading, spacing: scaledReactionMetadataSpacing) {
                     messageContent
                         .padding(.top, UI.topPad)
                         .padding(.leading, UI.textHPad + (isMine ? 0 : UI.tailWidth))
                         .padding(.trailing, UI.textHPad + (isMine ? UI.tailWidth : 0))
 
-                    ChatMessageReactionsView(
-                        reactions: reactions,
-                        onTap: onReactionTap
-                    )
-                    .padding(.top, scaledTextToReactionsSpacing)
-                    .padding(.leading, bottomLeadingInset)
-                    .padding(.trailing, bottomTrailingInset)
-                    .transition(.scale(scale: 0.85).combined(with: .opacity))
-                    .animation(.spring(response: 0.3, dampingFraction: 0.7), value: reactions.map(\.emoji))
-
-                    HStack {
-                        Spacer(minLength: 0)
-                        metadataCluster
-                    }
-                    .padding(.top, scaledReactionMetadataSpacing)
-                    .padding(.leading, bottomLeadingInset)
-                    .padding(.trailing, bottomTrailingInset)
-                    .padding(.bottom, bottomInset)
+                    bottomMetadataRow
                 }
                 .frame(minWidth: bubbleMinWidth, alignment: .leading)
                 .background(bubbleBackground)
@@ -246,6 +252,7 @@ struct ChatBubbleView: View {
                     .font(Font.App.caption(size: 11))
                     .foregroundStyle(Color.secondaryText.opacity(0.75))
                     .lineLimit(1)
+                    .minimumScaleFactor(0.82)
             }
 
             Text(ChatMessageDateFormatting.metadataText(for: createdAt))
@@ -253,6 +260,7 @@ struct ChatBubbleView: View {
                 .foregroundStyle(Color.secondaryText.opacity(0.75))
                 .monospacedDigit()
                 .lineLimit(1)
+                .minimumScaleFactor(0.82)
 
             if let deliveryStatus {
                 MessageDeliveryReceiptView(status: deliveryStatus)
@@ -263,8 +271,58 @@ struct ChatBubbleView: View {
                     .frame(width: 12, height: 12)
             }
         }
-        .fixedSize(horizontal: true, vertical: false)
         .allowsHitTesting(false)
+    }
+
+    private var bottomMetadataRow: some View {
+        ViewThatFits(in: .horizontal) {
+            inlineReactionMetadataRow
+            stackedReactionMetadataRow
+        }
+        .padding(.leading, bottomLeadingInset)
+        .padding(.trailing, bottomTrailingInset)
+        .padding(.bottom, bottomInset)
+    }
+
+    private var inlineReactionMetadataRow: some View {
+        HStack(alignment: .center, spacing: scaledReactionMetadataSpacing) {
+            ChatMessageReactionsView(
+                reactions: reactions,
+                onTap: onReactionTap
+            )
+            .transition(.scale(scale: 0.85).combined(with: .opacity))
+            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: reactions.map(\.emoji))
+
+            Spacer(minLength: 8)
+
+            metadataCluster
+        }
+    }
+
+    private var stackedReactionMetadataRow: some View {
+        VStack(alignment: .leading, spacing: scaledStackedMetadataSpacing) {
+            ChatMessageReactionsView(
+                reactions: reactions,
+                onTap: onReactionTap
+            )
+            .transition(.scale(scale: 0.85).combined(with: .opacity))
+            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: reactions.map(\.emoji))
+
+            HStack {
+                Spacer(minLength: 0)
+                metadataCluster
+            }
+        }
+    }
+
+    private var standaloneMetadataRow: some View {
+        HStack {
+            Spacer(minLength: 0)
+            metadataCluster
+        }
+        .padding(.leading, bottomLeadingInset)
+        .padding(.trailing, bottomTrailingInset)
+        .padding(.bottom, bottomInset)
     }
 
     private func outgoingStatusFooter(state: MessageLocalSendState) -> some View {
