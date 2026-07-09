@@ -35,6 +35,7 @@ struct PrivateChatView: View {
     @State private var bottomProximityUpdateTask: Task<Void, Never>?
     @State private var olderHeaderVisibilityTask: Task<Void, Never>?
     @State private var autoScrollCoalesceTask: Task<Void, Never>?
+    @State private var keyboardVisibilityScrollTask: Task<Void, Never>?
     @State private var layoutStabilizationTask: Task<Void, Never>?
     @State private var imageLayoutScrollTask: Task<Void, Never>?
     @State private var scrollProxy: ScrollViewProxy?
@@ -76,102 +77,116 @@ struct PrivateChatView: View {
     private var chatScreen: some View {
         @Bindable var viewModel = viewModel
 
-        return messageList
-            .safeAreaInset(edge: .bottom, spacing: 0) {
-                bottomChrome
-            }
-            .navigationBarTitleDisplayMode(.inline)
-            .navigationStackHostingBackgroundClear()
-            .tabBarInstantRevealOnPop()
-            .toolbarBackground(.hidden, for: .navigationBar)
-            .toolbar { toolbarContent }
-            .task {
-                guard !usesPreviewData else { return }
-                await viewModel.open(session: session, router: router)
-                viewModel.activateRealtime(session: session, router: router)
-            }
-            .onAppear {
-                guard !usesPreviewData else { return }
-                MessengerDiagnostics.event(
-                    .chatAppeared,
-                    conversationID: viewModel.conversation.id,
-                    metadata: [
-                        "messageCount": "\(viewModel.messages.count)",
-                        "isNearBottom": "\(isNearBottom)"
-                    ]
-                )
-                viewModel.activateRealtime(session: session, router: router)
-            }
-            .onDisappear {
-                guard !usesPreviewData else { return }
-                MessengerDiagnostics.event(
-                    .chatDisappeared,
-                    conversationID: viewModel.conversation.id,
-                    metadata: [
-                        "messageCount": "\(viewModel.messages.count)",
-                        "didCompleteInitialPositioning": "\(didCompleteInitialPositioning)"
-                    ]
-                )
-                viewModel.close()
-            }
-            .overlay {
-                if let message = viewModel.actionMenuMessage, viewModel.actionMenuAnchor != .zero {
-                    ChatMessageContextMenuOverlay(
-                        message: message,
-                        anchor: viewModel.actionMenuAnchor,
-                        onReply: { viewModel.startReply(to: message) },
-                        onCopy: { viewModel.copyMessage(message) },
-                        onEdit: { viewModel.startEdit(message: message) },
-                        onDelete: { viewModel.requestDelete(message) },
-                        onReact: { emoji in
-                            Task {
-                                await viewModel.applyReaction(
-                                    emoji,
-                                    to: message,
-                                    session: session,
-                                    router: router
-                                )
-                            }
-                        },
-                        onDismiss: { viewModel.dismissActionMenu() }
-                    )
-                }
-            }
-            .animation(.spring(response: 0.34, dampingFraction: 0.88), value: viewModel.actionMenuMessage?.id)
-            .alert(
-                "chats.action.delete_confirm_title",
-                isPresented: deleteAlertPresented
-            ) {
-                Button("chats.action.delete", role: .destructive) {
-                    let message = viewModel.pendingDeleteMessage
-                    viewModel.pendingDeleteMessage = nil
+        return VStack(spacing: 0) {
+            messageList
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-                    Task {
-                        await viewModel.deleteConfirmedMessage(message, session: session, router: router)
-                    }
-                }
-                Button("common.cancel", role: .cancel) {
-                    viewModel.pendingDeleteMessage = nil
-                }
-            } message: {
-                Text("chats.action.delete_confirm_message")
-            }
-            .alert(
-                "chats.error.title",
-                isPresented: Binding(
-                    get: { viewModel.errorMessage != nil },
-                    set: { if !$0 { viewModel.errorMessage = nil } }
+            bottomChrome
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .navigationBarTitleDisplayMode(.inline)
+        .navigationStackHostingBackgroundClear()
+        .toolbar(.hidden, for: .tabBar)
+        .tabBarInstantRevealOnPop()
+        .toolbarBackground(.hidden, for: .navigationBar)
+        .toolbar { toolbarContent }
+        #if canImport(UIKit)
+        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { _ in
+            handleKeyboardVisibilityChange()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillChangeFrameNotification)) { _ in
+            handleKeyboardVisibilityChange()
+        }
+        #endif
+        .task {
+            guard !usesPreviewData else { return }
+            await viewModel.open(session: session, router: router)
+            viewModel.activateRealtime(session: session, router: router)
+        }
+        .onAppear {
+            guard !usesPreviewData else { return }
+            MessengerDiagnostics.event(
+                .chatAppeared,
+                conversationID: viewModel.conversation.id,
+                metadata: [
+                    "messageCount": "\(viewModel.messages.count)",
+                    "isNearBottom": "\(isNearBottom)"
+                ]
+            )
+            viewModel.activateRealtime(session: session, router: router)
+        }
+        .onDisappear {
+            guard !usesPreviewData else { return }
+            MessengerDiagnostics.event(
+                .chatDisappeared,
+                conversationID: viewModel.conversation.id,
+                metadata: [
+                    "messageCount": "\(viewModel.messages.count)",
+                    "didCompleteInitialPositioning": "\(didCompleteInitialPositioning)"
+                ]
+            )
+            viewModel.close()
+            keyboardVisibilityScrollTask?.cancel()
+            keyboardVisibilityScrollTask = nil
+        }
+        .overlay {
+            if let message = viewModel.actionMenuMessage, viewModel.actionMenuAnchor != .zero {
+                ChatMessageContextMenuOverlay(
+                    message: message,
+                    anchor: viewModel.actionMenuAnchor,
+                    onReply: { viewModel.startReply(to: message) },
+                    onCopy: { viewModel.copyMessage(message) },
+                    onEdit: { viewModel.startEdit(message: message) },
+                    onDelete: { viewModel.requestDelete(message) },
+                    onReact: { emoji in
+                        Task {
+                            await viewModel.applyReaction(
+                                emoji,
+                                to: message,
+                                session: session,
+                                router: router
+                            )
+                        }
+                    },
+                    onDismiss: { viewModel.dismissActionMenu() }
                 )
-            ) {
-                Button("common.cancel", role: .cancel) {
-                    viewModel.errorMessage = nil
+            }
+        }
+        .animation(.spring(response: 0.34, dampingFraction: 0.88), value: viewModel.actionMenuMessage?.id)
+        .alert(
+            "chats.action.delete_confirm_title",
+            isPresented: deleteAlertPresented
+        ) {
+            Button("chats.action.delete", role: .destructive) {
+                let message = viewModel.pendingDeleteMessage
+                viewModel.pendingDeleteMessage = nil
+
+                Task {
+                    await viewModel.deleteConfirmedMessage(message, session: session, router: router)
                 }
-            } message: {
-                Text(viewModel.errorMessage ?? "")
             }
-            .fullScreenCover(item: $photoViewerAttachment) { attachment in
-                ChatPhotoViewerView(attachment: attachment)
+            Button("common.cancel", role: .cancel) {
+                viewModel.pendingDeleteMessage = nil
             }
+        } message: {
+            Text("chats.action.delete_confirm_message")
+        }
+        .alert(
+            "chats.error.title",
+            isPresented: Binding(
+                get: { viewModel.errorMessage != nil },
+                set: { if !$0 { viewModel.errorMessage = nil } }
+            )
+        ) {
+            Button("common.cancel", role: .cancel) {
+                viewModel.errorMessage = nil
+            }
+        } message: {
+            Text(viewModel.errorMessage ?? "")
+        }
+        .fullScreenCover(item: $photoViewerAttachment) { attachment in
+            ChatPhotoViewerView(attachment: attachment)
+        }
     }
 
     private var deleteAlertPresented: Binding<Bool> {
@@ -298,6 +313,7 @@ struct PrivateChatView: View {
                 .onTapGesture {
                     dismissKeyboard()
                 }
+                .scrollDismissesKeyboard(.interactively)
                 .scrollIndicators(.hidden)
                 .refreshable {
                     guard !usesPreviewData, viewModel.hasMoreOlderMessages else { return }
@@ -1025,6 +1041,22 @@ struct PrivateChatView: View {
         )
         shouldStickToBottom = true
         scheduleScrollToLatest(animated: true, delays: [0], force: true)
+    }
+
+    private func handleKeyboardVisibilityChange() {
+        guard !usesPreviewData, didCompleteInitialPositioning else { return }
+        guard shouldStickToBottom || isNearBottom else { return }
+
+        keyboardVisibilityScrollTask?.cancel()
+        keyboardVisibilityScrollTask = Task { @MainActor in
+            // ждём, пока SwiftUI применит новый keyboard-safe-area инсет и
+            // пересчитает фрейм VStack, иначе scrollTo сработает по старой геометрии
+            for delay: UInt64 in [16, 60, 150] {
+                try? await Task.sleep(for: .milliseconds(delay))
+                guard !Task.isCancelled else { return }
+                scrollToBottom(animated: false)
+            }
+        }
     }
 
     private func dismissKeyboard() {
