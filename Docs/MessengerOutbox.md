@@ -204,9 +204,22 @@ See [Messenger Sync Engine](MessengerSyncEngine.md).
 
 _Implemented — pending manual smoke._
 
-### User-facing outgoing states
+### User-facing outgoing states (PR18 wording)
 
-Runtime `MessageLocalSendState`: `waitingForNetwork`, `sending`, `uploading`, `retrying`, `failed`. See bubble status footer in `ChatBubbleView`.
+| State | EN |
+| --- | --- |
+| Waiting (offline) | Will send when you're back online. |
+| Waiting (online) | Waiting for network |
+| Sending | Sending… / Sending image… |
+| Uploading | Uploading photo… |
+| Retrying | Retrying… |
+| Failed | Failed to send. Tap to retry. |
+
+Runtime `MessageLocalSendState`: `waitingForNetwork`, `sending`, `uploading`, `retrying`, `failed`. See `OutgoingMessageStatus` + bubble footer in `ChatBubbleView`.
+
+### Network restore UX (PR18)
+
+On network restore: global banner shows “Connection restored. Refreshing…” briefly; outbox auto-retry unchanged (750ms debounce).
 
 ### Manual retry / cancel / auto-retry
 
@@ -218,9 +231,9 @@ Runtime `MessageLocalSendState`: `waitingForNetwork`, `sending`, `uploading`, `r
 
 `MessengerOutboxErrorCode` + `MessengerOutboxRetryPolicy` (5s / 15s / 60s cap).
 
-### Remaining (PR18)
+### Remaining
 
-- Global offline UX polish, optional retry countdown UI.
+- Optional retry countdown UI (future).
 
 ## Manual smoke
 

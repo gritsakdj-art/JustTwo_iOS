@@ -408,17 +408,52 @@ enum MessengerDiagnostics {
     }
 
     @MainActor
+    static func exportSummaryHeader() -> String {
+        exportSummaryHeader(session: SessionStore.shared, listViewModel: ConversationListViewModel.shared)
+    }
+
+    @MainActor
+    static func exportSummaryHeader(
+        session: SessionStore,
+        listViewModel: ConversationListViewModel
+    ) -> String {
+        let context = MessengerUXStatusStore.shared.makeGlobalContext(
+            listViewModel: listViewModel,
+            session: session
+        )
+        let presentation = MessengerConnectivityPresentationResolver.resolve(context)
+        let outbox = MessengerOutbox.shared
+        let lines = [
+            "messengerSummary=offlineUX",
+            "connectivityState=\(session.connectivityState)",
+            "networkOffline=\(NetworkPathMonitor.shared.shouldSkipNetworkBecauseOffline)",
+            "presentationState=\(presentation)",
+            "syncEngineState=\(MessengerSyncEngine.shared.state.rawValue)",
+            "lastAppliedRevision=\(MessengerSyncStateStore.shared.currentRevision.map(String.init) ?? "none")",
+            "lastSuccessfulSyncAt=\(MessengerSyncStateStore.shared.lastSyncAt?.ISO8601Format() ?? "none")",
+            "outboxPendingCount=\(outbox.diagnosticPendingCount())",
+            "outboxFailedCount=\(outbox.diagnosticFailedCount())",
+            "pendingMediaCount=\(outbox.diagnosticPendingMediaCount())",
+            "conversationCacheAvailable=\(listViewModel.hasCachedConversations)",
+            "listRefreshing=\(listViewModel.isRefreshingNetwork)",
+            "listRefreshFailed=\(listViewModel.lastNetworkRefreshFailed)"
+        ]
+        return lines.joined(separator: "\n")
+    }
+
+    @MainActor
     static func exportTextForClipboard() -> String {
         exportTextForClipboard(from: MessengerDiagnosticsStore.shared)
     }
 
     @MainActor
     static func exportTextForClipboard(from store: MessengerDiagnosticsStore) -> String {
+        let summary = exportSummaryHeader()
         let exportText = store.exportText()
         guard !exportText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-            return emptyExportText
+            return summary + "\n\n" + emptyExportText
         }
-        return exportText
+        return summary + "\n\n--- events ---\n\n" + exportText
     }
 
     nonisolated static func makeEntry(

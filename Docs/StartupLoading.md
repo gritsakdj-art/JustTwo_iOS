@@ -93,10 +93,17 @@ Snapshot written on:
 
 Cleared on logout via `AppStartupCoordinator.performReset()`.
 
-### Offline UI
+### Offline UI (PR18)
+
+* `MessengerUXStatusStore` combines network path (debounced), session connectivity, sync engine state, cache flags.
+* `OfflineSessionBanner` in `MainTabView` for offline showing cache, connection restored refreshing, refresh failed (saved data preserved).
+* `MessengerSubtleStatusStrip` in chats list and chat for refreshing / offline hints without blocking interaction.
+* No endless spinner when offline with no cached chats/messages — dedicated empty states instead.
+* Cached conversations/messages stay visible during background refresh and after refresh failure.
+
+Legacy:
 
 * `SessionStore.connectivityState` → `offlineUsingCache` / `validationPending`
-* `OfflineSessionBanner` in `MainTabView` when offline cached session is active
 * `StartupSessionValidationService` retries when network returns
 
 ## Critical vs background

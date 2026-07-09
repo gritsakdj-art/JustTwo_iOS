@@ -16,6 +16,7 @@ On-device messenger persistence using SwiftData.
 | PR16B | Persistent image outbox + composer preview | ✅ (pending manual smoke) |
 | PR16C | Outbox retry UI + network restore polish | ✅ (pending manual smoke) |
 | PR17 | Persistent sync engine + durable cursor | ✅ (pending manual smoke) |
+| PR18 | Offline/cache/sync/outbox UX polish | ✅ (pending manual smoke) |
 
 ## PR15D — Offline-friendly startup
 

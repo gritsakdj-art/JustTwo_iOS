@@ -1,14 +1,14 @@
 import SwiftUI
 
 struct OfflineSessionBanner: View {
-    let connectivityState: SessionConnectivityState
+    let presentation: MessengerBannerPresentation
 
-    private var isValidating: Bool {
-        connectivityState == .validationPending
+    private var title: String {
+        String(localized: String.LocalizationValue(presentation.titleKey))
     }
 
-    private var title: LocalizedStringResource {
-        isValidating ? "offline.banner.validating_title" : "offline.banner.title"
+    private var subtitle: String? {
+        presentation.subtitleKey.map { String(localized: String.LocalizationValue($0)) }
     }
 
     var body: some View {
@@ -20,10 +20,12 @@ struct OfflineSessionBanner: View {
                     .font(Font.App.manrope(size: 15, weight: .bold))
                     .foregroundStyle(Color.primaryText)
 
-                Text("offline.banner.subtitle")
-                    .font(Font.App.manrope(size: 13, weight: .medium))
-                    .foregroundStyle(Color.secondaryText)
-                    .fixedSize(horizontal: false, vertical: true)
+                if let subtitle {
+                    Text(subtitle)
+                        .font(Font.App.manrope(size: 13, weight: .medium))
+                        .foregroundStyle(Color.secondaryText)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
 
             Spacer(minLength: 0)
@@ -33,12 +35,31 @@ struct OfflineSessionBanner: View {
         .background(cardBackground)
         .overlay {
             RoundedRectangle(cornerRadius: AppCornerRadius.field, style: .continuous)
-                .stroke(Color.warning.opacity(0.22), lineWidth: 1)
+                .stroke(borderColor.opacity(0.22), lineWidth: 1)
         }
         .shadow(color: Color.discoverCardShadow.opacity(0.12), radius: 12, x: 0, y: 4)
         .accessibilityElement(children: .combine)
         .accessibilityLabel(Text(title))
-        .accessibilityHint(Text("offline.banner.subtitle"))
+    }
+
+    private var borderColor: Color {
+        switch presentation.style {
+        case .refreshFailed:
+            return Color.warning
+        case .connectionRestoredRefreshing, .validating:
+            return Color.discoverViolet
+        case .offlineShowingCache:
+            return Color.warning
+        }
+    }
+
+    private var accentColor: Color {
+        switch presentation.style {
+        case .connectionRestoredRefreshing, .validating:
+            return Color.discoverViolet
+        case .offlineShowingCache, .refreshFailed:
+            return Color.warning
+        }
     }
 
     @ViewBuilder
@@ -47,7 +68,7 @@ struct OfflineSessionBanner: View {
             .fill(Color.cardSurface)
             .overlay {
                 RoundedRectangle(cornerRadius: AppCornerRadius.field, style: .continuous)
-                    .fill(Color.warning.opacity(0.08))
+                    .fill(accentColor.opacity(0.08))
             }
     }
 
@@ -55,41 +76,51 @@ struct OfflineSessionBanner: View {
     private var iconBadge: some View {
         ZStack {
             Circle()
-                .fill(Color.warning.opacity(0.14))
+                .fill(accentColor.opacity(0.14))
                 .frame(width: 36, height: 36)
 
-            if isValidating {
+            if presentation.showsSpinner {
                 ProgressView()
                     .controlSize(.small)
-                    .tint(Color.warning)
+                    .tint(accentColor)
             } else {
-                Image(systemName: "wifi.slash")
+                Image(systemName: iconName)
                     .font(.system(size: 15, weight: .bold))
-                    .foregroundStyle(Color.warning)
+                    .foregroundStyle(accentColor)
             }
         }
         .accessibilityHidden(true)
     }
+
+    private var iconName: String {
+        switch presentation.style {
+        case .validating, .connectionRestoredRefreshing:
+            return "arrow.triangle.2.circlepath"
+        case .offlineShowingCache:
+            return "wifi.slash"
+        case .refreshFailed:
+            return "exclamationmark.triangle"
+        }
+    }
 }
 
 #Preview("Offline Light") {
-    OfflineSessionBanner(connectivityState: .offlineUsingCache)
+    OfflineSessionBanner(presentation: .offlineShowingCache)
         .padding(.horizontal, 16)
         .padding(.top, 4)
         .background(Color.discoverBackgroundGradient)
         .preferredColorScheme(.light)
 }
 
-#Preview("Offline Dark") {
-    OfflineSessionBanner(connectivityState: .offlineUsingCache)
+#Preview("Refreshing") {
+    OfflineSessionBanner(presentation: .connectionRestoredRefreshing)
         .padding(.horizontal, 16)
         .padding(.top, 4)
         .background(Color.discoverBackgroundGradient)
-        .preferredColorScheme(.dark)
 }
 
-#Preview("Validating") {
-    OfflineSessionBanner(connectivityState: .validationPending)
+#Preview("Refresh Failed") {
+    OfflineSessionBanner(presentation: .refreshFailed)
         .padding(.horizontal, 16)
         .padding(.top, 4)
         .background(Color.discoverBackgroundGradient)

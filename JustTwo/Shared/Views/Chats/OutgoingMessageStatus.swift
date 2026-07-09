@@ -1,9 +1,25 @@
 import Foundation
 
+@MainActor
 enum OutgoingMessageStatus {
     static func label(for state: MessageLocalSendState, isImage: Bool) -> String {
+        label(
+            for: state,
+            isImage: isImage,
+            isNetworkOffline: NetworkPathMonitor.shared.shouldSkipNetworkBecauseOffline
+        )
+    }
+
+    static func label(
+        for state: MessageLocalSendState,
+        isImage: Bool,
+        isNetworkOffline: Bool
+    ) -> String {
         switch state {
         case .waitingForNetwork:
+            if isNetworkOffline {
+                return String(localized: "chats.message.willSendWhenOnline")
+            }
             return String(localized: "chats.message.waitingForNetwork")
         case .sending:
             if isImage {
@@ -11,6 +27,9 @@ enum OutgoingMessageStatus {
             }
             return String(localized: "chats.message.sending")
         case .uploading:
+            if isImage {
+                return String(localized: "chats.message.uploadingPhoto")
+            }
             return String(localized: "chats.message.uploading")
         case .retrying:
             return String(localized: "chats.message.retrying")

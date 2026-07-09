@@ -89,6 +89,21 @@ final class MessengerOutbox {
         entries(for: conversationID).filter { $0.state == .queued || $0.state == .sending || $0.state == .failed }.count
     }
 
+    func diagnosticPendingCount() -> Int {
+        entries.values.filter { $0.state == .queued || $0.state == .sending }.count
+    }
+
+    func diagnosticFailedCount() -> Int {
+        entries.values.filter { $0.state == .failed }.count
+    }
+
+    func diagnosticPendingMediaCount() -> Int {
+        entries.values.filter { entry in
+            guard case .image = entry.payload else { return false }
+            return entry.state != .sent
+        }.count
+    }
+
     func serverMessageID(for clientMessageID: String) -> UUID? {
         entries[clientMessageID]?.serverMessageID
     }

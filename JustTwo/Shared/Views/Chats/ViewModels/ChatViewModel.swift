@@ -24,6 +24,7 @@ final class ChatViewModel {
     private(set) var hasMoreOlderMessages = false
     private(set) var isSending = false
     private(set) var isPreparingImage = false
+    private(set) var lastNetworkRefreshFailed = false
     #if canImport(UIKit)
     private(set) var composerPreviewImage: UIImage?
     #endif
@@ -76,6 +77,20 @@ final class ChatViewModel {
     /// `true` only while the first page is still loading and nothing is available to render yet.
     var isAwaitingInitialMessagePage: Bool {
         isLoading && messages.isEmpty
+    }
+
+    var hasCachedMessages: Bool {
+        !messages.isEmpty
+    }
+
+    var isNetworkRefreshingMessages: Bool {
+        messageCache.entry(for: conversation.id)?.isLoading == true
+    }
+
+    var shouldShowOfflineNoMessagesEmpty: Bool {
+        NetworkPathMonitor.shared.shouldSkipNetworkBecauseOffline
+            && messages.isEmpty
+            && !isLoading
     }
 
     convenience init(conversation: ChatConversationPreview) {
@@ -1036,6 +1051,7 @@ final class ChatViewModel {
 
         var showedCachedMessages = applyInMemoryMessageCacheIfAvailable(isInitialLoad: isInitialLoad)
         errorMessage = nil
+        lastNetworkRefreshFailed = false
 
         if !showedCachedMessages, let profileID = session.currentProfile?.id {
             currentProfileID = profileID
@@ -1166,6 +1182,7 @@ final class ChatViewModel {
                 ]
             )
             if showedCachedMessages {
+                lastNetworkRefreshFailed = true
                 syncMessagesFromCache()
                 syncPaginationStateFromCache()
                 MessengerDiagnostics.event(
@@ -1174,7 +1191,8 @@ final class ChatViewModel {
                     metadata: ["count": "\(messages.count)"]
                 )
             }
-            if let message = MessengerSessionSupport.handleNetworkError(error, session: session, router: router) {
+            if !shouldShowOfflineNoMessagesEmpty,
+               let message = MessengerSessionSupport.handleNetworkError(error, session: session, router: router) {
                 errorMessage = message
             }
         } catch {
@@ -1286,13 +1304,19 @@ final class ChatViewModel {
         messages = loaded
         syncPaginationStateFromCache()
         if let cacheError = messageCache.entry(for: conversation.id)?.errorMessage {
-            errorMessage = cacheError
-        } else if showedCachedMessages, !loaded.isEmpty {
+            lastNetworkRefreshFailed = true
+            if !shouldShowOfflineNoMessagesEmpty {
+                errorMessage = cacheError
+            }
+        } else {
+            lastNetworkRefreshFailed = false
+            if showedCachedMessages, !loaded.isEmpty {
             MessengerDiagnostics.event(
                 .messengerMessageLoadingStateRecovered,
                 conversationID: conversation.id,
                 metadata: ["count": "\(loaded.count)"]
             )
+            }
         }
 
         MessengerDiagnostics.event(

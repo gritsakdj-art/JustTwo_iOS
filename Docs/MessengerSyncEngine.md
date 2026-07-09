@@ -132,7 +132,17 @@ Unauthorized: stop sync loop (session handles auth).
 
 Events: `syncEngineStarted`, `syncBootstrapStarted/Succeeded/Failed`, `syncCursorAdvanced`, `syncDeltaPageApplied`, `syncNeedsFullRefresh`, `syncFullRefreshStarted/Succeeded/Failed`, `syncConversationRepairStarted/Applied`, `syncNetworkUnavailable`, `syncBackoffScheduled`, etc.
 
+**PR18 export summary** (prepended to clipboard export): `presentationState`, `syncEngineState`, `lastAppliedRevision`, `lastSuccessfulSyncAt`, outbox counts, `conversationCacheAvailable`. See [Messenger Offline UX](MessengerOfflineUX.md).
+
 Forbidden: message body, caption, JWT, signed URLs, storage keys, absolute paths.
+
+## User-facing sync mapping (PR18)
+
+| Engine state | User-facing (when cache visible) |
+| --- | --- |
+| `syncing` / `bootstrapping` | Refreshing… (subtle strip) |
+| `failed` / `needsFullRefresh` | Couldn't refresh. Saved data is still available. |
+| `idle` | Normal / optional “Updated just now” |
 
 ## Known limitations / PR20
 

@@ -296,6 +296,19 @@
 - **Manual smoke:** not run.
 - Out of scope: backend retention/metrics (PR20), PR18 offline UX polish.
 
+## 2026-07-09 (PR18)
+
+- Branch: `ios-messenger-pr18-offline-ux-polish`.
+- Unified `MessengerConnectivityPresentationState` + `MessengerUXStatusStore` coordinator.
+- Polished `OfflineSessionBanner` (offline/refreshing/refresh failed/validating) with RU/EN strings.
+- Chats list + chat subtle status strips; offline no-cache empty states.
+- Cached data visible during refresh; refresh failure preserves cache.
+- Outbox wording polish (`willSendWhenOnline`, `uploadingPhoto`, tap-to-retry failed).
+- Privacy-safe diagnostics summary header on export.
+- Added `Docs/MessengerOfflineUX.md`; updated startup, outbox, sync engine, local storage docs.
+- Added `MessengerOfflineUXTests`.
+- **Manual smoke:** not run (checklist in PR18 report).
+
 ## Notes
 
 - Continue adding completed changes here after each meaningful update.

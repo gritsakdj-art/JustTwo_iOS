@@ -6,11 +6,13 @@ struct MainTabView: View {
 
     @State private var selectedTab: AppTab = .discover
     @State private var chatsViewModel = ConversationListViewModel.shared
+    @State private var uxStatusStore = MessengerUXStatusStore.shared
+    @State private var syncEngine = MessengerSyncEngine.shared
 
     var body: some View {
         VStack(spacing: 0) {
-            if session.shouldShowOfflineBanner {
-                offlineBanner
+            if let bannerPresentation = uxStatusStore.globalBannerPresentation {
+                offlineBanner(presentation: bannerPresentation)
                     .transition(.move(edge: .top).combined(with: .opacity))
             }
 
@@ -49,10 +51,22 @@ struct MainTabView: View {
             Color.discoverBackgroundGradient
                 .ignoresSafeArea()
         }
-        .animation(.spring(response: 0.34, dampingFraction: 0.86), value: session.shouldShowOfflineBanner)
+        .animation(
+            .spring(response: 0.34, dampingFraction: 0.86),
+            value: uxStatusStore.globalBannerPresentation
+        )
         .onAppear {
             selectedTab = router.selectedMainTab
+            uxStatusStore.activate()
         }
+        .onDisappear {
+            uxStatusStore.deactivate()
+        }
+        .onChange(of: session.connectivityState) { _, _ in }
+        .onChange(of: syncEngine.state) { _, _ in }
+        .onChange(of: chatsViewModel.isRefreshingNetwork) { _, _ in }
+        .onChange(of: chatsViewModel.lastNetworkRefreshFailed) { _, _ in }
+        .onChange(of: chatsViewModel.conversations.count) { _, _ in }
         .task {
             guard session.isFullyAuthenticated else { return }
             await chatsViewModel.loadIfNeeded(session: session, router: router)
@@ -73,8 +87,8 @@ struct MainTabView: View {
         }
     }
 
-    private var offlineBanner: some View {
-        OfflineSessionBanner(connectivityState: session.connectivityState)
+    private func offlineBanner(presentation: MessengerBannerPresentation) -> some View {
+        OfflineSessionBanner(presentation: presentation)
             .padding(.horizontal, 16)
             .padding(.top, 4)
             .padding(.bottom, 4)

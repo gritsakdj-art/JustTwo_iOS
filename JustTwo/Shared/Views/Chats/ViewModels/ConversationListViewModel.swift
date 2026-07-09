@@ -8,7 +8,14 @@ final class ConversationListViewModel {
 
     private(set) var conversations: [ChatConversationPreview] = []
     private(set) var isLoading = false
+    private(set) var isRefreshingNetwork = false
+    private(set) var lastNetworkRefreshFailed = false
+    private(set) var lastRefreshSkippedOffline = false
     var errorMessage: String?
+
+    var hasCachedConversations: Bool {
+        !conversations.isEmpty
+    }
 
     var totalUnreadCount: Int {
         conversations.reduce(0) { $0 + $1.unreadCount }
@@ -19,7 +26,6 @@ final class ConversationListViewModel {
     private var listContentGeneration = 0
     private var appliedRealtimeMessageIDs: Set<UUID> = []
     private var lastNetworkRefreshAt: Date?
-    private var lastNetworkRefreshFailed = false
 
     #if DEBUG
     func setLastNetworkRefreshAtForTesting(_ date: Date?) {
@@ -37,6 +43,8 @@ final class ConversationListViewModel {
         appliedRealtimeMessageIDs = []
         lastNetworkRefreshAt = nil
         lastNetworkRefreshFailed = false
+        lastRefreshSkippedOffline = false
+        isRefreshingNetwork = false
         refreshGeneration += 1
         listContentGeneration += 1
         syncMessengerBadge()
@@ -124,8 +132,14 @@ final class ConversationListViewModel {
                 ]
             )
             isLoading = false
+            isRefreshingNetwork = false
+            lastRefreshSkippedOffline = true
             return
         }
+
+        lastRefreshSkippedOffline = false
+        isRefreshingNetwork = true
+        defer { isRefreshingNetwork = false }
 
         refreshGeneration += 1
         let generation = refreshGeneration

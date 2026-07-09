@@ -3,6 +3,8 @@ import SwiftUI
 struct ChatsView: View {
     @State private var listViewModel: ConversationListViewModel
     @State private var presenceStore = PresenceStore.shared
+    @State private var uxStatusStore = MessengerUXStatusStore.shared
+    @State private var syncEngine = MessengerSyncEngine.shared
     @State private var route: ChatRoute?
     @State private var isInviteSheetPresented = false
 
@@ -33,6 +35,12 @@ struct ChatsView: View {
 
                 VStack(spacing: 0) {
                     header
+                    if let statusText = listStatusText {
+                        MessengerSubtleStatusStrip(
+                            text: statusText,
+                            showsSpinner: isListRefreshing
+                        )
+                    }
                     content
                 }
             }
@@ -173,11 +181,35 @@ struct ChatsView: View {
         return String(format: String(localized: "chats.header.unreadCount"), count)
     }
 
+    private var shouldShowOfflineNoChatsEmpty: Bool {
+        !usesPreviewData
+            && NetworkPathMonitor.shared.shouldSkipNetworkBecauseOffline
+            && !listViewModel.hasCachedConversations
+            && !listViewModel.isLoading
+    }
+
+    private var listStatusText: String? {
+        guard !usesPreviewData else { return nil }
+        return uxStatusStore.chatsListStatusText(listViewModel: listViewModel, session: session)
+    }
+
+    private var isListRefreshing: Bool {
+        listViewModel.isRefreshingNetwork
+            || syncEngine.state == .syncing
+            || syncEngine.state == .bootstrapping
+    }
+
     @ViewBuilder
     private var content: some View {
         if listViewModel.isLoading, listViewModel.conversations.isEmpty {
-            loadingView
-        } else if let errorMessage = listViewModel.errorMessage, listViewModel.conversations.isEmpty {
+            if shouldShowOfflineNoChatsEmpty {
+                offlineNoCacheEmptyState
+            } else {
+                loadingView
+            }
+        } else if let errorMessage = listViewModel.errorMessage,
+                  listViewModel.conversations.isEmpty,
+                  !shouldShowOfflineNoChatsEmpty {
             errorView(message: errorMessage)
         } else {
             conversationsList
@@ -232,6 +264,27 @@ struct ChatsView: View {
         .scrollIndicators(.hidden)
         .scrollContentBackground(.hidden)
         .background(Color.clear)
+    }
+
+    private var offlineNoCacheEmptyState: some View {
+        VStack(spacing: AppSpacing.lg) {
+            Image(systemName: "wifi.slash")
+                .font(.system(size: 48, weight: .light))
+                .foregroundStyle(Color.warning.opacity(0.7))
+                .padding(.bottom, 8)
+
+            Text("chats.empty.offlineNoCache.title")
+                .font(Font.App.headline(size: 20, weight: .bold))
+                .foregroundStyle(Color.primaryText)
+
+            Text("chats.empty.offlineNoCache.subtitle")
+                .font(Font.App.subheadline())
+                .foregroundStyle(Color.secondaryText)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 32)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding(.top, 80)
     }
 
     private var emptyState: some View {

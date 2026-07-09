@@ -15,6 +15,8 @@ struct PrivateChatView: View {
 
     @State private var viewModel: ChatViewModel
     @State private var presenceStore = PresenceStore.shared
+    @State private var uxStatusStore = MessengerUXStatusStore.shared
+    @State private var syncEngine = MessengerSyncEngine.shared
 
     @Environment(SessionStore.self) private var session
     @Environment(AppRouter.self) private var router
@@ -78,6 +80,13 @@ struct PrivateChatView: View {
         @Bindable var viewModel = viewModel
 
         return VStack(spacing: 0) {
+            if let statusText = chatStatusText {
+                MessengerSubtleStatusStrip(
+                    text: statusText,
+                    showsSpinner: isChatRefreshing
+                )
+            }
+
             messageList
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
 
@@ -243,6 +252,17 @@ struct PrivateChatView: View {
         .background(Color.clear)
     }
 
+    private var chatStatusText: String? {
+        guard !usesPreviewData else { return nil }
+        return uxStatusStore.chatStatusText(chatViewModel: viewModel, session: session)
+    }
+
+    private var isChatRefreshing: Bool {
+        viewModel.isNetworkRefreshingMessages
+            || syncEngine.state == .syncing
+            || syncEngine.state == .bootstrapping
+    }
+
     @ViewBuilder
     private var messageList: some View {
         ZStack {
@@ -259,6 +279,8 @@ struct PrivateChatView: View {
                         .font(Font.App.subheadline())
                         .foregroundStyle(Color.secondaryText)
                 }
+            } else if viewModel.shouldShowOfflineNoMessagesEmpty {
+                offlineNoMessagesEmptyState
             } else if let errorMessage = viewModel.errorMessage, viewModel.messages.isEmpty {
                 StatePlaceholderView(
                     title: String(localized: "chats.error.title"),
@@ -274,6 +296,16 @@ struct PrivateChatView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private var offlineNoMessagesEmptyState: some View {
+        StatePlaceholderView(
+            title: String(localized: "chats.empty.offlineNoMessages.title"),
+            subtitle: String(localized: "chats.empty.offlineNoMessages.subtitle"),
+            systemImage: "wifi.slash",
+            actionTitle: nil,
+            action: nil
+        )
     }
 
     private var shouldShowMessageList: Bool {

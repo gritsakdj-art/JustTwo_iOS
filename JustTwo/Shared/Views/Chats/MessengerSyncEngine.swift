@@ -1,6 +1,7 @@
 import Foundation
 
 @MainActor
+@Observable
 final class MessengerSyncEngine {
 
     static let shared = MessengerSyncEngine()
