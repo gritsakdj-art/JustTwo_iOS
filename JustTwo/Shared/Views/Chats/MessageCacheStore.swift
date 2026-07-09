@@ -763,6 +763,9 @@ final class MessageCacheStore {
         if message.isMine {
             switch reconcileOutgoingMessage(message, conversationID: conversationID, source: .realtime) {
             case .reconciled(let applied):
+                if applied {
+                    notifyMessagesDidChange(conversationID: conversationID)
+                }
                 return applied
             case .ambiguousPending:
                 if entries[conversationID]?.messages.contains(where: { $0.id == message.id }) == true {
@@ -792,6 +795,7 @@ final class MessageCacheStore {
             entry.messages = sortedMessages(entry.messages)
             entry.loadedAt = .now
             entries[conversationID] = entry
+            notifyMessagesDidChange(conversationID: conversationID)
             return false
         }
 
@@ -799,6 +803,7 @@ final class MessageCacheStore {
         entry.messages = sortedMessages(entry.messages)
         entry.loadedAt = .now
         entries[conversationID] = entry
+        notifyMessagesDidChange(conversationID: conversationID)
         return true
     }
 
@@ -1014,6 +1019,7 @@ final class MessageCacheStore {
         entry.messages[index] = entry.messages[index].markingDeleted(deletedAt: deletedAt)
         entry.loadedAt = .now
         entries[conversationID] = entry
+        notifyMessagesDidChange(conversationID: conversationID)
         return true
     }
 
@@ -1052,6 +1058,7 @@ final class MessageCacheStore {
         )
         entry.loadedAt = .now
         entries[conversationID] = entry
+        notifyMessagesDidChange(conversationID: conversationID)
         return true
     }
 
@@ -1088,6 +1095,7 @@ final class MessageCacheStore {
         entry.messages[index] = entry.messages[index].replacingReactions(reactions)
         entry.loadedAt = .now
         entries[conversationID] = entry
+        notifyMessagesDidChange(conversationID: conversationID)
         return true
     }
 
@@ -1119,6 +1127,7 @@ final class MessageCacheStore {
         guard didUpdate else { return false }
         entry.loadedAt = .now
         entries[conversationID] = entry
+        notifyMessagesDidChange(conversationID: conversationID)
         return true
     }
 
@@ -1148,5 +1157,9 @@ final class MessageCacheStore {
 
     private func durationMilliseconds(since startDate: Date) -> Int {
         max(0, Int(Date().timeIntervalSince(startDate) * 1_000))
+    }
+
+    private func notifyMessagesDidChange(conversationID: UUID) {
+        MessengerConversationNotification.postMessagesDidChange(conversationID: conversationID)
     }
 }
