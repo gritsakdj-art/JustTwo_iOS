@@ -14,7 +14,7 @@ On-device messenger persistence using SwiftData.
 | PR15F | Messenger startup/request optimization | ✅ |
 | PR16A | Persistent text outbox | ✅ (pending manual smoke) |
 | PR16B | Persistent image outbox + composer preview | ✅ (pending manual smoke) |
-| PR16C | Outbox retry polish / scheduler | planned |
+| PR16C | Outbox retry UI + network restore polish | ✅ (pending manual smoke) |
 | PR17 | Full sync engine | planned |
 
 ## PR15D — Offline-friendly startup
@@ -408,6 +408,41 @@ PR16B adds `LocalMessengerPendingMedia` and `pendingMediaID` on outbox rows. Sch
 | `Shared/Views/Chats/ChatImagePreparer.swift` | Persistent + preview image preparation |
 | `Shared/Components/Chat/MessageInputView.swift` | Composer image preview + remove |
 | `JustTwoTests/MessengerPendingMediaStoreTests.swift` | Pending media store tests |
+
+## PR16C — Outbox retry UI + network restore polish
+
+Implemented on PR16A/PR16B foundation. See [Messenger Outbox](MessengerOutbox.md) PR16C section for full behavior.
+
+### Outbox status fields (unchanged schema)
+
+| `status` | Meaning |
+|----------|---------|
+| `pending` | Ready or waiting for retry window |
+| `sending` | Active network attempt |
+| `failed` | Last attempt failed; may auto-retry per `nextRetryAt` |
+| `sent` | Transitional before row delete |
+| `cancelled` | User-cancelled (row deleted locally) |
+
+### Pending/cancelled lifecycle (PR16C)
+
+```text
+pending/failed → user Delete → cancelPending
+  → cancel in-memory task
+  → remove optimistic bubble
+  → deleteOutboxItem (+ pending media file for image)
+  → no backend delete
+```
+
+Logout: `resetAllMessengerData()` clears all outbox + pending media rows and files.
+
+### File map (PR16C additions)
+
+| Path | Responsibility |
+|------|----------------|
+| `Shared/Views/Chats/OutgoingMessageStatus.swift` | UI labels + state helpers |
+| `Shared/Views/Chats/MessengerOutboxErrorCode.swift` | Failure classification |
+| `Shared/Components/Chat/ChatBubbleView.swift` | Unified outgoing status footer |
+| `Shared/Views/Chats/ViewModels/ChatViewModel.swift` | Cancel pending vs confirmed delete |
 
 ### File map (PR16A additions)
 

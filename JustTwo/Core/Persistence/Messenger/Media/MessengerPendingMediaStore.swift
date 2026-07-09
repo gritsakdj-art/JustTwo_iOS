@@ -24,8 +24,6 @@ enum MessengerPendingMediaStoreError: Error, Equatable {
 
 enum MessengerPendingMediaStore {
 
-    nonisolated static let directoryName = "MessengerPendingMedia"
-
     nonisolated static func storeJPEG(
         data: Data,
         pendingMediaID: String,
@@ -150,7 +148,7 @@ enum MessengerPendingMediaStore {
             ?? FileManager.default.temporaryDirectory
         return base
             .appendingPathComponent("JustTwo", isDirectory: true)
-            .appendingPathComponent(directoryName, isDirectory: true)
+            .appendingPathComponent("MessengerPendingMedia", isDirectory: true)
     }
 
     private nonisolated static func sanitizedFileComponent(_ value: String) throws -> String {

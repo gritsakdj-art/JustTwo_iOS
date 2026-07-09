@@ -277,12 +277,25 @@ final class MessengerOutbox {
         router: AppRouter,
         isManual: Bool = false
     ) {
-        guard var entry = entries[clientMessageID], entry.state == .failed else { return }
+        guard var entry = entries[clientMessageID] else { return }
+
+        let canRetry: Bool
+        if isManual {
+            canRetry = entry.state == .failed || entry.state == .queued
+        } else {
+            canRetry = entry.state == .failed
+        }
+        guard canRetry else { return }
+
         guard sendTasks[clientMessageID] == nil else {
             MessengerDiagnostics.event(
-                .outboxRetrySkippedAlreadySending,
+                .outboxRetrySkipped,
                 conversationID: entry.conversationID,
-                clientMessageID: clientMessageID
+                clientMessageID: clientMessageID,
+                metadata: [
+                    "kind": entry.payload.kindName,
+                    "retryReason": isManual ? "manual" : "auto"
+                ]
             )
             return
         }
@@ -290,27 +303,72 @@ final class MessengerOutbox {
         entry.state = .queued
         entry.lastError = nil
         entries[clientMessageID] = entry
+
+        let presentationState: MessageLocalSendState = isManual ? .retrying : .sending
         _ = MessageCacheStore.shared.updateOptimisticMessageState(
             clientMessageID: clientMessageID,
             conversationID: entry.conversationID,
-            state: .sending
+            state: presentationState
         )
         MessengerConversationNotification.postMessagesDidChange(conversationID: entry.conversationID)
 
         let event: MessengerDiagnosticEvent = isManual
-            ? .outboxManualRetry
+            ? .outboxRetryTapped
             : (entry.payload.kindName == "image" ? .imageOutboxRetryRequested : .outboxRetryRequested)
         MessengerDiagnostics.event(
             event,
             conversationID: entry.conversationID,
             clientMessageID: clientMessageID,
-            metadata: ["kind": entry.payload.kindName]
+            metadata: [
+                "kind": entry.payload.kindName,
+                "retryReason": isManual ? "manual" : "auto"
+            ]
         )
 
         Task {
             try? await MessengerLocalStore.shared.markOutboxPending(clientMessageID: clientMessageID)
             pumpConversationQueue(conversationID: entry.conversationID, session: session, router: router)
         }
+    }
+
+    func cancelPending(clientMessageID: String) {
+        sendTasks[clientMessageID]?.cancel()
+        sendTasks.removeValue(forKey: clientMessageID)
+
+        if let entry = entries.removeValue(forKey: clientMessageID) {
+            conversationQueues[entry.conversationID]?.removeAll { $0 == clientMessageID }
+            MessengerDiagnostics.event(
+                .outboxCancelTapped,
+                conversationID: entry.conversationID,
+                clientMessageID: clientMessageID,
+                metadata: ["kind": entry.payload.kindName]
+            )
+        }
+    }
+
+    func outgoingEntryState(for clientMessageID: String) -> State? {
+        entries[clientMessageID]?.state
+    }
+
+    func updateOutgoingPresentation(
+        clientMessageID: String,
+        conversationID: UUID,
+        state: MessageLocalSendState
+    ) {
+        let updated = MessageCacheStore.shared.updateOptimisticMessageState(
+            clientMessageID: clientMessageID,
+            conversationID: conversationID,
+            state: state
+        )
+        guard updated else { return }
+
+        MessengerDiagnostics.event(
+            .outboxStateChanged,
+            conversationID: conversationID,
+            clientMessageID: clientMessageID,
+            metadata: ["status": OutgoingMessageStatus.diagnosticName(for: state)]
+        )
+        MessengerConversationNotification.postMessagesDidChange(conversationID: conversationID)
     }
 
     func rehydrateImageItem(
@@ -479,7 +537,7 @@ final class MessengerOutbox {
         guard sendTasks[clientMessageID] == nil else { return }
 
         entries[clientMessageID]?.state = .sending
-        _ = MessageCacheStore.shared.updateOptimisticMessageState(
+        updateOutgoingPresentation(
             clientMessageID: clientMessageID,
             conversationID: entry.conversationID,
             state: .sending
@@ -511,7 +569,11 @@ final class MessengerOutbox {
 
             do {
                 let profileID = try await MessengerSessionSupport.resolveCurrentProfileID(session: session)
-                let dto = try await self.send(entry: currentEntry, clientMessageID: clientMessageID)
+                let dto = try await self.send(
+                    entry: currentEntry,
+                    clientMessageID: clientMessageID,
+                    session: session
+                )
 
                 guard !Task.isCancelled else { return }
 
@@ -556,6 +618,18 @@ final class MessengerOutbox {
                     conversationID: currentEntry.conversationID,
                     message: dto,
                     currentProfileID: profileID
+                )
+
+                MessengerDiagnostics.event(
+                    .outboxProcessorItemSucceeded,
+                    conversationID: currentEntry.conversationID,
+                    messageID: mapped.id,
+                    clientMessageID: clientMessageID,
+                    metadata: [
+                        "durationMs": "\(max(0, Int(Date().timeIntervalSince(startedAt) * 1_000)))",
+                        "reconciled": "\(reconciled)",
+                        "kind": currentEntry.payload.kindName
+                    ]
                 )
 
                 MessengerDiagnostics.event(
@@ -608,7 +682,11 @@ final class MessengerOutbox {
         }
     }
 
-    private func send(entry: Entry, clientMessageID: String) async throws -> MessageDTO {
+    private func send(
+        entry: Entry,
+        clientMessageID: String,
+        session: SessionStore
+    ) async throws -> MessageDTO {
         switch entry.payload {
         case .text(let payload):
             return try await MessageService.sendMessage(
@@ -649,6 +727,11 @@ final class MessengerOutbox {
                 throw error
             }
 
+            updateOutgoingPresentation(
+                clientMessageID: clientMessageID,
+                conversationID: entry.conversationID,
+                state: .uploading
+            )
             MessengerDiagnostics.event(
                 .outboxImageUploadStarted,
                 conversationID: entry.conversationID,
@@ -679,21 +762,27 @@ final class MessengerOutbox {
                     clientMessageID: clientMessageID
                 )
             } catch {
+                let errorCode = MessengerOutboxErrorCode.classifyUploadFailure(error).rawValue
                 MessengerDiagnostics.event(
                     .outboxImageUploadFailed,
                     conversationID: entry.conversationID,
                     clientMessageID: clientMessageID,
-                    metadata: ["errorCategory": MessengerDiagnostics.sanitizeError(error)]
+                    metadata: ["errorCode": errorCode]
                 )
                 MessengerDiagnostics.event(
                     .imageUploadFailed,
                     conversationID: entry.conversationID,
                     clientMessageID: clientMessageID,
-                    metadata: ["errorCategory": MessengerDiagnostics.sanitizeError(error)]
+                    metadata: ["errorCategory": errorCode]
                 )
                 throw error
             }
 
+            updateOutgoingPresentation(
+                clientMessageID: clientMessageID,
+                conversationID: entry.conversationID,
+                state: .sending
+            )
             MessengerDiagnostics.event(
                 .outboxImageCreateMessageStarted,
                 conversationID: entry.conversationID,
@@ -727,17 +816,18 @@ final class MessengerOutbox {
                 )
                 return dto
             } catch {
+                let errorCode = MessengerOutboxErrorCode.classifyCreateMessageFailure(error).rawValue
                 MessengerDiagnostics.event(
                     .outboxImageCreateMessageFailed,
                     conversationID: entry.conversationID,
                     clientMessageID: clientMessageID,
-                    metadata: ["errorCategory": MessengerDiagnostics.sanitizeError(error)]
+                    metadata: ["errorCode": errorCode]
                 )
                 MessengerDiagnostics.event(
                     .imageMessageCreateFailed,
                     conversationID: entry.conversationID,
                     clientMessageID: clientMessageID,
-                    metadata: ["errorCategory": MessengerDiagnostics.sanitizeError(error)]
+                    metadata: ["errorCategory": errorCode]
                 )
                 throw error
             }
@@ -760,26 +850,40 @@ final class MessengerOutbox {
         session: SessionStore,
         router: AppRouter
     ) {
+        guard !Task.isCancelled else { return }
         guard var entry = entries[clientMessageID] else { return }
+
+        let classified = MessengerOutboxErrorCode.classify(error)
+        if classified == .cancelled {
+            return
+        }
 
         entry.state = .failed
         entry.lastError = (error as? NetworkError)?.userMessage ?? error.localizedDescription
         entries[clientMessageID] = entry
 
-        _ = MessageCacheStore.shared.updateOptimisticMessageState(
+        let presentationState: MessageLocalSendState
+        if classified == .networkUnavailable || NetworkPathMonitor.shared.shouldSkipNetworkBecauseOffline {
+            presentationState = .waitingForNetwork
+        } else {
+            presentationState = .failed
+        }
+
+        updateOutgoingPresentation(
             clientMessageID: clientMessageID,
             conversationID: entry.conversationID,
-            state: .failed
+            state: presentationState
         )
 
         if entry.payload.kindName == "text" || entry.payload.kindName == "image" {
-            let errorCode = MessengerDiagnostics.sanitizeError(error)
+            let errorCode = classified.rawValue
+            let nextRetryAt: Date? = classified.blocksAutomaticRetry ? Date.distantFuture : nil
             Task {
                 do {
                     try await MessengerLocalStore.shared.markOutboxFailed(
                         clientMessageID: clientMessageID,
                         errorCode: errorCode,
-                        nextRetryAt: nil
+                        nextRetryAt: nextRetryAt
                     )
                     if let snapshot = try await MessengerLocalStore.shared.fetchOutboxItem(clientMessageID: clientMessageID) {
                         let retryEvent: MessengerDiagnosticEvent = entry.payload.kindName == "image"
@@ -791,16 +895,14 @@ final class MessengerOutbox {
                             clientMessageID: clientMessageID,
                             metadata: [
                                 "attemptCount": "\(snapshot.attemptCount)",
-                                "errorCode": errorCode
+                                "errorCode": errorCode,
+                                "retryReason": "auto"
                             ]
                         )
                     }
                 } catch {
-                    let retryEvent: MessengerDiagnosticEvent = entry.payload.kindName == "image"
-                        ? .outboxImageRetryScheduled
-                        : .outboxRetryScheduled
                     MessengerDiagnostics.event(
-                        retryEvent,
+                        .outboxRetryScheduled,
                         conversationID: entry.conversationID,
                         clientMessageID: clientMessageID,
                         metadata: ["errorCategory": MessengerDiagnostics.sanitizeError(error)]
@@ -810,12 +912,22 @@ final class MessengerOutbox {
         }
 
         MessengerDiagnostics.event(
+            .outboxProcessorItemFailed,
+            conversationID: entry.conversationID,
+            clientMessageID: clientMessageID,
+            metadata: [
+                "durationMs": "\(max(0, Int(Date().timeIntervalSince(startedAt) * 1_000)))",
+                "errorCode": classified.rawValue,
+                "kind": entry.payload.kindName
+            ]
+        )
+        MessengerDiagnostics.event(
             .outboxSendFailed,
             conversationID: entry.conversationID,
             clientMessageID: clientMessageID,
             metadata: [
                 "durationMs": "\(max(0, Int(Date().timeIntervalSince(startedAt) * 1_000)))",
-                "errorCategory": MessengerDiagnostics.sanitizeError(error),
+                "errorCategory": classified.rawValue,
                 "kind": entry.payload.kindName
             ]
         )
@@ -826,7 +938,9 @@ final class MessengerOutbox {
             _ = MessengerSessionSupport.handleNetworkError(networkError, session: session, router: router)
         }
 
-        pumpConversationQueueInternal(conversationID: entry.conversationID, session: session, router: router)
+        if !classified.blocksAutomaticRetry {
+            pumpConversationQueueInternal(conversationID: entry.conversationID, session: session, router: router)
+        }
     }
 
     static func clearPersistedOutboxItem(clientMessageID: String, conversationID: UUID, reason: String) {

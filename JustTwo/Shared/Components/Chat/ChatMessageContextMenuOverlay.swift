@@ -211,7 +211,7 @@ struct ChatMessageContextMenuOverlay: View {
                 actionRow(title: "chats.action.edit", icon: "pencil", action: onEdit)
                 rowDivider
             }
-            if message.canDelete {
+            if message.canCancelPendingOutgoing || message.canDelete {
                 actionRow(
                     title: "chats.action.delete",
                     icon: "trash",

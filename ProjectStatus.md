@@ -268,6 +268,20 @@
 - **Manual smoke:** not run (checklist in PR16B report).
 - Out of scope: retry UI polish (PR16C), full sync engine.
 
+## 2026-07-09 (PR16C)
+
+- Branch: `ios-messenger-pr16c-outbox-retry-ui`.
+- Unified `MessageLocalSendState` for text/image: waiting, sending, uploading, retrying, failed.
+- `ChatBubbleView` status footer + image progress for in-flight states.
+- Manual retry + cancel/delete pending via context menu; cancel does not call backend delete.
+- `MessengerOutboxProcessor`: debounced network restore (750ms), `syncOutgoingPresentationStates`, single-flight pump.
+- `MessengerOutboxErrorCode` classification; backoff via existing `MessengerOutboxRetryPolicy`.
+- Privacy-safe diagnostics events for retry/cancel/network/processor lifecycle.
+- Updated `Docs/MessengerOutbox.md`, `Docs/MessengerLocalStorage.md`, `Docs/MessengerMediaCache.md`.
+- Extended `MessengerOutboxTests` + related tests.
+- **Manual smoke:** not run (checklist in PR16C report).
+- Out of scope: full sync engine (PR17), PR18 offline UX polish.
+
 ## Notes
 
 - Continue adding completed changes here after each meaningful update.

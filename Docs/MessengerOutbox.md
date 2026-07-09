@@ -12,7 +12,7 @@ Unsent outgoing messages must survive app kill, relaunch, and transient network 
 |----------|--------------------------|
 | Text outbox in SwiftData | Full background sync engine (PR16C) |
 | Stable `clientMessageID` retry | Persistent sync cursor |
-| Manual retry UI (existing failed bubble) | Polished retry-state UI (PR16C) |
+| Manual retry UI (existing failed bubble) | Polished retry-state UI (PR16C) ✅ |
 | Limited auto-retry on chat open / network restore | |
 
 ## PR16B scope (image + composer preview)
@@ -21,7 +21,7 @@ Unsent outgoing messages must survive app kill, relaunch, and transient network 
 |----------|--------------|
 | Composer image preview before Send | Multiple image selection |
 | Remove preview (X) without creating outbox | Image editing/cropping |
-| Image + optional comment as **one** `kind=image` message | Polished failed/retry UI polish (PR16C) |
+| Image + optional comment as **one** `kind=image` message | Polished failed/retry UI polish (PR16C) ✅ |
 | Durable pending media files in Application Support | Full MessengerSyncEngine |
 | `LocalMessengerPendingMedia` SwiftData metadata | Backend changes |
 | Image outbox on PR16A lifecycle | Storing upload/download URLs |
@@ -193,10 +193,26 @@ Diagnostics events (PR16B additions): `outboxImageComposerPreviewSelected`, `out
 
 ## PR16C TODO
 
-- Polished failed/retry UI states
-- Broader auto-retry scheduler
-- Optional move/copy pending file into confirmed media cache after success (if architecture allows without URL/storageKey leaks)
+_Implemented — pending manual smoke._
+
+### User-facing outgoing states
+
+Runtime `MessageLocalSendState`: `waitingForNetwork`, `sending`, `uploading`, `retrying`, `failed`. See bubble status footer in `ChatBubbleView`.
+
+### Manual retry / cancel / auto-retry
+
+- Manual retry preserves `clientMessageID` and image caption.
+- Cancel pending removes outbox + bubble + pending media (no backend delete).
+- Network restore debounces 750ms then pumps ready items when authenticated.
+
+### Error classification + backoff
+
+`MessengerOutboxErrorCode` + `MessengerOutboxRetryPolicy` (5s / 15s / 60s cap).
+
+### Remaining (PR18)
+
+- Global offline UX polish, optional retry countdown UI.
 
 ## Manual smoke
 
-See PR16B report checklist in `ProjectStatus.md`.
+See PR16C report checklist in `ProjectStatus.md`.

@@ -69,7 +69,9 @@ final class MessageCacheStore {
             .optimisticMessageInserted,
             conversationID: conversationID,
             clientMessageID: message.clientMessageID,
-            metadata: ["state": message.localSendState == .failed ? "failed" : "sending"]
+            metadata: ["state": OutgoingMessageStatus.diagnosticName(
+                for: message.localSendState ?? .sending
+            )]
         )
     }
 
@@ -88,6 +90,28 @@ final class MessageCacheStore {
         entry.loadedAt = .now
         entries[conversationID] = entry
         return true
+    }
+
+    @discardableResult
+    func removeOptimisticMessage(clientMessageID: String, conversationID: UUID) -> Bool {
+        guard var entry = entries[conversationID],
+              let index = entry.messages.firstIndex(where: {
+                  $0.clientMessageID == clientMessageID && $0.localSendState != nil
+              }) else {
+            return false
+        }
+
+        entry.messages.remove(at: index)
+        entry.loadedAt = .now
+        entries[conversationID] = entry
+        MessengerConversationNotification.postMessagesDidChange(conversationID: conversationID)
+        return true
+    }
+
+    func conversationIDsWithPendingOutgoing() -> [UUID] {
+        entries.compactMap { key, value in
+            value.messages.contains(where: { $0.localSendState != nil }) ? key : nil
+        }
     }
 
     @discardableResult

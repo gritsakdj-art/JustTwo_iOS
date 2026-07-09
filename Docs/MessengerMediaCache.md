@@ -60,6 +60,8 @@ Application Support/JustTwo/MessengerPendingMedia/<pendingMediaID>/<clientMessag
 
 Pending outgoing files are **not** inserted into PR15E `MediaCache/` before server confirmation. After success, pending file is deleted; confirmed bubble loads via normal attachment/cache paths.
 
+**PR16C:** User cancel/delete on failed/pending image also deletes the pending media file via `deleteOutboxItem` — confirmed PR15E cache is unaffected.
+
 See [Messenger Outbox](MessengerOutbox.md) for composer preview, retry pipeline, and cleanup rules.
 
 ### Components

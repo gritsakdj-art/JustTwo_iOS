@@ -3,7 +3,10 @@ import CoreGraphics
 import CryptoKit
 
 enum MessageLocalSendState: Equatable, Hashable {
+    case waitingForNetwork
     case sending
+    case uploading
+    case retrying
     case failed
 }
 
@@ -202,8 +205,9 @@ struct ChatMessage: Identifiable, Equatable, Hashable {
     var canCopy: Bool { rawBody != nil && !(rawBody?.isEmpty ?? true) }
     var canEdit: Bool { isMine && kind == .text && !isDeleted && localSendState == nil }
     var canDelete: Bool { isMine && !isDeleted && localSendState == nil }
+    var canCancelPendingOutgoing: Bool { isMine && !isDeleted && localSendState != nil }
     var canReact: Bool { !isDeleted && localSendState == nil }
-    var canRetrySend: Bool { isMine && localSendState == .failed }
+    var canRetrySend: Bool { isMine && (localSendState?.isRetryable == true) }
 }
 
 enum ChatImageRenderSource: Equatable {

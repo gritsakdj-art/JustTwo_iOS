@@ -402,6 +402,104 @@ struct MessengerOutboxTests {
         #endif
     }
 
+    @Test
+    func retryBackoffSchedulesIncreasingDelays() {
+        let now = Date(timeIntervalSince1970: 1_700_000_000)
+        let second = MessengerOutboxRetryPolicy.nextRetryDate(afterAttemptCount: 2, from: now)
+        let third = MessengerOutboxRetryPolicy.nextRetryDate(afterAttemptCount: 3, from: now)
+        let fourth = MessengerOutboxRetryPolicy.nextRetryDate(afterAttemptCount: 4, from: now)
+
+        #expect(second.timeIntervalSince(now) == 5)
+        #expect(third.timeIntervalSince(now) == 15)
+        #expect(fourth.timeIntervalSince(now) == 60)
+    }
+
+    @Test
+    func manualMarkPendingOverridesFutureNextRetryAt() async throws {
+        let store = makeStore()
+        _ = try await store.createTextOutboxItem(
+            conversationID: conversationID,
+            clientMessageID: clientMessageID,
+            body: "Backoff",
+            replyToMessageID: nil
+        )
+
+        let future = Date().addingTimeInterval(3600)
+        try await store.markOutboxFailed(
+            clientMessageID: clientMessageID,
+            errorCode: MessengerOutboxErrorCode.networkUnavailable.rawValue,
+            nextRetryAt: future
+        )
+
+        try await store.markOutboxPending(clientMessageID: clientMessageID)
+        let pending = try #require(try await store.fetchOutboxItem(clientMessageID: clientMessageID))
+
+        #expect(pending.status == .pending)
+        #expect(pending.nextRetryAt != nil)
+        #expect(pending.nextRetryAt! <= Date().addingTimeInterval(1))
+    }
+
+    @Test
+    func unauthorizedErrorBlocksAutomaticRetry() {
+        #expect(MessengerOutboxErrorCode.unauthorized.blocksAutomaticRetry)
+    }
+
+    @Test
+    func missingPendingMediaBlocksAutomaticRetry() {
+        #expect(MessengerOutboxErrorCode.missingPendingMedia.blocksAutomaticRetry)
+    }
+
+    @Test
+    func outgoingStatesExposeRetryableAndProgressFlags() {
+        #expect(MessageLocalSendState.failed.isRetryable)
+        #expect(MessageLocalSendState.waitingForNetwork.isRetryable)
+        #expect(!MessageLocalSendState.sending.isRetryable)
+        #expect(MessageLocalSendState.uploading.showsProgressIndicator)
+        #expect(MessageLocalSendState.retrying.showsProgressIndicator)
+    }
+
+    @Test
+    func cancelRemovesOptimisticMessageFromCache() {
+        let cache = MessageCacheStore.shared
+        let clientID = "client-cancel-text"
+        let optimistic = ChatMessage.optimisticOutgoing(
+            clientMessageID: clientID,
+            body: "Remove me",
+            replyPreview: nil,
+            createdAt: .now
+        ).replacingLocalSendState(.failed)
+
+        cache.insertOptimisticMessage(optimistic, for: conversationID)
+        #expect(cache.messages(for: conversationID)?.contains(where: { $0.clientMessageID == clientID }) == true)
+
+        let removed = cache.removeOptimisticMessage(clientMessageID: clientID, conversationID: conversationID)
+        #expect(removed)
+        #expect(cache.messages(for: conversationID)?.contains(where: { $0.clientMessageID == clientID }) != true)
+    }
+
+    @Test
+    func pr16cDiagnosticsDoNotLeakSensitiveMetadata() {
+        let entry = MessengerDiagnostics.makeEntry(
+            .outboxCancelTapped,
+            conversationID: conversationID,
+            clientMessageID: clientMessageID,
+            metadata: [
+                "body": "secret",
+                "caption": "hidden",
+                "uploadUrl": "https://example.com/upload?X-Amz-Signature=abc",
+                "localPath": "/Users/secret/pending.jpg",
+                "Authorization": "Bearer jwt-token"
+            ]
+        )
+
+        let export = entry.exportLine
+        #expect(!export.contains("secret"))
+        #expect(!export.contains("hidden"))
+        #expect(!export.contains("upload"))
+        #expect(!export.contains("Bearer"))
+        #expect(!export.contains("/Users/"))
+    }
+
     #if canImport(UIKit)
     private func makeTestJPEGData() -> Data {
         let size = CGSize(width: 10, height: 10)

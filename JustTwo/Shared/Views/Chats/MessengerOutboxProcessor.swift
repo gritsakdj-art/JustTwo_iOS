@@ -7,6 +7,10 @@ final class MessengerOutboxProcessor {
 
     private var networkHandlerID: UUID?
     private var isRecovering = false
+    private var debouncedRetryTask: Task<Void, Never>?
+    private var isProcessing = false
+
+    private let networkRestoreDebounceMilliseconds = 750
 
     private init() {}
 
@@ -15,12 +19,14 @@ final class MessengerOutboxProcessor {
         networkHandlerID = NetworkPathMonitor.shared.registerPathChangeHandler { [weak self] in
             guard let self else { return }
             Task { @MainActor in
-                await self.processReadyItems(session: session, router: router)
+                await self.handleNetworkPathChange(session: session, router: router)
             }
         }
     }
 
     func deactivate() {
+        debouncedRetryTask?.cancel()
+        debouncedRetryTask = nil
         if let networkHandlerID {
             NetworkPathMonitor.shared.unregisterHandler(networkHandlerID)
             self.networkHandlerID = nil
@@ -35,6 +41,13 @@ final class MessengerOutboxProcessor {
         do {
             let resetCount = try await localStore.resetStaleOutboxSendingItems()
             if resetCount > 0 {
+                MessengerDiagnostics.event(
+                    .outboxStaleSendingRecovered,
+                    metadata: [
+                        "reason": "staleSending",
+                        "count": "\(resetCount)"
+                    ]
+                )
                 MessengerDiagnostics.event(
                     .outboxReset,
                     metadata: [
@@ -96,7 +109,10 @@ final class MessengerOutboxProcessor {
                 }
             }
 
-            guard !activeItems.isEmpty else { return }
+            guard !activeItems.isEmpty else {
+                syncOutgoingPresentationStates(conversationID: conversationID)
+                return
+            }
 
             let cachedMessages = MessageCacheStore.shared.messages(for: conversationID) ?? []
             var insertedCount = 0
@@ -139,7 +155,7 @@ final class MessengerOutboxProcessor {
                 }
 
                 let replyPreview = replyPreview(from: item, messages: cachedMessages)
-                let localState: MessageLocalSendState = item.status == .failed ? .failed : .sending
+                let localState = presentationState(for: item)
 
                 switch item.kind {
                 case .text:
@@ -163,8 +179,8 @@ final class MessengerOutboxProcessor {
                     guard let prepared = try await loadPreparedImage(for: item) else {
                         try? await localStore.markOutboxFailed(
                             clientMessageID: item.clientMessageID,
-                            errorCode: "pendingMediaMissing",
-                            nextRetryAt: nil
+                            errorCode: MessengerOutboxErrorCode.missingPendingMedia.rawValue,
+                            nextRetryAt: Date.distantFuture
                         )
                         MessengerDiagnostics.event(
                             .outboxPendingMediaMissing,
@@ -220,6 +236,8 @@ final class MessengerOutboxProcessor {
                 MessengerConversationNotification.postMessagesDidChange(conversationID: conversationID)
             }
 
+            syncOutgoingPresentationStates(conversationID: conversationID)
+
             await processReadyItems(
                 session: session,
                 router: router,
@@ -242,9 +260,12 @@ final class MessengerOutboxProcessor {
         session: SessionStore,
         router: AppRouter
     ) async {
+        guard session.isFullyAuthenticated else { return }
+
         MessengerDiagnostics.event(
-            .outboxManualRetry,
-            clientMessageID: clientMessageID
+            .outboxRetryTapped,
+            clientMessageID: clientMessageID,
+            metadata: ["retryReason": "manual"]
         )
 
         MessengerOutbox.shared.retry(
@@ -255,14 +276,66 @@ final class MessengerOutboxProcessor {
         )
     }
 
+    func cancelPending(
+        clientMessageID: String,
+        conversationID: UUID,
+        session: SessionStore,
+        router: AppRouter
+    ) async {
+        MessengerOutbox.shared.cancelPending(clientMessageID: clientMessageID)
+        MessageCacheStore.shared.removeOptimisticMessage(
+            clientMessageID: clientMessageID,
+            conversationID: conversationID
+        )
+
+        do {
+            try await localStore.deleteOutboxItem(clientMessageID: clientMessageID)
+            MessengerDiagnostics.event(
+                .outboxItemCleared,
+                conversationID: conversationID,
+                clientMessageID: clientMessageID,
+                metadata: ["reason": "cancelled"]
+            )
+        } catch {
+            MessengerDiagnostics.event(
+                .outboxItemCleared,
+                conversationID: conversationID,
+                clientMessageID: clientMessageID,
+                metadata: [
+                    "reason": "cancelledFailed",
+                    "errorCategory": MessengerDiagnostics.sanitizeError(error)
+                ]
+            )
+        }
+    }
+
     func processReadyItems(
         session: SessionStore,
         router: AppRouter,
         conversationID: UUID? = nil
     ) async {
         guard session.isFullyAuthenticated else { return }
+        guard !isProcessing else { return }
         if NetworkPathMonitor.shared.shouldSkipNetworkBecauseOffline {
+            syncOutgoingPresentationStates(conversationID: conversationID)
             return
+        }
+
+        isProcessing = true
+        defer { isProcessing = false }
+
+        MessengerDiagnostics.event(
+            .outboxProcessorStarted,
+            metadata: [
+                "networkState": "online",
+                "count": "0"
+            ]
+        )
+        defer {
+            MessengerDiagnostics.event(
+                .outboxProcessorFinished,
+                metadata: ["networkState": "online"]
+            )
         }
 
         do {
@@ -308,6 +381,8 @@ final class MessengerOutboxProcessor {
     }
 
     func clearOutboxOnLogout() async {
+        debouncedRetryTask?.cancel()
+        debouncedRetryTask = nil
         do {
             try await localStore.clearPendingMedia()
             try await localStore.clearOutbox()
@@ -323,6 +398,54 @@ final class MessengerOutboxProcessor {
         }
     }
 
+    func syncOutgoingPresentationStates(conversationID: UUID?) {
+        let isOffline = NetworkPathMonitor.shared.shouldSkipNetworkBecauseOffline
+        let conversationIDs: [UUID]
+        if let conversationID {
+            conversationIDs = [conversationID]
+        } else {
+            conversationIDs = MessageCacheStore.shared.conversationIDsWithPendingOutgoing()
+        }
+
+        for id in conversationIDs {
+            for message in MessageCacheStore.shared.pendingOutgoingMessages(for: id) {
+                guard let clientMessageID = message.clientMessageID,
+                      let currentState = message.localSendState else { continue }
+
+                let targetState: MessageLocalSendState?
+                if isOffline {
+                    switch currentState {
+                    case .sending, .uploading, .retrying:
+                        targetState = .waitingForNetwork
+                    case .failed, .waitingForNetwork:
+                        targetState = nil
+                    }
+                } else {
+                    switch currentState {
+                    case .waitingForNetwork:
+                        if let entryState = MessengerOutbox.shared.outgoingEntryState(for: clientMessageID) {
+                            targetState = entryState == .failed ? .failed : .sending
+                        } else if currentState == .failed {
+                            targetState = .failed
+                        } else {
+                            targetState = .sending
+                        }
+                    case .failed, .sending, .uploading, .retrying:
+                        targetState = nil
+                    }
+                }
+
+                if let targetState, targetState != currentState {
+                    MessengerOutbox.shared.updateOutgoingPresentation(
+                        clientMessageID: clientMessageID,
+                        conversationID: id,
+                        state: targetState
+                    )
+                }
+            }
+        }
+    }
+
     private var localStore: MessengerLocalStore {
         #if DEBUG
         if let testingStore = MessengerMessageCacheService.testingStore {
@@ -330,6 +453,50 @@ final class MessengerOutboxProcessor {
         }
         #endif
         return .shared
+    }
+
+    private func handleNetworkPathChange(session: SessionStore, router: AppRouter) async {
+        if NetworkPathMonitor.shared.shouldSkipNetworkBecauseOffline {
+            MessengerDiagnostics.event(
+                .outboxNetworkUnavailable,
+                metadata: ["networkState": "offline"]
+            )
+            syncOutgoingPresentationStates(conversationID: nil)
+            return
+        }
+
+        MessengerDiagnostics.event(
+            .outboxNetworkRestored,
+            metadata: ["networkState": "online"]
+        )
+        scheduleDebouncedAutoRetry(session: session, router: router)
+    }
+
+    private func scheduleDebouncedAutoRetry(session: SessionStore, router: AppRouter) {
+        debouncedRetryTask?.cancel()
+        debouncedRetryTask = Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(networkRestoreDebounceMilliseconds))
+            guard !Task.isCancelled else { return }
+            guard session.isFullyAuthenticated else { return }
+
+            MessengerDiagnostics.event(
+                .outboxAutoRetryScheduled,
+                metadata: ["retryReason": "networkRestored"]
+            )
+            await recoverOnLaunch()
+            syncOutgoingPresentationStates(conversationID: nil)
+            await processReadyItems(session: session, router: router)
+        }
+    }
+
+    private func presentationState(for item: MessengerOutboxItemSnapshot) -> MessageLocalSendState {
+        if item.status == .failed {
+            return .failed
+        }
+        if NetworkPathMonitor.shared.shouldSkipNetworkBecauseOffline {
+            return .waitingForNetwork
+        }
+        return .sending
     }
 
     private func rehydrateInMemoryOutboxItem(

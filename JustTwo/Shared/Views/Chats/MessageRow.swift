@@ -48,7 +48,7 @@ struct MessageRow: View {
             .contentShape(Rectangle())
             .silentGlobalFrameReader(bubbleFrameReference)
             .onLongPressGesture(minimumDuration: 0.35) {
-                guard message.canReply || message.canCopy || message.canEdit || message.canDelete || message.canReact else {
+                guard message.canReply || message.canCopy || message.canEdit || message.canDelete || message.canCancelPendingOutgoing || message.canReact else {
                     return
                 }
                 onLongPress(bubbleFrameReference.rect)

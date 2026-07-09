@@ -69,8 +69,8 @@ struct ChatBubbleView: View {
 
             bubbleBody
 
-            if localSendState == .failed, let onRetry {
-                failedSendFooter(onRetry: onRetry)
+            if let localSendState {
+                outgoingStatusFooter(state: localSendState)
             }
         }
         .frame(maxWidth: UI.maxWidth, alignment: isMine ? .trailing : .leading)
@@ -185,7 +185,7 @@ struct ChatBubbleView: View {
                 ChatImageBubbleView(
                     attachment: imageAttachment,
                     size: imageBubbleSize(for: imageAttachment),
-                    showsSendProgress: localSendState == .sending,
+                    showsSendProgress: localSendState?.showsProgressIndicator == true,
                     isMine: isMine,
                     onTap: { onImageTap?(imageAttachment) }
                 )
@@ -256,7 +256,7 @@ struct ChatBubbleView: View {
 
             if let deliveryStatus {
                 MessageDeliveryReceiptView(status: deliveryStatus)
-            } else if localSendState == .sending, imageAttachment == nil {
+            } else if localSendState?.showsProgressIndicator == true, imageAttachment == nil {
                 ProgressView()
                     .controlSize(.mini)
                     .tint(Color.secondaryText.opacity(0.75))
@@ -267,21 +267,33 @@ struct ChatBubbleView: View {
         .allowsHitTesting(false)
     }
 
-    private func failedSendFooter(onRetry: @escaping () -> Void) -> some View {
+    private func outgoingStatusFooter(state: MessageLocalSendState) -> some View {
         HStack(spacing: 6) {
-            Image(systemName: "exclamationmark.circle.fill")
-                .font(.system(size: 12))
-                .foregroundStyle(Color.error)
-
-            Text("chats.message.sendFailed")
-                .font(Font.App.caption())
-                .foregroundStyle(Color.secondaryText)
-
-            Button(action: onRetry) {
-                Text("chats.message.retry")
-                    .font(Font.App.caption(weight: .semibold))
+            if state.showsProgressIndicator {
+                ProgressView()
+                    .controlSize(.mini)
+                    .tint(Color.secondaryText)
+            } else if state == .failed {
+                Image(systemName: "exclamationmark.circle.fill")
+                    .font(.system(size: 12))
+                    .foregroundStyle(Color.error)
+            } else if state == .waitingForNetwork {
+                Image(systemName: "wifi.slash")
+                    .font(.system(size: 12))
+                    .foregroundStyle(Color.secondaryText)
             }
-            .buttonStyle(.plain)
+
+            Text(OutgoingMessageStatus.label(for: state, isImage: imageAttachment != nil))
+                .font(Font.App.caption())
+                .foregroundStyle(state == .failed ? Color.secondaryText : Color.secondaryText.opacity(0.9))
+
+            if state.isRetryable, let onRetry {
+                Button(action: onRetry) {
+                    Text("chats.message.retry")
+                        .font(Font.App.caption(weight: .semibold))
+                }
+                .buttonStyle(.plain)
+            }
         }
         .padding(.horizontal, 4)
     }

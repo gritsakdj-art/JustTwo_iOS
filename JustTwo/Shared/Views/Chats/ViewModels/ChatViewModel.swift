@@ -889,6 +889,18 @@ final class ChatViewModel {
         router: AppRouter
     ) async {
         guard let message else { return }
+
+        if message.canCancelPendingOutgoing, let clientMessageID = message.clientMessageID {
+            await MessengerOutboxProcessor.shared.cancelPending(
+                clientMessageID: clientMessageID,
+                conversationID: conversation.id,
+                session: session,
+                router: router
+            )
+            syncMessagesFromCache()
+            return
+        }
+
         await deleteMessage(message, session: session, router: router)
     }
 

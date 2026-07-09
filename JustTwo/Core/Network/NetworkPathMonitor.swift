@@ -57,7 +57,6 @@ final class NetworkPathMonitor {
         let signature = Self.signature(for: path)
         defer { lastSignature = signature }
 
-        guard path.status == .satisfied else { return }
         guard let lastSignature, lastSignature != signature else { return }
 
         NetworkDebug.log("Network path changed \(lastSignature) → \(signature)")

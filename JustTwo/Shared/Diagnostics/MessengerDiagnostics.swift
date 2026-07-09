@@ -177,6 +177,19 @@ enum MessengerDiagnosticEvent: String, Sendable {
     case outboxPendingMediaMissing
     case outboxImageRetryScheduled
 
+    case outboxRetryTapped
+    case outboxCancelTapped
+    case outboxAutoRetryScheduled
+    case outboxNetworkRestored
+    case outboxNetworkUnavailable
+    case outboxRetrySkipped
+    case outboxStateChanged
+    case outboxStaleSendingRecovered
+    case outboxProcessorStarted
+    case outboxProcessorFinished
+    case outboxProcessorItemFailed
+    case outboxProcessorItemSucceeded
+
     case imageBubbleRenderStarted
     case imageBubbleRenderSucceeded
     case imageBubbleRenderFailed
