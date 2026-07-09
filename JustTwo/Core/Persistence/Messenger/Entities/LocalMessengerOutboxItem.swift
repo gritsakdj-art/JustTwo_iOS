@@ -17,6 +17,7 @@ final class LocalMessengerOutboxItem {
     var updatedAt: Date
     var lastAttemptAt: Date?
     var serverMessageID: String?
+    var pendingMediaID: String?
 
     init(
         id: String,
@@ -32,7 +33,8 @@ final class LocalMessengerOutboxItem {
         createdAt: Date,
         updatedAt: Date,
         lastAttemptAt: Date?,
-        serverMessageID: String?
+        serverMessageID: String?,
+        pendingMediaID: String? = nil
     ) {
         self.id = id
         self.conversationID = conversationID
@@ -48,5 +50,6 @@ final class LocalMessengerOutboxItem {
         self.updatedAt = updatedAt
         self.lastAttemptAt = lastAttemptAt
         self.serverMessageID = serverMessageID
+        self.pendingMediaID = pendingMediaID
     }
 }

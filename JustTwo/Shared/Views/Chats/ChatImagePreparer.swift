@@ -45,41 +45,65 @@ enum ChatImagePreparer {
     }
 
     nonisolated static func prepare(data: Data, clientMessageID: String) throws -> PreparedChatImage {
-        #if canImport(UIKit)
-        guard let image = UIImage(data: data) else {
-            throw ChatImagePreparationError.invalidImage
-        }
-
-        let rendered = normalizedAndResized(image)
-        guard let jpegData = rendered.jpegData(compressionQuality: jpegQuality) else {
-            throw ChatImagePreparationError.encodingFailed
-        }
-        guard jpegData.count <= MessengerLimits.maxImageBytes else {
-            throw ChatImagePreparationError.fileTooLarge(jpegData.count)
-        }
-
+        let jpegData = try encodedJPEGData(from: data)
         let directory = try temporaryDirectory()
         let fileURL = directory.appendingPathComponent(safeFileName(for: clientMessageID)).appendingPathExtension("jpg")
-        do {
-            if FileManager.default.fileExists(atPath: fileURL.path) {
-                try FileManager.default.removeItem(at: fileURL)
-            }
-            try jpegData.write(to: fileURL, options: [.atomic])
-        } catch {
-            throw ChatImagePreparationError.fileWriteFailed
-        }
+        try writeJPEG(jpegData, to: fileURL)
+        return try preparedImage(from: jpegData, fileURL: fileURL)
+    }
 
-        return PreparedChatImage(
-            localFileURL: fileURL,
+    static func preparePersistent(
+        _ item: PhotosPickerItem,
+        clientMessageID: String,
+        pendingMediaID: String
+    ) async throws -> PreparedChatImage {
+        guard let data = try await item.loadTransferable(type: Data.self) else {
+            throw ChatImagePreparationError.loadFailed
+        }
+        return try await Task.detached(priority: .userInitiated) {
+            try preparePersistent(data: data, clientMessageID: clientMessageID, pendingMediaID: pendingMediaID)
+        }.value
+    }
+
+    nonisolated static func preparePersistent(
+        data: Data,
+        clientMessageID: String,
+        pendingMediaID: String
+    ) throws -> PreparedChatImage {
+        let jpegData = try encodedJPEGData(from: data)
+        let relativePath = try MessengerPendingMediaStore.storeJPEG(
+            data: jpegData,
+            pendingMediaID: pendingMediaID,
+            clientMessageID: clientMessageID
+        )
+        return try MessengerPendingMediaStore.preparedImage(
+            relativePath: relativePath,
             contentType: "image/jpeg",
             byteSize: jpegData.count,
-            width: Int(rendered.size.width.rounded()),
-            height: Int(rendered.size.height.rounded())
+            width: imageDimensions(from: jpegData).width,
+            height: imageDimensions(from: jpegData).height
         )
-        #else
-        throw ChatImagePreparationError.invalidImage
-        #endif
     }
+
+    nonisolated static func preparedFromPendingMedia(_ snapshot: MessengerPendingMediaSnapshot) throws -> PreparedChatImage {
+        try MessengerPendingMediaStore.preparedImage(
+            relativePath: snapshot.localRelativePath,
+            contentType: snapshot.contentType,
+            byteSize: snapshot.byteSize,
+            width: snapshot.width ?? 0,
+            height: snapshot.height ?? 0
+        )
+    }
+
+    #if canImport(UIKit)
+    static func loadPreviewImage(from item: PhotosPickerItem) async throws -> UIImage {
+        guard let data = try await item.loadTransferable(type: Data.self),
+              let image = UIImage(data: data) else {
+            throw ChatImagePreparationError.loadFailed
+        }
+        return image
+    }
+    #endif
 
     nonisolated static func removeTemporaryFile(_ fileURL: URL) {
         try? FileManager.default.removeItem(at: fileURL)
@@ -109,6 +133,56 @@ enum ChatImagePreparer {
     }
 
     #if canImport(UIKit)
+    private nonisolated static func encodedJPEGData(from data: Data) throws -> Data {
+        guard let image = UIImage(data: data) else {
+            throw ChatImagePreparationError.invalidImage
+        }
+
+        let rendered = normalizedAndResized(image)
+        guard let jpegData = rendered.jpegData(compressionQuality: jpegQuality) else {
+            throw ChatImagePreparationError.encodingFailed
+        }
+        guard jpegData.count <= MessengerLimits.maxImageBytes else {
+            throw ChatImagePreparationError.fileTooLarge(jpegData.count)
+        }
+        return jpegData
+    }
+
+    private nonisolated static func writeJPEG(_ jpegData: Data, to fileURL: URL) throws {
+        let directory = fileURL.deletingLastPathComponent()
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        if FileManager.default.fileExists(atPath: fileURL.path) {
+            try FileManager.default.removeItem(at: fileURL)
+        }
+        do {
+            try jpegData.write(to: fileURL, options: [.atomic])
+        } catch {
+            throw ChatImagePreparationError.fileWriteFailed
+        }
+    }
+
+    private nonisolated static func preparedImage(from jpegData: Data, fileURL: URL) throws -> PreparedChatImage {
+        let dimensions = imageDimensions(from: jpegData)
+        return PreparedChatImage(
+            localFileURL: fileURL,
+            contentType: "image/jpeg",
+            byteSize: jpegData.count,
+            width: dimensions.width,
+            height: dimensions.height
+        )
+    }
+
+    private nonisolated static func imageDimensions(from jpegData: Data) -> (width: Int, height: Int) {
+        guard let image = UIImage(data: jpegData) else {
+            return (0, 0)
+        }
+        let rendered = normalizedAndResized(image)
+        return (
+            width: Int(rendered.size.width.rounded()),
+            height: Int(rendered.size.height.rounded())
+        )
+    }
+
     private nonisolated static func normalizedAndResized(_ image: UIImage) -> UIImage {
         let sourceSize = image.size
         guard sourceSize.width > 0, sourceSize.height > 0 else { return image }

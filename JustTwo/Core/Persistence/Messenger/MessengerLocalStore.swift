@@ -394,6 +394,64 @@ final class MessengerLocalStore: MessengerLocalStoreProtocol {
         }
     }
 
+    func createImageOutboxItem(
+        conversationID: UUID,
+        clientMessageID: String,
+        caption: String?,
+        replyToMessageID: UUID?,
+        pendingMediaID: String,
+        localRelativePath: String,
+        contentType: String,
+        byteSize: Int,
+        width: Int,
+        height: Int
+    ) async throws -> MessengerOutboxItemSnapshot {
+        try await performSessionBoundOperation(operation: "createImageOutboxItem") {
+            try await backingStore.createImageOutboxItem(
+                conversationID: conversationID,
+                clientMessageID: clientMessageID,
+                caption: caption,
+                replyToMessageID: replyToMessageID,
+                pendingMediaID: pendingMediaID,
+                localRelativePath: localRelativePath,
+                contentType: contentType,
+                byteSize: byteSize,
+                width: width,
+                height: height
+            )
+        }
+    }
+
+    func fetchPendingMedia(clientMessageID: String) async throws -> MessengerPendingMediaSnapshot? {
+        try await performSessionBoundOperation(operation: "fetchPendingMedia") {
+            try await backingStore.fetchPendingMedia(clientMessageID: clientMessageID)
+        }
+    }
+
+    func fetchPendingMedia(pendingMediaID: String) async throws -> MessengerPendingMediaSnapshot? {
+        try await performSessionBoundOperation(operation: "fetchPendingMediaByID") {
+            try await backingStore.fetchPendingMedia(pendingMediaID: pendingMediaID)
+        }
+    }
+
+    func deletePendingMedia(clientMessageID: String) async throws {
+        try await performSessionBoundOperation(operation: "deletePendingMedia") {
+            try await backingStore.deletePendingMedia(clientMessageID: clientMessageID)
+        }
+    }
+
+    func clearPendingMedia() async throws {
+        try await performSessionBoundOperation(operation: "clearPendingMedia") {
+            try await backingStore.clearPendingMedia()
+        }
+    }
+
+    func fetchPendingMediaRelativePaths() async throws -> Set<String> {
+        try await performSessionBoundOperation(operation: "fetchPendingMediaRelativePaths") {
+            try await backingStore.fetchPendingMediaRelativePaths()
+        }
+    }
+
     private func performSessionBoundOperation<T>(
         operation: String,
         _ work: () async throws -> T

@@ -260,15 +260,27 @@ extension ChatMessage {
         clientMessageID: String,
         prepared: PreparedChatImage,
         replyPreview: ChatReplyPreview?,
+        caption: String? = nil,
         createdAt: Date = .now
     ) -> ChatMessage {
-        ChatMessage(
+        let trimmedCaption = caption?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let displayText: String
+        let rawBody: String?
+        if trimmedCaption.isEmpty {
+            displayText = ChatUIMapping.imageMessagePreviewText
+            rawBody = nil
+        } else {
+            displayText = trimmedCaption
+            rawBody = trimmedCaption
+        }
+
+        return ChatMessage(
             id: OptimisticMessageIdentity.localMessageID(for: clientMessageID),
             clientMessageID: clientMessageID,
             localSendState: .sending,
             kind: .image,
-            displayText: ChatUIMapping.imageMessagePreviewText,
-            rawBody: nil,
+            displayText: displayText,
+            rawBody: rawBody,
             imageAttachment: .local(clientMessageID: clientMessageID, prepared: prepared),
             createdAt: createdAt,
             isMine: true,

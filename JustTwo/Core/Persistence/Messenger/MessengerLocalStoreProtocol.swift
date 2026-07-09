@@ -77,4 +77,27 @@ protocol MessengerLocalStoreProtocol: AnyObject {
     func resetStaleOutboxSendingItems() async throws -> Int
 
     func clearOutbox() async throws
+
+    func createImageOutboxItem(
+        conversationID: UUID,
+        clientMessageID: String,
+        caption: String?,
+        replyToMessageID: UUID?,
+        pendingMediaID: String,
+        localRelativePath: String,
+        contentType: String,
+        byteSize: Int,
+        width: Int,
+        height: Int
+    ) async throws -> MessengerOutboxItemSnapshot
+
+    func fetchPendingMedia(clientMessageID: String) async throws -> MessengerPendingMediaSnapshot?
+
+    func fetchPendingMedia(pendingMediaID: String) async throws -> MessengerPendingMediaSnapshot?
+
+    func deletePendingMedia(clientMessageID: String) async throws
+
+    func clearPendingMedia() async throws
+
+    func fetchPendingMediaRelativePaths() async throws -> Set<String>
 }

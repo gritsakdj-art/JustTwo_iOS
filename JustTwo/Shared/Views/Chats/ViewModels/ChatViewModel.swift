@@ -24,6 +24,11 @@ final class ChatViewModel {
     private(set) var hasMoreOlderMessages = false
     private(set) var isSending = false
     private(set) var isPreparingImage = false
+    #if canImport(UIKit)
+    private(set) var composerPreviewImage: UIImage?
+    #endif
+    private var composerPhotoItem: PhotosPickerItem?
+    var hasComposerImagePreview: Bool { composerPhotoItem != nil }
     private(set) var typingProfileIDs: Set<UUID> = []
     var errorMessage: String?
 
@@ -424,7 +429,7 @@ final class ChatViewModel {
     }
 
     var blocksComposeSend: Bool {
-        isSending && editingMessage != nil
+        isSending || isPreparingImage
     }
 
     @discardableResult
@@ -495,6 +500,11 @@ final class ChatViewModel {
     }
 
     func send(session: SessionStore, router: AppRouter) {
+        if composerPhotoItem != nil {
+            sendComposerImage(session: session, router: router)
+            return
+        }
+
         let trimmed = draftText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
         guard trimmed.count <= MessengerLimits.maxMessageLength else {
@@ -587,94 +597,170 @@ final class ChatViewModel {
     }
 
 
-    func sendImage(from item: PhotosPickerItem, session: SessionStore, router: AppRouter) async {
-        guard editingMessage == nil else {
-            MessengerDiagnostics.event(
-                .imagePrepareFailed,
-                conversationID: conversation.id,
-                metadata: ["reason": "editingActive"]
-            )
-            return
-        }
-        guard !isPreparingImage else {
-            MessengerDiagnostics.event(
-                .imagePrepareFailed,
-                conversationID: conversation.id,
-                metadata: ["reason": "alreadyPreparing"]
-            )
-            return
-        }
-
-        let clientMessageID = UUID().uuidString
-        let activeReplyTarget = replyTarget
-        let replyPreview = currentReplyPreview()
-
-        MessengerDiagnostics.event(
-            .imagePicked,
-            conversationID: conversation.id,
-            clientMessageID: clientMessageID,
-            metadata: ["hasReply": "\(activeReplyTarget != nil)"]
-        )
-        MessengerDiagnostics.event(
-            .imagePrepareStarted,
-            conversationID: conversation.id,
-            clientMessageID: clientMessageID
-        )
+    func selectComposerPhoto(from item: PhotosPickerItem) async {
+        guard editingMessage == nil else { return }
+        guard !isPreparingImage else { return }
 
         isPreparingImage = true
         defer { isPreparingImage = false }
 
         do {
-            let prepared = try await ChatImagePreparer.prepare(item, clientMessageID: clientMessageID)
+            #if canImport(UIKit)
+            composerPreviewImage = try await ChatImagePreparer.loadPreviewImage(from: item)
+            #endif
+            composerPhotoItem = item
             MessengerDiagnostics.event(
-                .imagePrepareSucceeded,
-                conversationID: conversation.id,
-                clientMessageID: clientMessageID,
-                metadata: [
-                    "contentType": prepared.contentType,
-                    "byteSize": "\(prepared.byteSize)",
-                    "width": "\(prepared.width)",
-                    "height": "\(prepared.height)"
-                ]
-            )
-
-            let optimistic = ChatMessage.optimisticOutgoingImage(
-                clientMessageID: clientMessageID,
-                prepared: prepared,
-                replyPreview: replyPreview
-            )
-            messageCache.insertOptimisticMessage(optimistic, for: conversation.id)
-            syncMessagesFromCache()
-
-            replyTarget = nil
-            errorMessage = nil
-            typingEmitter.messageSent()
-
-            ConversationListViewModel.shared.applyOptimisticOutgoing(
-                conversationID: conversation.id,
-                previewText: ChatUIMapping.imageMessagePreviewText,
-                sentAt: optimistic.createdAt
-            )
-
-            MessengerOutbox.shared.enqueueImage(
-                conversationID: conversation.id,
-                prepared: prepared,
-                replyToID: activeReplyTarget?.id,
-                clientMessageID: clientMessageID,
-                localMessageID: optimistic.id,
-                session: session,
-                router: router
+                .outboxImageComposerPreviewSelected,
+                conversationID: conversation.id
             )
         } catch {
+            composerPhotoItem = nil
+            #if canImport(UIKit)
+            composerPreviewImage = nil
+            #endif
+            errorMessage = (error as? LocalizedError)?.errorDescription
+                ?? String(localized: "chats.image.error.prepare_failed")
             MessengerDiagnostics.event(
                 .imagePrepareFailed,
                 conversationID: conversation.id,
-                clientMessageID: clientMessageID,
-                metadata: ["errorCategory": MessengerDiagnostics.sanitizeError(error)]
+                metadata: ["reason": "composerPreview", "errorCategory": MessengerDiagnostics.sanitizeError(error)]
             )
-            errorMessage = (error as? LocalizedError)?.errorDescription ?? String(localized: "chats.image.error.prepare_failed")
         }
     }
+
+    func removeComposerImagePreview() {
+        composerPhotoItem = nil
+        #if canImport(UIKit)
+        composerPreviewImage = nil
+        #endif
+        MessengerDiagnostics.event(
+            .outboxImageComposerPreviewRemoved,
+            conversationID: conversation.id
+        )
+    }
+
+    private func sendComposerImage(session: SessionStore, router: AppRouter) {
+        guard let item = composerPhotoItem else { return }
+        guard editingMessage == nil else { return }
+        guard !isPreparingImage else { return }
+
+        let caption = draftText.trimmingCharacters(in: .whitespacesAndNewlines)
+        let normalizedCaption = caption.isEmpty ? nil : caption
+        let activeReplyTarget = replyTarget
+        let replyPreview = currentReplyPreview()
+        let clientMessageID = UUID().uuidString
+        let pendingMediaID = UUID().uuidString
+
+        isPreparingImage = true
+
+        Task {
+            defer { isPreparingImage = false }
+
+            do {
+                let prepared = try await ChatImagePreparer.preparePersistent(
+                    item,
+                    clientMessageID: clientMessageID,
+                    pendingMediaID: pendingMediaID
+                )
+                let relativePath = try MessengerPendingMediaStore.makeRelativePath(
+                    pendingMediaID: pendingMediaID,
+                    clientMessageID: clientMessageID
+                )
+
+                let snapshot = try await MessengerLocalStore.shared.createImageOutboxItem(
+                    conversationID: conversation.id,
+                    clientMessageID: clientMessageID,
+                    caption: normalizedCaption,
+                    replyToMessageID: activeReplyTarget?.id,
+                    pendingMediaID: pendingMediaID,
+                    localRelativePath: relativePath,
+                    contentType: prepared.contentType,
+                    byteSize: prepared.byteSize,
+                    width: prepared.width,
+                    height: prepared.height
+                )
+
+                MessengerDiagnostics.event(
+                    .outboxImageItemCreated,
+                    conversationID: conversation.id,
+                    clientMessageID: snapshot.clientMessageID,
+                    metadata: [
+                        "pendingMediaID": MessengerPendingMediaStore.sanitizedPendingMediaIDForDiagnostics(pendingMediaID),
+                        "byteSize": "\(prepared.byteSize)",
+                        "contentType": prepared.contentType,
+                        "optionalNotePresent": normalizedCaption == nil ? "false" : "true"
+                    ]
+                )
+                MessengerDiagnostics.event(
+                    .outboxPendingMediaStored,
+                    conversationID: conversation.id,
+                    clientMessageID: snapshot.clientMessageID,
+                    metadata: [
+                        "pendingMediaID": MessengerPendingMediaStore.sanitizedPendingMediaIDForDiagnostics(pendingMediaID),
+                        "byteSize": "\(prepared.byteSize)",
+                        "width": "\(prepared.width)",
+                        "height": "\(prepared.height)"
+                    ]
+                )
+
+                let optimistic = ChatMessage.optimisticOutgoingImage(
+                    clientMessageID: snapshot.clientMessageID,
+                    prepared: prepared,
+                    replyPreview: replyPreview,
+                    caption: normalizedCaption,
+                    createdAt: snapshot.createdAt
+                )
+
+                messageCache.insertOptimisticMessage(optimistic, for: conversation.id)
+                syncMessagesFromCache()
+
+                draftText = ""
+                replyTarget = nil
+                composerPhotoItem = nil
+                #if canImport(UIKit)
+                composerPreviewImage = nil
+                #endif
+                errorMessage = nil
+                typingEmitter.messageSent()
+
+                let previewText = normalizedCaption ?? ChatUIMapping.imageMessagePreviewText
+                ConversationListViewModel.shared.applyOptimisticOutgoing(
+                    conversationID: conversation.id,
+                    previewText: previewText,
+                    sentAt: optimistic.createdAt
+                )
+
+                MessengerOutbox.shared.registerPersistedImageEntry(
+                    snapshot: snapshot,
+                    prepared: prepared,
+                    localMessageID: optimistic.id,
+                    session: session,
+                    router: router
+                )
+            } catch {
+                if let relativePath = try? MessengerPendingMediaStore.makeRelativePath(
+                    pendingMediaID: pendingMediaID,
+                    clientMessageID: clientMessageID
+                ) {
+                    MessengerPendingMediaStore.delete(relativePath: relativePath)
+                }
+                errorMessage = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+                MessengerDiagnostics.event(
+                    .outboxImageItemCreated,
+                    conversationID: conversation.id,
+                    clientMessageID: clientMessageID,
+                    metadata: ["errorCategory": MessengerDiagnostics.sanitizeError(error)]
+                )
+            }
+        }
+    }
+
+    #if canImport(UIKit)
+    var composerPreviewSwiftUIImage: Image? {
+        guard let composerPreviewImage else { return nil }
+        return Image(uiImage: composerPreviewImage)
+    }
+    #endif
 
     private func sendEdit(
         _ editingMessage: ChatMessage,

@@ -415,6 +415,7 @@ enum MessengerLocalMapping {
     static func mapOutboxItem(
         conversationID: UUID,
         clientMessageID: String,
+        kind: MessengerOutboxItemKind,
         body: String,
         replyToMessageID: UUID?,
         status: MessengerOutboxItemStatus,
@@ -424,13 +425,14 @@ enum MessengerLocalMapping {
         createdAt: Date,
         updatedAt: Date,
         lastAttemptAt: Date?,
-        serverMessageID: UUID?
+        serverMessageID: UUID?,
+        pendingMediaID: String? = nil
     ) -> LocalMessengerOutboxItem {
         LocalMessengerOutboxItem(
             id: UUID().uuidString,
             conversationID: conversationID.uuidString,
             clientMessageID: clientMessageID,
-            kind: MessengerOutboxItemKind.text.rawValue,
+            kind: kind.rawValue,
             body: body,
             replyToMessageID: replyToMessageID?.uuidString,
             status: status.rawValue,
@@ -440,7 +442,8 @@ enum MessengerLocalMapping {
             createdAt: createdAt,
             updatedAt: updatedAt,
             lastAttemptAt: lastAttemptAt,
-            serverMessageID: serverMessageID?.uuidString
+            serverMessageID: serverMessageID?.uuidString,
+            pendingMediaID: pendingMediaID
         )
     }
 
@@ -459,7 +462,8 @@ enum MessengerLocalMapping {
             createdAt: entity.createdAt,
             updatedAt: entity.updatedAt,
             lastAttemptAt: entity.lastAttemptAt,
-            serverMessageID: entity.serverMessageID
+            serverMessageID: entity.serverMessageID,
+            pendingMediaID: entity.pendingMediaID
         )
     }
 
@@ -477,6 +481,50 @@ enum MessengerLocalMapping {
         entity.updatedAt = snapshot.updatedAt
         entity.lastAttemptAt = snapshot.lastAttemptAt
         entity.serverMessageID = snapshot.serverMessageID
+        entity.pendingMediaID = snapshot.pendingMediaID
+    }
+
+    static func mapPendingMedia(
+        pendingMediaID: String,
+        clientMessageID: String,
+        conversationID: UUID,
+        localRelativePath: String,
+        contentType: String,
+        byteSize: Int,
+        width: Int,
+        height: Int,
+        createdAt: Date,
+        updatedAt: Date
+    ) -> LocalMessengerPendingMedia {
+        LocalMessengerPendingMedia(
+            id: UUID().uuidString,
+            pendingMediaID: pendingMediaID,
+            clientMessageID: clientMessageID,
+            conversationID: conversationID.uuidString,
+            localRelativePath: localRelativePath,
+            contentType: contentType,
+            byteSize: byteSize,
+            width: width,
+            height: height,
+            createdAt: createdAt,
+            updatedAt: updatedAt
+        )
+    }
+
+    static func pendingMediaSnapshot(from entity: LocalMessengerPendingMedia) -> MessengerPendingMediaSnapshot {
+        MessengerPendingMediaSnapshot(
+            id: entity.id,
+            pendingMediaID: entity.pendingMediaID,
+            clientMessageID: entity.clientMessageID,
+            conversationID: entity.conversationID,
+            localRelativePath: entity.localRelativePath,
+            contentType: entity.contentType,
+            byteSize: entity.byteSize,
+            width: entity.width,
+            height: entity.height,
+            createdAt: entity.createdAt,
+            updatedAt: entity.updatedAt
+        )
     }
 }
 

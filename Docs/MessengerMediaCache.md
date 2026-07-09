@@ -18,9 +18,9 @@ If an image attachment was already loaded/viewed/downloaded, it survives app rel
 - File protection + iCloud backup exclusion
 - Privacy-safe diagnostics + tests
 
-### Out of scope
+### Out of scope (PR15E)
 
-- Persistent outgoing outbox / failed upload retry (**PR16**)
+- Persistent outgoing outbox / failed upload retry (**PR16B** — separate pending media store)
 - Persistent sync cursor / full sync engine (**PR17**)
 - Storing signed URLs, upload URLs, storage keys, image bytes, or absolute paths in SwiftData
 - Startup preload optimization beyond local-DB-first message hydrate (**PR15F**)
@@ -41,6 +41,26 @@ AppStartupCoordinator.runBackgroundNetworkWarmup
 Logout reset
   └─ MessengerMediaCacheService.clearAll
 ```
+
+## PR16B boundary — pending outgoing media (not confirmed cache)
+
+PR16B adds a **separate** on-disk store for **outgoing** images waiting to upload:
+
+```text
+Application Support/JustTwo/MessengerPendingMedia/<pendingMediaID>/<clientMessageID>.jpg
+```
+
+| | PR15E confirmed cache | PR16B pending outgoing |
+|--|----------------------|------------------------|
+| Purpose | Received/confirmed attachments | Outbox upload retry |
+| Key | `attachmentID` | `pendingMediaID` / `clientMessageID` |
+| SwiftData | `LocalMessengerAttachment` flags | `LocalMessengerPendingMedia` metadata |
+| Cleared on | Delete message, quota, logout | Send success, cancel, logout |
+| Signed URLs | Ephemeral network only | Never persisted |
+
+Pending outgoing files are **not** inserted into PR15E `MediaCache/` before server confirmation. After success, pending file is deleted; confirmed bubble loads via normal attachment/cache paths.
+
+See [Messenger Outbox](MessengerOutbox.md) for composer preview, retry pipeline, and cleanup rules.
 
 ### Components
 

@@ -13,7 +13,7 @@ On-device messenger persistence using SwiftData.
 | PR15E | Persistent media disk cache for message attachments | ✅ |
 | PR15F | Messenger startup/request optimization | ✅ |
 | PR16A | Persistent text outbox | ✅ (pending manual smoke) |
-| PR16B | Persistent image outbox | planned |
+| PR16B | Persistent image outbox + composer preview | ✅ (pending manual smoke) |
 | PR16C | Outbox retry polish / scheduler | planned |
 | PR17 | Full sync engine | planned |
 
@@ -69,7 +69,7 @@ Confirmed/received image attachments can survive relaunch from disk cache.
 ### What is not cached
 
 - Pending outgoing `local-*` attachments before server ID
-- Failed upload temp files / durable outbox media (**PR16**)
+- Failed upload temp files (**legacy**) / durable outbox pending media (**PR16B** — `MessengerPendingMedia/`)
 - Signed `downloadUrl`, `uploadUrl`, storage keys, image bytes in SwiftData
 
 ### SwiftData attachment fields (PR15E)
@@ -370,6 +370,44 @@ Outbox rows are **not** a replacement for confirmed message cache. On success, o
 PR16A adds `LocalMessengerOutboxItem`. Schema version is `3` (`MessengerPersistence.schemaVersion`). If the on-device store cannot open, `AppModelContainerFactory` recreates it once (same policy as PR15E v2 migration).
 
 See [Messenger Outbox](MessengerOutbox.md) for lifecycle, retry, reconciliation, and privacy rules.
+
+## PR16B — Persistent image outbox + pending media
+
+Outgoing image sends with optional caption survive network failure, upload failure, create-message failure, and app relaunch.
+
+### `LocalMessengerPendingMedia`
+
+| Field | Stored | Forbidden |
+|-------|--------|-----------|
+| `pendingMediaID`, `clientMessageID`, `conversationID` | ✅ | |
+| `localRelativePath` (relative only) | ✅ | absolute paths |
+| `contentType`, `byteSize`, `width`, `height` | ✅ | |
+| Image bytes | | ❌ |
+| `uploadUrl`, `downloadUrl`, `storageKey` | | ❌ |
+
+### Image outbox linkage
+
+`LocalMessengerOutboxItem` for `kind=image`:
+
+- `body` — optional caption/comment for retry (not logged in diagnostics)
+- `pendingMediaID` — links to `LocalMessengerPendingMedia`
+- Same status lifecycle as text (`pending` / `sending` / `failed` / …)
+
+On success or logout: `deleteOutboxItem` / `resetAllMessengerData` deletes both SwiftData rows and pending media files.
+
+### Schema note (v4)
+
+PR16B adds `LocalMessengerPendingMedia` and `pendingMediaID` on outbox rows. Schema version is `4` (`MessengerPersistence.schemaVersion`).
+
+### File map (PR16B additions)
+
+| Path | Responsibility |
+|------|----------------|
+| `Core/Persistence/Messenger/Entities/LocalMessengerPendingMedia.swift` | SwiftData pending media metadata |
+| `Core/Persistence/Messenger/Media/MessengerPendingMediaStore.swift` | Application Support pending file I/O |
+| `Shared/Views/Chats/ChatImagePreparer.swift` | Persistent + preview image preparation |
+| `Shared/Components/Chat/MessageInputView.swift` | Composer image preview + remove |
+| `JustTwoTests/MessengerPendingMediaStoreTests.swift` | Pending media store tests |
 
 ### File map (PR16A additions)
 

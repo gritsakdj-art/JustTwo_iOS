@@ -11,6 +11,9 @@ struct MessageInputView: View {
     var composeMode: MessageInputComposeMode? = nil
     var onCancelCompose: (() -> Void)? = nil
     var onAttach: (() -> Void)? = nil
+    var imagePreview: Image? = nil
+    var onRemoveImagePreview: (() -> Void)? = nil
+    var hasImageAttachment: Bool = false
     var isSending: Bool = false
     var isAttachmentDisabled: Bool = false
 
@@ -22,7 +25,9 @@ struct MessageInputView: View {
     }
 
     private var canSend: Bool {
-        !isSending && !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        guard !isSending else { return false }
+        if hasImageAttachment { return true }
+        return !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
     var body: some View {
@@ -53,6 +58,29 @@ struct MessageInputView: View {
                     .padding(.horizontal, 12)
                     .padding(.top, 8)
                     .padding(.bottom, 6)
+            }
+
+            if let imagePreview, onRemoveImagePreview != nil {
+                ZStack(alignment: .topTrailing) {
+                    imagePreview
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: 72, height: 72)
+                        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+
+                    Button(action: { onRemoveImagePreview?() }) {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 18, weight: .semibold))
+                            .symbolRenderingMode(.palette)
+                            .foregroundStyle(Color.onAccentText, Color.black.opacity(0.55))
+                    }
+                    .buttonStyle(.plain)
+                    .offset(x: 6, y: -6)
+                    .accessibilityLabel(String(localized: "common.remove"))
+                }
+                .padding(.horizontal, 14)
+                .padding(.top, composeMode == nil ? 10 : 0)
+                .padding(.bottom, 8)
             }
 
             TextField("chats.messagePlaceholder", text: $text, axis: .vertical)

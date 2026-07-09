@@ -106,6 +106,7 @@ struct LocalMessengerSyncMetadataSnapshot: Sendable, Equatable {
 
 enum MessengerOutboxItemKind: String, Sendable, Equatable {
     case text
+    case image
 }
 
 enum MessengerOutboxItemStatus: String, Sendable, Equatable {
@@ -131,6 +132,7 @@ struct MessengerOutboxItemSnapshot: Sendable, Equatable, Identifiable {
     let updatedAt: Date
     let lastAttemptAt: Date?
     let serverMessageID: String?
+    let pendingMediaID: String?
 }
 
 enum MessengerOutboxRetryPolicy {

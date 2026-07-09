@@ -162,6 +162,21 @@ enum MessengerDiagnosticEvent: String, Sendable {
     case imageOutboxRetryRequested
     case imageTempFileCleaned
 
+    case outboxImageComposerPreviewSelected
+    case outboxImageComposerPreviewRemoved
+    case outboxImageItemCreated
+    case outboxPendingMediaStored
+    case outboxImageUploadStarted
+    case outboxImageUploadSucceeded
+    case outboxImageUploadFailed
+    case outboxImageCreateMessageStarted
+    case outboxImageCreateMessageSucceeded
+    case outboxImageCreateMessageFailed
+    case outboxImageRehydrated
+    case outboxPendingMediaCleared
+    case outboxPendingMediaMissing
+    case outboxImageRetryScheduled
+
     case imageBubbleRenderStarted
     case imageBubbleRenderSucceeded
     case imageBubbleRenderFailed
@@ -482,6 +497,8 @@ enum MessengerDiagnostics {
             "email",
             "displayname",
             "body",
+            "caption",
+            "comment",
             "draft",
             "text",
             "payload",

@@ -217,6 +217,11 @@ struct PrivateChatView: View {
                 isPhotoPickerPresented = true
                 #endif
             },
+            imagePreview: viewModel.composerPreviewSwiftUIImage,
+            onRemoveImagePreview: {
+                viewModel.removeComposerImagePreview()
+            },
+            hasImageAttachment: viewModel.hasComposerImagePreview,
             isSending: viewModel.blocksComposeSend,
             isAttachmentDisabled: viewModel.isPreparingImage || viewModel.editingMessage != nil
         )
@@ -231,7 +236,7 @@ struct PrivateChatView: View {
             guard let item else { return }
             selectedPhotoItem = nil
             Task {
-                await viewModel.sendImage(from: item, session: session, router: router)
+                await viewModel.selectComposerPhoto(from: item)
             }
         }
         #endif

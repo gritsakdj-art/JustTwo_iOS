@@ -1,9 +1,59 @@
 import Foundation
 import Testing
 @testable import JustTwo
+#if canImport(UIKit)
+import UIKit
+#endif
 
 @MainActor
 struct OptimisticSendTests {
+
+    @Test
+    func optimisticImageMessageIncludesOptionalCaption() throws {
+        #if canImport(UIKit)
+        let clientMessageID = "client-image-caption"
+        let data = makeTestJPEGData()
+        let relativePath = try MessengerPendingMediaStore.storeJPEG(
+            data: data,
+            pendingMediaID: "pending-caption",
+            clientMessageID: clientMessageID
+        )
+        let prepared = try MessengerPendingMediaStore.preparedImage(
+            relativePath: relativePath,
+            contentType: "image/jpeg",
+            byteSize: data.count,
+            width: 10,
+            height: 10
+        )
+
+        let message = ChatMessage.optimisticOutgoingImage(
+            clientMessageID: clientMessageID,
+            prepared: prepared,
+            replyPreview: nil,
+            caption: "Nice sunset"
+        )
+
+        #expect(message.kind == .image)
+        #expect(message.rawBody == "Nice sunset")
+        #expect(message.displayText == "Nice sunset")
+
+        MessengerPendingMediaStore.delete(relativePath: relativePath)
+        #else
+        Issue.record("UIKit unavailable")
+        #endif
+    }
+
+    #if canImport(UIKit)
+    private func makeTestJPEGData() -> Data {
+        let size = CGSize(width: 10, height: 10)
+        let renderer = UIGraphicsImageRenderer(size: size)
+        let image = renderer.image { context in
+            UIColor.red.setFill()
+            context.fill(CGRect(origin: .zero, size: size))
+        }
+        return image.jpegData(compressionQuality: 0.8) ?? Data()
+    }
+    #endif
 
     private let conversationID = UUID(uuidString: "AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE")!
 

@@ -20,6 +20,7 @@ final class SwiftDataMessengerLocalStore: MessengerLocalStoreProtocol {
         }
 
         try context.save()
+        MessengerPendingMediaStore.clearAll()
     }
 
     func upsertConversations(_ conversations: [ConversationDTO]) async throws {
@@ -319,6 +320,7 @@ final class SwiftDataMessengerLocalStore: MessengerLocalStoreProtocol {
         let mapped = MessengerLocalMapping.mapOutboxItem(
             conversationID: conversationID,
             clientMessageID: clientMessageID,
+            kind: .text,
             body: body,
             replyToMessageID: replyToMessageID,
             status: .pending,
@@ -446,6 +448,14 @@ final class SwiftDataMessengerLocalStore: MessengerLocalStoreProtocol {
         guard let entity = try fetchOutboxEntity(clientMessageID: clientMessageID, context: context) else {
             return
         }
+        if let pendingMediaID = entity.pendingMediaID,
+           let media = try fetchPendingMediaEntity(pendingMediaID: pendingMediaID, context: context) {
+            MessengerPendingMediaStore.delete(relativePath: media.localRelativePath)
+            context.delete(media)
+        } else if let media = try fetchPendingMediaEntity(clientMessageID: clientMessageID, context: context) {
+            MessengerPendingMediaStore.delete(relativePath: media.localRelativePath)
+            context.delete(media)
+        }
         context.delete(entity)
         try context.save()
     }
@@ -488,9 +498,103 @@ final class SwiftDataMessengerLocalStore: MessengerLocalStoreProtocol {
     }
 
     func clearOutbox() async throws {
+        try await clearPendingMedia()
         let context = modelContext
         try context.delete(model: LocalMessengerOutboxItem.self)
         try context.save()
+    }
+
+    func createImageOutboxItem(
+        conversationID: UUID,
+        clientMessageID: String,
+        caption: String?,
+        replyToMessageID: UUID?,
+        pendingMediaID: String,
+        localRelativePath: String,
+        contentType: String,
+        byteSize: Int,
+        width: Int,
+        height: Int
+    ) async throws -> MessengerOutboxItemSnapshot {
+        let context = modelContext
+        let now = Date()
+
+        if let existing = try fetchOutboxEntity(clientMessageID: clientMessageID, context: context) {
+            return MessengerLocalMapping.outboxSnapshot(from: existing)
+        }
+
+        let media = MessengerLocalMapping.mapPendingMedia(
+            pendingMediaID: pendingMediaID,
+            clientMessageID: clientMessageID,
+            conversationID: conversationID,
+            localRelativePath: localRelativePath,
+            contentType: contentType,
+            byteSize: byteSize,
+            width: width,
+            height: height,
+            createdAt: now,
+            updatedAt: now
+        )
+        context.insert(media)
+
+        let outbox = MessengerLocalMapping.mapOutboxItem(
+            conversationID: conversationID,
+            clientMessageID: clientMessageID,
+            kind: .image,
+            body: caption ?? "",
+            replyToMessageID: replyToMessageID,
+            status: .pending,
+            attemptCount: 0,
+            lastErrorCode: nil,
+            nextRetryAt: now,
+            createdAt: now,
+            updatedAt: now,
+            lastAttemptAt: nil,
+            serverMessageID: nil,
+            pendingMediaID: pendingMediaID
+        )
+        context.insert(outbox)
+        try context.save()
+        return MessengerLocalMapping.outboxSnapshot(from: outbox)
+    }
+
+    func fetchPendingMedia(clientMessageID: String) async throws -> MessengerPendingMediaSnapshot? {
+        let context = modelContext
+        guard let entity = try fetchPendingMediaEntity(clientMessageID: clientMessageID, context: context) else {
+            return nil
+        }
+        return MessengerLocalMapping.pendingMediaSnapshot(from: entity)
+    }
+
+    func fetchPendingMedia(pendingMediaID: String) async throws -> MessengerPendingMediaSnapshot? {
+        let context = modelContext
+        guard let entity = try fetchPendingMediaEntity(pendingMediaID: pendingMediaID, context: context) else {
+            return nil
+        }
+        return MessengerLocalMapping.pendingMediaSnapshot(from: entity)
+    }
+
+    func deletePendingMedia(clientMessageID: String) async throws {
+        let context = modelContext
+        guard let entity = try fetchPendingMediaEntity(clientMessageID: clientMessageID, context: context) else {
+            return
+        }
+        MessengerPendingMediaStore.delete(relativePath: entity.localRelativePath)
+        context.delete(entity)
+        try context.save()
+    }
+
+    func clearPendingMedia() async throws {
+        let context = modelContext
+        try context.delete(model: LocalMessengerPendingMedia.self)
+        try context.save()
+        MessengerPendingMediaStore.clearAll()
+    }
+
+    func fetchPendingMediaRelativePaths() async throws -> Set<String> {
+        let context = modelContext
+        let descriptor = FetchDescriptor<LocalMessengerPendingMedia>()
+        return Set(try context.fetch(descriptor).map(\.localRelativePath))
     }
 }
 
@@ -691,6 +795,28 @@ private extension SwiftDataMessengerLocalStore {
     ) throws -> LocalMessengerOutboxItem? {
         var descriptor = FetchDescriptor<LocalMessengerOutboxItem>(
             predicate: #Predicate { $0.clientMessageID == clientMessageID }
+        )
+        descriptor.fetchLimit = 1
+        return try context.fetch(descriptor).first
+    }
+
+    func fetchPendingMediaEntity(
+        clientMessageID: String,
+        context: ModelContext
+    ) throws -> LocalMessengerPendingMedia? {
+        var descriptor = FetchDescriptor<LocalMessengerPendingMedia>(
+            predicate: #Predicate { $0.clientMessageID == clientMessageID }
+        )
+        descriptor.fetchLimit = 1
+        return try context.fetch(descriptor).first
+    }
+
+    func fetchPendingMediaEntity(
+        pendingMediaID: String,
+        context: ModelContext
+    ) throws -> LocalMessengerPendingMedia? {
+        var descriptor = FetchDescriptor<LocalMessengerPendingMedia>(
+            predicate: #Predicate { $0.pendingMediaID == pendingMediaID }
         )
         descriptor.fetchLimit = 1
         return try context.fetch(descriptor).first

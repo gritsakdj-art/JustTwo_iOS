@@ -52,6 +52,28 @@ final class MessengerOutboxProcessor {
                 ]
             )
         }
+
+        do {
+            let validPaths = try await localStore.fetchPendingMediaRelativePaths()
+            let prunedCount = MessengerPendingMediaStore.pruneOrphans(validRelativePaths: validPaths)
+            if prunedCount > 0 {
+                MessengerDiagnostics.event(
+                    .outboxPendingMediaCleared,
+                    metadata: [
+                        "reason": "pruneOrphans",
+                        "count": "\(prunedCount)"
+                    ]
+                )
+            }
+        } catch {
+            MessengerDiagnostics.event(
+                .outboxPendingMediaCleared,
+                metadata: [
+                    "reason": "pruneOrphansFailed",
+                    "errorCategory": MessengerDiagnostics.sanitizeError(error)
+                ]
+            )
+        }
     }
 
     func reconcileConversation(
@@ -78,6 +100,7 @@ final class MessengerOutboxProcessor {
 
             let cachedMessages = MessageCacheStore.shared.messages(for: conversationID) ?? []
             var insertedCount = 0
+            var imageRehydratedCount = 0
 
             for item in activeItems {
                 if let serverMessageID = item.serverMessageID,
@@ -88,16 +111,6 @@ final class MessengerOutboxProcessor {
                         conversationID: conversationID,
                         clientMessageID: item.clientMessageID,
                         metadata: ["reason": "alreadyConfirmed"]
-                    )
-                    continue
-                }
-
-                if cachedMessages.contains(where: { $0.clientMessageID == item.clientMessageID }) {
-                    MessengerOutbox.shared.rehydrateTextItem(
-                        snapshot: item,
-                        localMessageID: OptimisticMessageIdentity.localMessageID(for: item.clientMessageID),
-                        session: session,
-                        router: router
                     )
                     continue
                 }
@@ -115,23 +128,78 @@ final class MessengerOutboxProcessor {
                     continue
                 }
 
+                if cachedMessages.contains(where: { $0.clientMessageID == item.clientMessageID }) {
+                    await rehydrateInMemoryOutboxItem(
+                        item: item,
+                        localMessageID: OptimisticMessageIdentity.localMessageID(for: item.clientMessageID),
+                        session: session,
+                        router: router
+                    )
+                    continue
+                }
+
                 let replyPreview = replyPreview(from: item, messages: cachedMessages)
                 let localState: MessageLocalSendState = item.status == .failed ? .failed : .sending
-                let optimistic = ChatMessage.optimisticOutgoing(
-                    clientMessageID: item.clientMessageID,
-                    body: item.body,
-                    replyPreview: replyPreview,
-                    createdAt: item.createdAt
-                ).replacingLocalSendState(localState)
 
-                MessageCacheStore.shared.insertOptimisticMessage(optimistic, for: conversationID)
-                MessengerOutbox.shared.rehydrateTextItem(
-                    snapshot: item,
-                    localMessageID: optimistic.id,
-                    session: session,
-                    router: router
-                )
-                insertedCount += 1
+                switch item.kind {
+                case .text:
+                    let optimistic = ChatMessage.optimisticOutgoing(
+                        clientMessageID: item.clientMessageID,
+                        body: item.body,
+                        replyPreview: replyPreview,
+                        createdAt: item.createdAt
+                    ).replacingLocalSendState(localState)
+
+                    MessageCacheStore.shared.insertOptimisticMessage(optimistic, for: conversationID)
+                    MessengerOutbox.shared.rehydrateTextItem(
+                        snapshot: item,
+                        localMessageID: optimistic.id,
+                        session: session,
+                        router: router
+                    )
+                    insertedCount += 1
+
+                case .image:
+                    guard let prepared = try await loadPreparedImage(for: item) else {
+                        try? await localStore.markOutboxFailed(
+                            clientMessageID: item.clientMessageID,
+                            errorCode: "pendingMediaMissing",
+                            nextRetryAt: nil
+                        )
+                        MessengerDiagnostics.event(
+                            .outboxPendingMediaMissing,
+                            conversationID: conversationID,
+                            clientMessageID: item.clientMessageID,
+                            metadata: [
+                                "pendingMediaID": item.pendingMediaID.map {
+                                    MessengerPendingMediaStore.sanitizedPendingMediaIDForDiagnostics($0)
+                                } ?? "none"
+                            ]
+                        )
+                        continue
+                    }
+
+                    let caption = item.body.trimmingCharacters(in: .whitespacesAndNewlines)
+                    let normalizedCaption = caption.isEmpty ? nil : caption
+                    let optimistic = ChatMessage.optimisticOutgoingImage(
+                        clientMessageID: item.clientMessageID,
+                        prepared: prepared,
+                        replyPreview: replyPreview,
+                        caption: normalizedCaption,
+                        createdAt: item.createdAt
+                    ).replacingLocalSendState(localState)
+
+                    MessageCacheStore.shared.insertOptimisticMessage(optimistic, for: conversationID)
+                    MessengerOutbox.shared.rehydrateImageItem(
+                        snapshot: item,
+                        prepared: prepared,
+                        localMessageID: optimistic.id,
+                        session: session,
+                        router: router
+                    )
+                    insertedCount += 1
+                    imageRehydratedCount += 1
+                }
             }
 
             if insertedCount > 0 {
@@ -140,6 +208,15 @@ final class MessengerOutboxProcessor {
                     conversationID: conversationID,
                     metadata: ["count": "\(insertedCount)"]
                 )
+            }
+            if imageRehydratedCount > 0 {
+                MessengerDiagnostics.event(
+                    .outboxImageRehydrated,
+                    conversationID: conversationID,
+                    metadata: ["count": "\(imageRehydratedCount)"]
+                )
+            }
+            if insertedCount > 0 || imageRehydratedCount > 0 {
                 MessengerConversationNotification.postMessagesDidChange(conversationID: conversationID)
             }
 
@@ -191,7 +268,7 @@ final class MessengerOutboxProcessor {
         do {
             let pendingItems = try await localStore.fetchPendingOutboxItems()
             let readyItems = pendingItems.filter { item in
-                guard item.kind == .text else { return false }
+                guard item.kind == .text || item.kind == .image else { return false }
                 if MessengerOutbox.shared.entry(for: item.clientMessageID)?.state == .sending {
                     return false
                 }
@@ -202,15 +279,16 @@ final class MessengerOutboxProcessor {
             }
 
             for item in readyItems {
-                guard item.kind == .text else { continue }
                 guard let conversationUUID = UUID(uuidString: item.conversationID) else { continue }
 
-                MessengerOutbox.shared.rehydrateTextItem(
-                    snapshot: item,
+                await rehydrateInMemoryOutboxItem(
+                    item: item,
                     localMessageID: OptimisticMessageIdentity.localMessageID(for: item.clientMessageID),
                     session: session,
                     router: router
                 )
+
+                _ = conversationUUID
             }
 
             let conversationIDs = Set(readyItems.compactMap { UUID(uuidString: $0.conversationID) })
@@ -231,6 +309,7 @@ final class MessengerOutboxProcessor {
 
     func clearOutboxOnLogout() async {
         do {
+            try await localStore.clearPendingMedia()
             try await localStore.clearOutbox()
             MessengerDiagnostics.event(.outboxReset, metadata: ["reason": "logout"])
         } catch {
@@ -251,6 +330,43 @@ final class MessengerOutboxProcessor {
         }
         #endif
         return .shared
+    }
+
+    private func rehydrateInMemoryOutboxItem(
+        item: MessengerOutboxItemSnapshot,
+        localMessageID: UUID,
+        session: SessionStore,
+        router: AppRouter
+    ) async {
+        switch item.kind {
+        case .text:
+            MessengerOutbox.shared.rehydrateTextItem(
+                snapshot: item,
+                localMessageID: localMessageID,
+                session: session,
+                router: router
+            )
+        case .image:
+            guard let prepared = try? await loadPreparedImage(for: item) else { return }
+            MessengerOutbox.shared.rehydrateImageItem(
+                snapshot: item,
+                prepared: prepared,
+                localMessageID: localMessageID,
+                session: session,
+                router: router
+            )
+        }
+    }
+
+    private func loadPreparedImage(for item: MessengerOutboxItemSnapshot) async throws -> PreparedChatImage? {
+        if let mediaSnapshot = try await localStore.fetchPendingMedia(clientMessageID: item.clientMessageID) {
+            return try ChatImagePreparer.preparedFromPendingMedia(mediaSnapshot)
+        }
+        if let pendingMediaID = item.pendingMediaID,
+           let mediaSnapshot = try await localStore.fetchPendingMedia(pendingMediaID: pendingMediaID) {
+            return try ChatImagePreparer.preparedFromPendingMedia(mediaSnapshot)
+        }
+        return nil
     }
 
     private func replyPreview(

@@ -251,6 +251,23 @@
 - **Manual smoke:** not run (checklist in PR16A report).
 - Out of scope: image outbox, upload retry, full sync engine (PR16B/PR16C).
 
+## 2026-07-09 (PR16B)
+
+### Persistent image outbox + composer preview
+
+- Composer image preview before Send (picker no longer auto-sends); X removes preview, keeps typed text.
+- Image + optional comment sends as **one** `kind=image` message (`body` = caption).
+- Added `LocalMessengerPendingMedia` (schema v4) + `MessengerPendingMediaStore` in Application Support.
+- Extended `LocalMessengerOutboxItem` with `pendingMediaID`; image jobs use PR16A lifecycle.
+- `ChatViewModel.sendComposerImage` durable ordering: persist file → SwiftData → bubble → clear composer → pump.
+- `MessengerOutbox.registerPersistedImageEntry` + `rehydrateImageItem`; upload session refreshed on retry.
+- `MessengerOutboxProcessor` rehydrates pending image bubbles + caption after relaunch.
+- Success/logout clears outbox row + pending media file; no `uploadUrl`/`storageKey` persistence.
+- Updated `Docs/MessengerOutbox.md`, `Docs/MessengerMediaCache.md`, `Docs/MessengerLocalStorage.md`.
+- Added/extended `MessengerOutboxTests`, `MessengerPendingMediaStoreTests`, `OptimisticSendTests`.
+- **Manual smoke:** not run (checklist in PR16B report).
+- Out of scope: retry UI polish (PR16C), full sync engine.
+
 ## Notes
 
 - Continue adding completed changes here after each meaningful update.
