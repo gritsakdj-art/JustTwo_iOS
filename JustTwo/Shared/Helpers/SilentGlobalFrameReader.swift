@@ -10,6 +10,15 @@ import UIKit
 @MainActor
 final class SilentGlobalFrameReference {
     var rect: CGRect = .zero
+
+    fileprivate var resolveCurrentRect: (() -> CGRect?)?
+
+    func currentRect() -> CGRect {
+        if let currentRect = resolveCurrentRect?() {
+            rect = currentRect
+        }
+        return rect
+    }
 }
 
 #if canImport(UIKit)
@@ -19,6 +28,10 @@ struct SilentGlobalFrameReader: UIViewRepresentable {
     func makeUIView(context: Context) -> SilentGlobalFrameCaptureView {
         let view = SilentGlobalFrameCaptureView()
         view.reference = reference
+        reference.resolveCurrentRect = { [weak view] in
+            guard let view else { return nil }
+            return view.convert(view.bounds, to: nil)
+        }
         view.isUserInteractionEnabled = false
         view.backgroundColor = .clear
         return view
@@ -26,6 +39,10 @@ struct SilentGlobalFrameReader: UIViewRepresentable {
 
     func updateUIView(_ uiView: SilentGlobalFrameCaptureView, context: Context) {
         uiView.reference = reference
+        reference.resolveCurrentRect = { [weak uiView] in
+            guard let uiView else { return nil }
+            return uiView.convert(uiView.bounds, to: nil)
+        }
     }
 }
 

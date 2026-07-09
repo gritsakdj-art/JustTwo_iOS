@@ -51,7 +51,7 @@ struct MessageRow: View {
                 guard message.canReply || message.canCopy || message.canEdit || message.canDelete || message.canCancelPendingOutgoing || message.canReact else {
                     return
                 }
-                onLongPress(bubbleFrameReference.rect)
+                onLongPress(bubbleFrameReference.currentRect())
             }
 
             if !message.isMine { Spacer() }
