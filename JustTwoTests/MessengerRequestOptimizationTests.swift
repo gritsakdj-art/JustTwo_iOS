@@ -319,7 +319,7 @@ struct MessengerRequestOptimizationTests {
     // MARK: - Privacy
 
     @Test
-    func diagnosticsExportHasNoSensitiveMessengerOptimizationFields() {
+    func diagnosticsExportHasNoSensitiveMessengerOptimizationFields() async {
         MessengerDiagnosticsStore.shared.clear()
         MessengerDiagnostics.event(
             .messengerChatOpenNetworkRefreshSkippedFreshCache,
@@ -327,7 +327,7 @@ struct MessengerRequestOptimizationTests {
             metadata: ["count": "1", "reason": "open"]
         )
 
-        let export = MessengerDiagnostics.exportTextForClipboard().lowercased()
+        let export = (await MessengerDiagnostics.exportTextForClipboard()).lowercased()
         #expect(!export.contains("downloadurl"))
         #expect(!export.contains("uploadurl"))
         #expect(!export.contains("bearer"))

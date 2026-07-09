@@ -115,9 +115,24 @@ final class MessengerMediaDiskCache: MessengerMediaDiskCacheProtocol, @unchecked
     func cleanup(
         policy: MessengerMediaCacheCleanupPolicy,
         referencedAttachmentIDs: Set<String>
-    ) async {
+    ) async -> MessengerMediaCacheTrimResult {
         await runOnQueue {
             self.cleanupSync(policy: policy, referencedAttachmentIDs: referencedAttachmentIDs)
+        }
+    }
+
+    func confirmedInventory(referencedAttachmentIDs: Set<String>) async -> (
+        thumbnailBytes: Int64,
+        fullBytes: Int64,
+        thumbnailCount: Int,
+        fullCount: Int,
+        orphanBytes: Int64,
+        orphanCount: Int,
+        oldestAccess: Date?,
+        newestAccess: Date?
+    ) {
+        await runOnQueue {
+            self.confirmedInventorySync(referencedAttachmentIDs: referencedAttachmentIDs)
         }
     }
 
@@ -130,6 +145,16 @@ final class MessengerMediaDiskCache: MessengerMediaDiskCacheProtocol, @unchecked
     func totalCachedBytes() async -> Int64 {
         await runOnQueue {
             self.totalCachedBytesSync()
+        }
+    }
+
+    func hasCachedVariant(for attachmentID: String, variant: MessengerMediaVariant) async -> Bool {
+        await runOnQueue {
+            guard let sanitized = try? MessengerMediaDiskCacheSupport.sanitizeAttachmentID(attachmentID) else {
+                return false
+            }
+            let fileURL = self.fileURL(for: sanitized, variant: variant)
+            return self.fileManager.fileExists(atPath: fileURL.path)
         }
     }
 
@@ -162,6 +187,10 @@ final class MessengerMediaDiskCache: MessengerMediaDiskCacheProtocol, @unchecked
 
         do {
             let data = try Data(contentsOf: fileURL)
+            try? fileManager.setAttributes(
+                [.modificationDate: Date()],
+                ofItemAtPath: fileURL.path
+            )
             MessengerDiagnostics.event(
                 .messengerMediaDiskCacheHit,
                 metadata: MessengerMediaDiskCacheSupport.lookupMetadata(
@@ -260,11 +289,14 @@ final class MessengerMediaDiskCache: MessengerMediaDiskCacheProtocol, @unchecked
     private func cleanupSync(
         policy: MessengerMediaCacheCleanupPolicy,
         referencedAttachmentIDs: Set<String>
-    ) {
+    ) -> MessengerMediaCacheTrimResult {
         let startedAt = Date()
         MessengerDiagnostics.event(
             .messengerMediaDiskCacheCleanupStarted,
-            metadata: ["maxBytes": "\(policy.maxBytes)"]
+            metadata: [
+                "softLimitBytes": "\(policy.softLimitBytes)",
+                "hardLimitBytes": "\(policy.hardLimitBytes)"
+            ]
         )
 
         let referenced = Set(
@@ -272,42 +304,153 @@ final class MessengerMediaDiskCache: MessengerMediaDiskCacheProtocol, @unchecked
         )
         let cutoff = Calendar.current.date(byAdding: .day, value: -policy.maxAgeDays, to: Date())
 
-        var entries = (try? allCacheEntriesSync()) ?? []
-        var removedCount = 0
+        var removedFullCount = 0
+        var removedThumbnailCount = 0
+        var orphanDirectoryCount = 0
+        var deletedBytes: Int64 = 0
 
-        for entry in entries where !referenced.contains(entry.attachmentID) {
-            try? fileManager.removeItem(at: entry.directoryURL)
-            removedCount += 1
+        var variantFiles = (try? allVariantFilesSync()) ?? []
+
+        let orphanFiles = variantFiles.filter { !referenced.contains($0.attachmentID) }
+        orphanDirectoryCount = Set(orphanFiles.map(\.attachmentID)).count
+        for entry in orphanFiles {
+            deletedBytes += entry.byteSize
+            if entry.variant == .full {
+                removedFullCount += 1
+            } else {
+                removedThumbnailCount += 1
+            }
+            try? fileManager.removeItem(at: entry.fileURL)
         }
-
-        entries = (try? allCacheEntriesSync()) ?? []
+        removeEmptyAttachmentDirectoriesSync()
+        variantFiles = (try? allVariantFilesSync()) ?? []
 
         if let cutoff {
-            for entry in entries where entry.lastModified < cutoff {
-                try? fileManager.removeItem(at: entry.directoryURL)
-                removedCount += 1
+            let staleAttachmentIDs = Set(
+                variantFiles
+                    .filter { $0.lastModified < cutoff }
+                    .map(\.attachmentID)
+            )
+            for attachmentID in staleAttachmentIDs {
+                let staleFiles = variantFiles.filter { $0.attachmentID == attachmentID }
+                for entry in staleFiles {
+                    deletedBytes += entry.byteSize
+                    if entry.variant == .full {
+                        removedFullCount += 1
+                    } else {
+                        removedThumbnailCount += 1
+                    }
+                    try? fileManager.removeItem(at: entry.fileURL)
+                }
             }
+            removeEmptyAttachmentDirectoriesSync()
+            variantFiles = (try? allVariantFilesSync()) ?? []
         }
 
-        entries = (try? allCacheEntriesSync()) ?? []
-        var totalBytes = entries.reduce(Int64(0)) { $0 + $1.byteSize }
+        var totalBytes = variantFiles.reduce(Int64(0)) { $0 + $1.byteSize }
 
-        if totalBytes > policy.maxBytes {
-            let sorted = entries.sorted { $0.lastModified < $1.lastModified }
-            for entry in sorted where totalBytes > policy.targetBytesAfterCleanup {
-                try? fileManager.removeItem(at: entry.directoryURL)
+        if totalBytes > policy.softLimitBytes {
+            let fullCandidates = variantFiles
+                .filter { $0.variant == .full }
+                .sorted { $0.lastModified < $1.lastModified }
+            for entry in fullCandidates where totalBytes > policy.softLimitBytes {
+                guard fileManager.fileExists(atPath: entry.fileURL.path) else { continue }
+                try? fileManager.removeItem(at: entry.fileURL)
                 totalBytes -= entry.byteSize
-                removedCount += 1
+                deletedBytes += entry.byteSize
+                removedFullCount += 1
+                variantFiles.removeAll { $0.fileURL == entry.fileURL }
             }
+            removeEmptyAttachmentDirectoriesSync()
         }
+
+        totalBytes = variantFiles.reduce(Int64(0)) { $0 + $1.byteSize }
+        if totalBytes > policy.hardLimitBytes {
+            let thumbnailCandidates = variantFiles
+                .filter { $0.variant == .thumbnail }
+                .sorted { $0.lastModified < $1.lastModified }
+            for entry in thumbnailCandidates where totalBytes > policy.hardLimitBytes {
+                guard fileManager.fileExists(atPath: entry.fileURL.path) else { continue }
+                try? fileManager.removeItem(at: entry.fileURL)
+                totalBytes -= entry.byteSize
+                deletedBytes += entry.byteSize
+                removedThumbnailCount += 1
+            }
+            removeEmptyAttachmentDirectoriesSync()
+        }
+
+        let result = MessengerMediaCacheTrimResult(
+            removedFullCount: removedFullCount,
+            removedThumbnailCount: removedThumbnailCount,
+            orphanDirectoryCount: orphanDirectoryCount,
+            deletedBytes: deletedBytes,
+            finishedAt: Date()
+        )
 
         MessengerDiagnostics.event(
             .messengerMediaDiskCacheCleanupSucceeded,
             metadata: [
-                "removedCount": "\(removedCount)",
-                "totalBytes": "\(max(0, totalBytes))",
+                "removedFullCount": "\(removedFullCount)",
+                "removedThumbnailCount": "\(removedThumbnailCount)",
+                "deletedBytes": "\(deletedBytes)",
                 "durationMs": "\(MessengerMediaDiskCacheSupport.durationMilliseconds(since: startedAt))"
             ]
+        )
+
+        return result
+    }
+
+    private func confirmedInventorySync(referencedAttachmentIDs: Set<String>) -> (
+        thumbnailBytes: Int64,
+        fullBytes: Int64,
+        thumbnailCount: Int,
+        fullCount: Int,
+        orphanBytes: Int64,
+        orphanCount: Int,
+        oldestAccess: Date?,
+        newestAccess: Date?
+    ) {
+        let referenced = Set(
+            referencedAttachmentIDs.compactMap { try? MessengerMediaDiskCacheSupport.sanitizeAttachmentID($0) }
+        )
+        let variantFiles = (try? allVariantFilesSync()) ?? []
+
+        var thumbnailBytes: Int64 = 0
+        var fullBytes: Int64 = 0
+        var thumbnailCount = 0
+        var fullCount = 0
+        var orphanBytes: Int64 = 0
+        var orphanCount = 0
+        var oldest: Date?
+        var newest: Date?
+
+        for entry in variantFiles {
+            if entry.variant == .thumbnail {
+                thumbnailBytes += entry.byteSize
+                thumbnailCount += 1
+            } else {
+                fullBytes += entry.byteSize
+                fullCount += 1
+            }
+
+            if !referenced.contains(entry.attachmentID) {
+                orphanBytes += entry.byteSize
+                orphanCount += 1
+            }
+
+            oldest = oldest.map { min($0, entry.lastModified) } ?? entry.lastModified
+            newest = newest.map { max($0, entry.lastModified) } ?? entry.lastModified
+        }
+
+        return (
+            thumbnailBytes,
+            fullBytes,
+            thumbnailCount,
+            fullCount,
+            orphanBytes,
+            orphanCount,
+            oldest,
+            newest
         )
     }
 
@@ -319,8 +462,8 @@ final class MessengerMediaDiskCache: MessengerMediaDiskCacheProtocol, @unchecked
     }
 
     private func totalCachedBytesSync() -> Int64 {
-        let entries = (try? allCacheEntriesSync()) ?? []
-        return entries.reduce(0) { $0 + $1.byteSize }
+        let files = (try? allVariantFilesSync()) ?? []
+        return files.reduce(0) { $0 + $1.byteSize }
     }
 
     // MARK: - Paths
@@ -356,11 +499,82 @@ final class MessengerMediaDiskCache: MessengerMediaDiskCacheProtocol, @unchecked
 
     // MARK: - Helpers
 
+    private struct VariantFileEntry {
+        let attachmentID: String
+        let variant: MessengerMediaVariant
+        let fileURL: URL
+        let byteSize: Int64
+        let lastModified: Date
+    }
+
     private struct CacheEntry {
         let attachmentID: String
         let directoryURL: URL
         let byteSize: Int64
         let lastModified: Date
+    }
+
+    private func allVariantFilesSync() throws -> [VariantFileEntry] {
+        let root = attachmentsRootURL
+        guard fileManager.fileExists(atPath: root.path) else { return [] }
+
+        let directories = try fileManager.contentsOfDirectory(
+            at: root,
+            includingPropertiesForKeys: [.isDirectoryKey],
+            options: [.skipsHiddenFiles]
+        )
+
+        var files: [VariantFileEntry] = []
+        for directoryURL in directories {
+            guard (try? directoryURL.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true else {
+                continue
+            }
+
+            let attachmentID = directoryURL.lastPathComponent
+            guard (try? MessengerMediaDiskCacheSupport.sanitizeAttachmentID(attachmentID)) != nil else { continue }
+
+            for variant in MessengerMediaVariant.allCases {
+                let fileURL = fileURL(for: attachmentID, variant: variant)
+                guard fileManager.fileExists(atPath: fileURL.path) else { continue }
+                let values = try fileURL.resourceValues(forKeys: [.fileSizeKey, .contentModificationDateKey])
+                let byteSize = Int64(values.fileSize ?? 0)
+                let lastModified = values.contentModificationDate ?? .distantPast
+                files.append(
+                    VariantFileEntry(
+                        attachmentID: attachmentID,
+                        variant: variant,
+                        fileURL: fileURL,
+                        byteSize: byteSize,
+                        lastModified: lastModified
+                    )
+                )
+            }
+        }
+        return files
+    }
+
+    private func removeEmptyAttachmentDirectoriesSync() {
+        guard let directories = try? fileManager.contentsOfDirectory(
+            at: attachmentsRootURL,
+            includingPropertiesForKeys: [.isDirectoryKey],
+            options: [.skipsHiddenFiles]
+        ) else {
+            return
+        }
+
+        for directoryURL in directories {
+            guard (try? directoryURL.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true else {
+                continue
+            }
+            let contents = (try? fileManager.contentsOfDirectory(
+                at: directoryURL,
+                includingPropertiesForKeys: nil,
+                options: [.skipsHiddenFiles]
+            )) ?? []
+            if contents.isEmpty {
+                try? fileManager.removeItem(at: directoryURL)
+            }
+        }
     }
 
     private func allCacheEntriesSync() throws -> [CacheEntry] {

@@ -17,6 +17,7 @@ On-device messenger persistence using SwiftData.
 | PR16C | Outbox retry UI + network restore polish | ✅ (pending manual smoke) |
 | PR17 | Persistent sync engine + durable cursor | ✅ (pending manual smoke) |
 | PR18 | Offline/cache/sync/outbox UX polish | ✅ (pending manual smoke) |
+| PR19 | Media cache inventory, LRU trim, clear confirmed cache, storage UI | ✅ (pending manual smoke) |
 
 ## PR15D — Offline-friendly startup
 
@@ -80,6 +81,14 @@ Confirmed/received image attachments can survive relaunch from disk cache.
 **Schema note (v2):** PR15E adds optional attachment media metadata fields. If an on-device SwiftData store from PR15A–PR15D cannot be opened, `AppModelContainerFactory` recreates the store once (local messenger cache is rebuilt from REST/delta; media disk cache in Application Support is separate and preserved).
 
 See [Messenger Media Cache](MessengerMediaCache.md) for storage layout, security, cleanup, and smoke checklist.
+
+## PR19 — Media cache metadata reset
+
+`clearAllConfirmedMediaCacheMetadata()` clears `hasLocalThumbnail`, `hasLocalFullImage`, byte sizes, and access timestamps on all `LocalMessengerAttachment` rows **without** deleting messages or attachment rows.
+
+Forbidden in metadata (unchanged): `downloadUrl`, `uploadUrl`, `storageKey`, absolute paths, image bytes.
+
+Logout still clears the entire confirmed media directory plus all messenger SwiftData.
 
 ## PR15F — Messenger startup/request optimization
 

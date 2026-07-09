@@ -309,6 +309,20 @@
 - Added `MessengerOfflineUXTests`.
 - **Manual smoke:** not run (checklist in PR18 report).
 
+## 2026-07-09 (PR19)
+
+- Branch: `ios-messenger-pr19-media-cache-controls`.
+- `MessengerMediaCacheControls` + inventory (confirmed vs pending outgoing bytes/counts).
+- LRU trim: full variants first, then thumbnails; soft 200 MB / hard 300 MB; disk mtime on cache hit.
+- `clearConfirmedMediaCache()` preserves pending outgoing media, messages, and outbox.
+- Settings → Storage section with cache size, pending uploads, clear with RU/EN confirmation.
+- Offline placeholder: “Photo unavailable offline” in bubble + full-screen viewer.
+- Privacy-safe media section in diagnostics export (`exportTextForClipboard` now async).
+- Added `MessengerMediaCacheControlsTests`; updated related tests for async diagnostics.
+- Docs: `MessengerMediaCache.md`, `MessengerOutbox.md`, `MessengerOfflineUX.md`, `MessengerLocalStorage.md`, `MessengerStorageControls.md`.
+- **Manual smoke:** not run (checklist in PR19 report).
+- Out of scope: backend retention/metrics (PR20).
+
 ## Notes
 
 - Continue adding completed changes here after each meaningful update.

@@ -130,28 +130,76 @@ When a message is tombstoned:
 3. SwiftData media flags cleared
 4. In-memory `ChatMessageImageCache` entry removed
 
-### Quota / LRU
+### Quota / LRU (PR19 update)
 
 Default policy (`MessengerMediaCacheCleanupPolicy.default`):
 
 | Setting | Value |
 |---------|-------|
-| `maxBytes` | 300 MB |
-| `targetBytesAfterCleanup` | 240 MB |
+| Soft limit (`targetBytesAfterCleanup`) | 200 MB |
+| Hard limit (`maxBytes`) | 300 MB |
 | `maxAgeDays` | 90 |
 
 Triggers:
 
 - Background task after startup network warmup
-- After store when total size exceeds quota
+- After store when total size exceeds soft limit
+- App entering background (via `MessengerMediaCacheService.runCleanupIfNeeded`)
+- Manual trim from storage controls (optional)
 
-Cleanup removes:
+Trim order:
 
 1. Orphan files not referenced by any `LocalMessengerAttachment.localCacheKey`
-2. Files older than `maxAgeDays` (directory mtime scan)
-3. LRU oldest directories when over quota
+2. Files older than `maxAgeDays`
+3. LRU **full** variants first until under soft limit
+4. LRU **thumbnail** variants only if still over soft limit
 
-**Limitation:** LRU uses filesystem modification time at cleanup time, not `mediaLastAccessedAt`. Disk hits update SwiftData `mediaLastAccessedAt` for future enhancements but do not currently touch file mtimes; cleanup may therefore evict recently viewed media if quota pressure occurs before the file mtime changes.
+Disk hits update file modification time (used for LRU) and SwiftData `mediaLastAccessedAt`.
+
+**PR19 boundary:** Pending outgoing media in `MessengerPendingMedia/` is **never** trimmed or cleared by confirmed-cache LRU/trim.
+
+## PR19 — Media cache controls
+
+### Inventory (`MessengerMediaCacheControls.inventory`)
+
+Non-blocking scan of confirmed disk cache + pending outgoing store:
+
+| Field | Meaning |
+|-------|---------|
+| `confirmedThumbnailBytes` / `confirmedFullBytes` | Variant breakdown |
+| `confirmedTotalBytes` / `confirmedFileCount` | Confirmed cache total |
+| `pendingOutgoingBytes` / `pendingOutgoingFileCount` | Outbox upload files (separate directory) |
+| `totalMessengerMediaBytes` | Confirmed + pending |
+| `orphanConfirmedFileCount` / `orphanConfirmedBytes` | Unreferenced confirmed files |
+| `cacheSoftLimitBytes` / `cacheHardLimitBytes` | Policy limits |
+| `overLimitBytes` | Bytes above soft limit |
+
+No absolute paths, signed URLs, or image decoding during inventory.
+
+### Clear confirmed media cache
+
+`MessengerMediaCacheControls.clearConfirmedMediaCache()`:
+
+1. Removes all files under `MediaCache/attachments/`
+2. Clears SwiftData confirmed media flags via `clearAllConfirmedMediaCacheMetadata()`
+3. Clears in-memory `ChatMessageImageCache`
+4. **Does not** delete `MessengerPendingMedia/` files or outbox rows
+5. **Does not** delete messages/conversations
+
+User control: **Settings → Storage → Clear media cache** (confirmation required, RU/EN).
+
+After clear: bubbles/viewer show placeholder; online re-download uses ephemeral signed URLs; offline shows “Photo unavailable offline” when no local file and no URL.
+
+### Components (PR19)
+
+| Component | Path |
+|-----------|------|
+| `MessengerMediaCacheControls` | `Core/Persistence/Messenger/Media/MessengerMediaCacheControls.swift` |
+| `MessengerMediaCacheInventory` | `Core/Persistence/Messenger/Media/MessengerMediaCacheInventory.swift` |
+| `MessengerStorageFormatting` | `Shared/Utilities/MessengerStorageFormatting.swift` |
+| Storage UI | `Shared/Views/Profile/GeneralSettingsView.swift` |
+
+See [Messenger Storage Controls](MessengerStorageControls.md).
 
 ## Security / privacy
 
@@ -174,6 +222,8 @@ Cleanup removes:
 6. **Outgoing confirmed:** send image online → confirm → relaunch → bubble uses disk if previously stored
 7. **Cleanup:** app launch after large cache → no crash; recent media remains under quota
 8. **Privacy:** export diagnostics → no signed URLs / tokens / local paths
+9. **PR19 clear:** Settings → Clear media cache → confirmed files gone, pending uploads preserved, messages remain
+10. **PR19 offline after clear:** airplane mode → placeholder / “Photo unavailable offline”, no endless spinner
 
 ## Related docs
 

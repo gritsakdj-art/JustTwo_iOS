@@ -295,6 +295,12 @@ final class MessengerLocalStore: MessengerLocalStoreProtocol {
         }
     }
 
+    func clearAllConfirmedMediaCacheMetadata() async throws {
+        try await performSessionBoundOperation(operation: "clearAllConfirmedMediaCacheMetadata") {
+            try await backingStore.clearAllConfirmedMediaCacheMetadata()
+        }
+    }
+
     func fetchAttachmentLocalCacheKeys() async throws -> Set<String> {
         try await performSessionBoundOperation(operation: "fetchAttachmentLocalCacheKeys") {
             try await backingStore.fetchAttachmentLocalCacheKeys()

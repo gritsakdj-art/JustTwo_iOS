@@ -143,7 +143,7 @@ struct MessengerConversationCacheTests {
         _ = await MessengerConversationCacheService.hydrateCachedPreviews(currentProfileID: profileID)
         try await Task.sleep(nanoseconds: 100_000_000)
 
-        let export = MessengerDiagnostics.exportTextForClipboard().lowercased()
+        let export = (await MessengerDiagnostics.exportTextForClipboard()).lowercased()
         #expect(!export.contains("x-amz-signature"))
         #expect(!export.contains("downloadurl"))
         #expect(!export.contains("bearer"))

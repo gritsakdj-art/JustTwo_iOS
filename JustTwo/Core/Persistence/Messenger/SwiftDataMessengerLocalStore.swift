@@ -311,6 +311,24 @@ final class SwiftDataMessengerLocalStore: MessengerLocalStoreProtocol {
         try context.save()
     }
 
+    func clearAllConfirmedMediaCacheMetadata() async throws {
+        let context = modelContext
+        let attachments = try context.fetch(FetchDescriptor<LocalMessengerAttachment>())
+        let now = Date()
+        for attachment in attachments {
+            attachment.hasLocalThumbnail = false
+            attachment.hasLocalFullImage = false
+            attachment.localThumbnailByteSize = nil
+            attachment.localFullByteSize = nil
+            attachment.mediaCachedAt = nil
+            attachment.mediaLastAccessedAt = nil
+            attachment.localUpdatedAt = now
+        }
+        if !attachments.isEmpty {
+            try context.save()
+        }
+    }
+
     func fetchAttachmentLocalCacheKeys() async throws -> Set<String> {
         let context = modelContext
         let descriptor = FetchDescriptor<LocalMessengerAttachment>()

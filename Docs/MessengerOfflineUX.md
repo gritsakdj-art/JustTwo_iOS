@@ -84,8 +84,20 @@ Export prepends a privacy-safe summary:
 - `lastAppliedRevision`, `lastSuccessfulSyncAt`
 - outbox pending/failed counts, pending media count
 - conversation cache availability
+- **PR19:** messenger media cache counts/bytes (confirmed thumbnail/full, pending outgoing, limits, last trim)
 
 Never includes: message body, caption, JWT, signed URLs, absolute paths, storage keys.
+
+## PR19 — Image unavailable after cache clear (offline)
+
+When confirmed disk cache was cleared and the device is offline:
+
+- Image bubbles show placeholder with **“Photo unavailable offline”** / **«Фото недоступно офлайн»** when no `downloadURL` is available
+- No endless loading spinner
+- Text messages and captions remain visible
+- Full-screen viewer shows the same offline-unavailable state
+
+When online after clear, images re-download through the existing ephemeral signed-URL flow.
 
 ## Privacy rules
 
@@ -99,5 +111,4 @@ Same as PR16–PR17: diagnostics and UI must not expose secrets or message conte
 
 ## Follow-ups
 
-- **PR19** — media cache management screen
 - **PR20** — backend retention/metrics

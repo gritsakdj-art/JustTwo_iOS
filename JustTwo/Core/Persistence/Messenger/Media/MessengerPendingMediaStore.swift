@@ -112,6 +112,28 @@ enum MessengerPendingMediaStore {
         return String(trimmed.prefix(8)) + "..."
     }
 
+    nonisolated static func inventory() -> (fileCount: Int, totalBytes: Int64) {
+        guard let directory = try? rootDirectoryURL(),
+              let enumerator = FileManager.default.enumerator(
+                at: directory,
+                includingPropertiesForKeys: [.fileSizeKey, .isRegularFileKey],
+                options: [.skipsHiddenFiles]
+              ) else {
+            return (0, 0)
+        }
+
+        var fileCount = 0
+        var totalBytes: Int64 = 0
+        for case let fileURL as URL in enumerator {
+            guard (try? fileURL.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) == true else {
+                continue
+            }
+            fileCount += 1
+            totalBytes += Int64((try? fileURL.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0)
+        }
+        return (fileCount, totalBytes)
+    }
+
     private nonisolated static func relativePath(for pendingMediaID: String, clientMessageID: String) throws -> String {
         let safeMediaID = try sanitizedFileComponent(pendingMediaID)
         let safeClientID = try sanitizedFileComponent(clientMessageID)

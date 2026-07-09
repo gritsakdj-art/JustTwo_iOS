@@ -172,7 +172,7 @@ struct MessengerOfflineUXTests {
     }
 
     @Test
-    func diagnosticsSummaryDoesNotLeakSensitiveContent() {
+    func diagnosticsSummaryDoesNotLeakSensitiveContent() async {
         MessengerDiagnostics.event(
             .outboxItemCreated,
             metadata: [
@@ -183,7 +183,7 @@ struct MessengerOfflineUXTests {
             ]
         )
 
-        let export = MessengerDiagnostics.exportTextForClipboard()
+        let export = await MessengerDiagnostics.exportTextForClipboard()
         let lowercased = export.lowercased()
 
         #expect(!lowercased.contains("secret body"))

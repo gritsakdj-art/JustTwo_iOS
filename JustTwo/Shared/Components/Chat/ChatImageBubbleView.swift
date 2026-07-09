@@ -16,6 +16,7 @@ struct ChatImageBubbleView: View {
     @State private var image: UIImage?
     @State private var isLoading = false
     @State private var loadFailed = false
+    @State private var isUnavailableOffline = false
     @State private var reloadToken = 0
 
     private var cacheKey: String {
@@ -28,7 +29,7 @@ struct ChatImageBubbleView: View {
 
     private var accessibilityLabel: Text {
         if loadFailed {
-            return Text("chats.imageBubble.loadFailed")
+            return Text(isUnavailableOffline ? "chats.imageBubble.unavailableOffline" : "chats.imageBubble.loadFailed")
         }
         if isLoading && image == nil {
             return Text("chats.imageBubble.loading")
@@ -80,7 +81,7 @@ struct ChatImageBubbleView: View {
         .accessibilityLabel(accessibilityLabel)
         .accessibilityAddTraits(image == nil ? [] : .isImage)
         .onTapGesture {
-            if loadFailed {
+            if loadFailed, !isUnavailableOffline {
                 retryLoad()
             } else if image != nil {
                 onTap?()
@@ -107,9 +108,9 @@ struct ChatImageBubbleView: View {
             Color.black.opacity(0.28)
 
             VStack(spacing: 6) {
-                Image(systemName: "arrow.clockwise")
+                Image(systemName: isUnavailableOffline ? "wifi.slash" : "arrow.clockwise")
                     .font(.system(size: 20, weight: .semibold))
-                Text("chats.imageBubble.tapToRetry")
+                Text(isUnavailableOffline ? "chats.imageBubble.unavailableOffline" : "chats.imageBubble.tapToRetry")
                     .font(Font.App.caption(size: 11, weight: .semibold))
                     .multilineTextAlignment(.center)
             }
@@ -120,6 +121,7 @@ struct ChatImageBubbleView: View {
 
     private func retryLoad() {
         loadFailed = false
+        isUnavailableOffline = false
         image = nil
         reloadToken += 1
     }
@@ -168,7 +170,11 @@ struct ChatImageBubbleView: View {
         )
 
         guard let downloadURL = attachment.downloadURL else {
-            markLoadFailed(source: "missingRemoteURL")
+            if NetworkPathMonitor.shared.shouldSkipNetworkBecauseOffline {
+                markUnavailableOffline(source: "missingRemoteURLOffline")
+            } else {
+                markLoadFailed(source: "missingRemoteURL")
+            }
             return
         }
 
@@ -204,6 +210,7 @@ struct ChatImageBubbleView: View {
         let wasEmpty = image == nil
         image = loaded
         loadFailed = false
+        isUnavailableOffline = false
         MessengerDiagnostics.event(
             .imageBubbleRenderSucceeded,
             metadata: renderMetadata(source: source)
@@ -215,6 +222,16 @@ struct ChatImageBubbleView: View {
 
     private func markLoadFailed(source: String) {
         loadFailed = true
+        isUnavailableOffline = false
+        MessengerDiagnostics.event(
+            .imageBubbleRenderFailed,
+            metadata: renderMetadata(source: source)
+        )
+    }
+
+    private func markUnavailableOffline(source: String) {
+        loadFailed = true
+        isUnavailableOffline = true
         MessengerDiagnostics.event(
             .imageBubbleRenderFailed,
             metadata: renderMetadata(source: source)

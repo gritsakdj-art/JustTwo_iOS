@@ -488,7 +488,7 @@ struct MessengerMediaDiskCacheTests {
             variant: .thumbnail
         )
 
-        let export = MessengerDiagnostics.exportTextForClipboard().lowercased()
+        let export = (await MessengerDiagnostics.exportTextForClipboard()).lowercased()
         #expect(!export.contains("x-amz-signature"))
         #expect(!export.contains("downloadurl"))
         #expect(!export.contains("uploadurl"))

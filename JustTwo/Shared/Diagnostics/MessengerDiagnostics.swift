@@ -442,13 +442,56 @@ enum MessengerDiagnostics {
     }
 
     @MainActor
-    static func exportTextForClipboard() -> String {
-        exportTextForClipboard(from: MessengerDiagnosticsStore.shared)
+    static func exportMediaSummarySection(inventory: MessengerMediaCacheInventory) -> String {
+        let lines = [
+            "messengerMediaSummary=cacheControls",
+            "confirmedThumbnailBytes=\(inventory.confirmedThumbnailBytes)",
+            "confirmedFullBytes=\(inventory.confirmedFullBytes)",
+            "confirmedTotalBytes=\(inventory.confirmedTotalBytes)",
+            "confirmedFileCount=\(inventory.confirmedFileCount)",
+            "pendingOutgoingBytes=\(inventory.pendingOutgoingBytes)",
+            "pendingOutgoingFileCount=\(inventory.pendingOutgoingFileCount)",
+            "totalMessengerMediaBytes=\(inventory.totalMessengerMediaBytes)",
+            "orphanConfirmedFileCount=\(inventory.orphanConfirmedFileCount)",
+            "orphanConfirmedBytes=\(inventory.orphanConfirmedBytes)",
+            "cacheSoftLimitBytes=\(inventory.cacheSoftLimitBytes)",
+            "cacheHardLimitBytes=\(inventory.cacheHardLimitBytes)",
+            "overLimitBytes=\(inventory.overLimitBytes)",
+            "lastTrimDeletedCount=\(MessengerMediaCacheLastOperationStore.lastTrimDeletedCount())",
+            "lastTrimDeletedBytes=\(MessengerMediaCacheLastOperationStore.lastTrimDeletedBytes())",
+            "lastTrimFinishedAt=\(MessengerMediaCacheLastOperationStore.lastTrimFinishedAt()?.ISO8601Format() ?? "none")",
+            "lastOrphanRemovedCount=\(MessengerMediaCacheLastOperationStore.lastOrphanRemovedCount())"
+        ]
+        return lines.joined(separator: "\n")
     }
 
     @MainActor
-    static func exportTextForClipboard(from store: MessengerDiagnosticsStore) -> String {
-        let summary = exportSummaryHeader()
+    static func exportSummaryHeaderWithMedia() async -> String {
+        await exportSummaryHeaderWithMedia(
+            session: SessionStore.shared,
+            listViewModel: ConversationListViewModel.shared
+        )
+    }
+
+    @MainActor
+    static func exportSummaryHeaderWithMedia(
+        session: SessionStore,
+        listViewModel: ConversationListViewModel
+    ) async -> String {
+        let base = exportSummaryHeader(session: session, listViewModel: listViewModel)
+        let inventory = await MessengerMediaCacheControls.inventory()
+        let media = exportMediaSummarySection(inventory: inventory)
+        return base + "\n" + media
+    }
+
+    @MainActor
+    static func exportTextForClipboard() async -> String {
+        await exportTextForClipboard(from: MessengerDiagnosticsStore.shared)
+    }
+
+    @MainActor
+    static func exportTextForClipboard(from store: MessengerDiagnosticsStore) async -> String {
+        let summary = await exportSummaryHeaderWithMedia()
         let exportText = store.exportText()
         guard !exportText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             return summary + "\n\n" + emptyExportText

@@ -189,7 +189,24 @@ Diagnostics events (PR16B additions): `outboxImageComposerPreviewSelected`, `out
 
 ## Logout cleanup
 
-`AppStartupCoordinator.performReset()` → `MessengerLocalStore.resetAllMessengerData()` deletes all messenger entities including outbox + pending media metadata, and clears the pending media directory. In-memory `MessengerOutbox` is cleared separately.
+`AppStartupCoordinator.performReset()` → `MessengerLocalStore.resetAllMessengerData()` deletes all messenger entities including outbox + pending media metadata, and clears the pending media directory. In-memory `MessengerOutbox` is cleared separately. Confirmed media disk cache is also cleared on logout via `MessengerMediaCacheService.clearAll()`.
+
+## PR19 — Confirmed cache clear vs pending outgoing
+
+**Clear media cache** (Settings) removes only **confirmed/received** files under `MediaCache/`. It does **not**:
+
+- Delete pending outgoing files in `MessengerPendingMedia/`
+- Delete outbox rows or message text/captions
+- Call backend delete
+
+Pending outgoing media is cleared only by:
+
+- Successful send confirmation (pending file deleted)
+- User cancel/delete on failed/pending image message
+- Logout / full messenger reset
+- Orphan recovery tied to outbox (if implemented)
+
+See [Messenger Storage Controls](MessengerStorageControls.md).
 
 ## PR17 — Sync engine interaction
 

@@ -90,14 +90,23 @@ enum MessengerMediaCacheService {
     }
 
     static func runCleanupIfNeeded() async {
-        let metadataStore = metadataStoreForUpdates()
-        let policy = MessengerMediaCacheCleanupPolicy.default
-        let referencedKeys = await fetchReferencedAttachmentIDs(store: metadataStore)
-        await diskCache.cleanup(policy: policy, referencedAttachmentIDs: referencedKeys)
+        await MessengerMediaCacheControls.runCleanupIfNeeded()
     }
 
     static func clearAll() async {
         await diskCache.clearAll()
+    }
+
+    static func inventory() async -> MessengerMediaCacheInventory {
+        await MessengerMediaCacheControls.inventory()
+    }
+
+    static func trimNow() async -> MessengerMediaCacheTrimResult {
+        await MessengerMediaCacheControls.trimNow()
+    }
+
+    static func clearConfirmedMediaCache() async -> MessengerMediaCacheClearResult {
+        await MessengerMediaCacheControls.clearConfirmedMediaCache()
     }
 
     // MARK: - Private
@@ -191,9 +200,8 @@ enum MessengerMediaCacheService {
     private static func enforceQuotaIfNeeded(store: MessengerLocalStore) async {
         let totalBytes = await diskCache.totalCachedBytes()
         let policy = MessengerMediaCacheCleanupPolicy.default
-        guard totalBytes > policy.maxBytes else { return }
-        let referencedKeys = await fetchReferencedAttachmentIDs(store: store)
-        await diskCache.cleanup(policy: policy, referencedAttachmentIDs: referencedKeys)
+        guard totalBytes > policy.softLimitBytes else { return }
+        _ = await MessengerMediaCacheControls.trimNow(store: store)
     }
 
     private static func sanitizedAttachmentIDForDiagnostics(_ attachmentID: String) -> String {

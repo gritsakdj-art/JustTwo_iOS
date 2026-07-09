@@ -1902,6 +1902,23 @@
         }
       }
     },
+    "chats.imageBubble.unavailableOffline" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Photo unavailable offline"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Фото недоступно офлайн"
+          }
+        }
+      }
+    },
     "chats.loading" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -12674,6 +12691,107 @@
             "value" : "Логи мессенджера пустые"
           }
         }
+      }
+    },
+    "settings.mediaCache.alert.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Media cache" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Кэш медиа" } }
+      }
+    },
+    "settings.mediaCache.clear.confirm.action" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Clear cache" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Очистить кэш" } }
+      }
+    },
+    "settings.mediaCache.clear.confirm.message" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Photos from messages will be removed from this device, but will stay in chats and download again when opened. Unsent photos will not be affected."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Фотографии из сообщений будут удалены с устройства, но останутся в чатах и загрузятся заново при открытии. Неотправленные фото затронуты не будут."
+          }
+        }
+      }
+    },
+    "settings.mediaCache.clear.confirm.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Clear media cache?" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Очистить кэш медиа?" } }
+      }
+    },
+    "settings.mediaCache.clear.subtitle" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Remove saved chat photos from this device" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Удалить сохранённые фото чатов с устройства" } }
+      }
+    },
+    "settings.mediaCache.clear.success" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Media cache cleared." } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Кэш медиа очищен." } }
+      }
+    },
+    "settings.mediaCache.clear.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Clear media cache" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Очистить кэш медиа" } }
+      }
+    },
+    "settings.mediaCache.confirmed.subtitle" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Media cache: %@" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Кэш медиа: %@" } }
+      }
+    },
+    "settings.mediaCache.confirmed.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Saved chat photos" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Сохранённые фото чатов" } }
+      }
+    },
+    "settings.mediaCache.loading" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Calculating…" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Подсчитываем…" } }
+      }
+    },
+    "settings.mediaCache.pending.subtitle" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Pending uploads: %@" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Ожидающие отправки фото: %@" } }
+      }
+    },
+    "settings.mediaCache.pending.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Pending uploads" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Ожидающие отправки" } }
+      }
+    },
+    "settings.mediaCache.section" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Storage" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Хранилище" } }
       }
     },
     "settings.diagnostics.section" : {

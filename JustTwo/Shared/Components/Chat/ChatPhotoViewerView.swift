@@ -15,6 +15,7 @@ struct ChatPhotoViewerView: View {
 
     @State private var image: UIImage?
     @State private var loadFailed = false
+    @State private var isUnavailableOffline = false
 
     @State private var scale: CGFloat = 1
     @State private var gestureBaseScale: CGFloat = 1
@@ -80,10 +81,10 @@ struct ChatPhotoViewerView: View {
                 .accessibilityAddTraits(.isImage)
         } else if loadFailed {
             VStack(spacing: AppSpacing.sm) {
-                Image(systemName: "photo.badge.exclamationmark")
+                Image(systemName: isUnavailableOffline ? "wifi.slash" : "photo.badge.exclamationmark")
                     .font(.system(size: 40, weight: .semibold))
                     .foregroundStyle(.white.opacity(0.7))
-                Text("chats.photoViewer.loadFailed")
+                Text(isUnavailableOffline ? "chats.imageBubble.unavailableOffline" : "chats.photoViewer.loadFailed")
                     .font(Font.App.subheadline())
                     .foregroundStyle(.white.opacity(0.7))
             }
@@ -234,7 +235,12 @@ struct ChatPhotoViewerView: View {
         }
 
         guard let downloadURL = attachment.downloadURL else {
-            loadFailed = true
+            if NetworkPathMonitor.shared.shouldSkipNetworkBecauseOffline {
+                loadFailed = true
+                isUnavailableOffline = true
+            } else {
+                loadFailed = true
+            }
             return
         }
 

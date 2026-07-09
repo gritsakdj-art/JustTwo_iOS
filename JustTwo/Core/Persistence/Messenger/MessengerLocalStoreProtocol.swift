@@ -43,6 +43,7 @@ protocol MessengerLocalStoreProtocol: AnyObject {
         accessedAt: Date
     ) async throws
     func clearAttachmentMediaCacheMetadata(attachmentID: String) async throws
+    func clearAllConfirmedMediaCacheMetadata() async throws
     func fetchAttachmentLocalCacheKeys() async throws -> Set<String>
 
     func createTextOutboxItem(

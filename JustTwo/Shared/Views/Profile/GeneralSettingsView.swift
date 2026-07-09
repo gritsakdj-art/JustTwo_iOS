@@ -15,6 +15,12 @@ struct GeneralSettingsView: View {
     @State private var diagnosticsAlertMessage = ""
     @State private var isDiagnosticsAlertPresented = false
     @State private var showsInternalDiagnostics = AppBuildEnvironment.showsInternalDiagnostics
+    @State private var mediaCacheInventory: MessengerMediaCacheInventory?
+    @State private var isLoadingMediaInventory = false
+    @State private var isClearingMediaCache = false
+    @State private var showClearMediaCacheConfirmation = false
+    @State private var mediaCacheAlertMessage = ""
+    @State private var isMediaCacheAlertPresented = false
 
     var body: some View {
         ScrollView(showsIndicators: false) {
@@ -22,6 +28,7 @@ struct GeneralSettingsView: View {
                 themePicker
                 languagePicker
                 notificationsSection
+                mediaStorageSection
                 if showsInternalDiagnostics {
                     diagnosticsSection
                 }
@@ -39,6 +46,7 @@ struct GeneralSettingsView: View {
             authorizationStatus = await MessengerNotificationService.shared.authorizationStatus()
             await AppBuildEnvironment.refreshTestFlightStatus()
             showsInternalDiagnostics = AppBuildEnvironment.showsInternalDiagnostics
+            await refreshMediaCacheInventory()
         }
         .onReceive(NotificationCenter.default.publisher(for: .appBuildEnvironmentDidUpdate)) { _ in
             showsInternalDiagnostics = AppBuildEnvironment.showsInternalDiagnostics
@@ -47,6 +55,23 @@ struct GeneralSettingsView: View {
             Button("common.done", role: .cancel) {}
         } message: {
             Text(diagnosticsAlertMessage)
+        }
+        .confirmationDialog(
+            Text("settings.mediaCache.clear.confirm.title"),
+            isPresented: $showClearMediaCacheConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("settings.mediaCache.clear.confirm.action", role: .destructive) {
+                Task { await clearMediaCache() }
+            }
+            Button("common.cancel", role: .cancel) {}
+        } message: {
+            Text("settings.mediaCache.clear.confirm.message")
+        }
+        .alert(Text("settings.mediaCache.alert.title"), isPresented: $isMediaCacheAlertPresented) {
+            Button("common.done", role: .cancel) {}
+        } message: {
+            Text(mediaCacheAlertMessage)
         }
     }
 
@@ -183,6 +208,87 @@ struct GeneralSettingsView: View {
         }
     }
 
+    private var mediaStorageSection: some View {
+        VStack(alignment: .leading, spacing: AppSpacing.sm) {
+            Text("settings.mediaCache.section")
+                .font(Font.App.manrope(size: 13, weight: .bold))
+                .foregroundStyle(Color.secondaryText)
+                .textCase(.uppercase)
+                .padding(.horizontal, 4)
+
+            VStack(spacing: 0) {
+                SettingsDiagnosticsActionRow(
+                    iconName: "photo.on.rectangle.angled",
+                    title: "settings.mediaCache.confirmed.title",
+                    subtitleText: confirmedMediaCacheSubtitle
+                )
+
+                SettingsPickerDivider()
+
+                SettingsDiagnosticsActionRow(
+                    iconName: "arrow.up.circle",
+                    title: "settings.mediaCache.pending.title",
+                    subtitleText: pendingMediaCacheSubtitle
+                )
+
+                SettingsPickerDivider()
+
+                Button {
+                    showClearMediaCacheConfirmation = true
+                } label: {
+                    SettingsDiagnosticsActionRow(
+                        iconName: "trash",
+                        title: "settings.mediaCache.clear.title",
+                        subtitle: "settings.mediaCache.clear.subtitle"
+                    )
+                }
+                .buttonStyle(.spring(pressedScale: 0.98, pressedOpacity: 0.9))
+                .disabled(isClearingMediaCache || isLoadingMediaInventory)
+            }
+            .background(Color.cardSurface, in: RoundedRectangle(cornerRadius: AppCornerRadius.card, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: AppCornerRadius.card, style: .continuous)
+                    .stroke(Color.hairline, lineWidth: 1)
+            )
+            .shadow(color: Color.discoverCardShadow.opacity(0.08), radius: 24, x: 0, y: 10)
+        }
+    }
+
+    private var confirmedMediaCacheSubtitle: String {
+        guard let mediaCacheInventory else {
+            return String(localized: "settings.mediaCache.loading")
+        }
+        return String(
+            format: String(localized: "settings.mediaCache.confirmed.subtitle"),
+            MessengerStorageFormatting.string(for: mediaCacheInventory.confirmedTotalBytes)
+        )
+    }
+
+    private var pendingMediaCacheSubtitle: String {
+        guard let mediaCacheInventory else {
+            return String(localized: "settings.mediaCache.loading")
+        }
+        return String(
+            format: String(localized: "settings.mediaCache.pending.subtitle"),
+            MessengerStorageFormatting.string(for: mediaCacheInventory.pendingOutgoingBytes)
+        )
+    }
+
+    private func refreshMediaCacheInventory() async {
+        isLoadingMediaInventory = true
+        defer { isLoadingMediaInventory = false }
+        mediaCacheInventory = await MessengerMediaCacheControls.inventory()
+    }
+
+    private func clearMediaCache() async {
+        isClearingMediaCache = true
+        defer { isClearingMediaCache = false }
+        _ = await MessengerMediaCacheControls.clearConfirmedMediaCache()
+        await refreshMediaCacheInventory()
+        mediaCacheAlertMessage = String(localized: "settings.mediaCache.clear.success")
+        isMediaCacheAlertPresented = true
+    }
+
     private var diagnosticsSection: some View {
         VStack(alignment: .leading, spacing: AppSpacing.sm) {
             Text("settings.diagnostics.section")
@@ -213,16 +319,18 @@ struct GeneralSettingsView: View {
     }
 
     private func copyMessengerDiagnostics() {
-        let exportText = MessengerDiagnostics.exportTextForClipboard()
+        Task {
+            let exportText = await MessengerDiagnostics.exportTextForClipboard()
 
-        #if canImport(UIKit)
-        UIPasteboard.general.string = exportText
-        #endif
+            #if canImport(UIKit)
+            UIPasteboard.general.string = exportText
+            #endif
 
-        diagnosticsAlertMessage = exportText == MessengerDiagnostics.emptyExportText
-            ? String(localized: "settings.diagnostics.empty")
-            : String(localized: "settings.diagnostics.copied")
-        isDiagnosticsAlertPresented = true
+            diagnosticsAlertMessage = exportText == MessengerDiagnostics.emptyExportText
+                ? String(localized: "settings.diagnostics.empty")
+                : String(localized: "settings.diagnostics.copied")
+            isDiagnosticsAlertPresented = true
+        }
     }
 
     private func handleMessagesToggleEnabled() async {
@@ -337,7 +445,19 @@ private struct SettingsPickerDivider: View {
 private struct SettingsDiagnosticsActionRow: View {
     let iconName: String
     let title: LocalizedStringResource
-    let subtitle: LocalizedStringResource
+    private let subtitleText: Text
+
+    init(iconName: String, title: LocalizedStringResource, subtitle: LocalizedStringResource) {
+        self.iconName = iconName
+        self.title = title
+        self.subtitleText = Text(subtitle)
+    }
+
+    init(iconName: String, title: LocalizedStringResource, subtitleText: String) {
+        self.iconName = iconName
+        self.title = title
+        self.subtitleText = Text(subtitleText)
+    }
 
     var body: some View {
         HStack(spacing: AppSpacing.sm) {
@@ -360,7 +480,7 @@ private struct SettingsDiagnosticsActionRow: View {
                     .font(Font.App.manrope(size: 16, weight: .semibold))
                     .foregroundStyle(Color.primaryText)
 
-                Text(subtitle)
+                subtitleText
                     .font(Font.App.caption(size: 12, weight: .medium))
                     .foregroundStyle(Color.secondaryText)
                     .fixedSize(horizontal: false, vertical: true)
