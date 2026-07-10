@@ -70,7 +70,10 @@ struct HTTPClient: Sendable {
         var headers = defaultHeaders()
         request.headers.forEach { headers[$0.key] = $0.value }
 
-        if request.requiresAuth, let token = APIAuth.accessToken {
+        if request.requiresAuth {
+            guard let token = APIAuth.accessToken, !token.isEmpty else {
+                throw NetworkError.unauthorized
+            }
             headers["Authorization"] = "Bearer \(token)"
         }
 

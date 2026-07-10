@@ -15,6 +15,7 @@ final class AppRouter {
     var selectedMainTab: AppTab = .discover
     var pendingChatConversation: ChatConversationPreview?
     var pendingChatMessageID: UUID?
+    var pendingChatNavigationID: UUID?
 
     private init() {}
 
@@ -135,12 +136,14 @@ final class AppRouter {
     func openChat(_ conversation: ChatConversationPreview, messageID: UUID? = nil) {
         pendingChatConversation = conversation
         pendingChatMessageID = messageID
+        pendingChatNavigationID = UUID()
         selectedMainTab = .chats
     }
 
     func clearPendingChatNavigation() {
         pendingChatConversation = nil
         pendingChatMessageID = nil
+        pendingChatNavigationID = nil
     }
 
     func clearPendingChatConversation() {

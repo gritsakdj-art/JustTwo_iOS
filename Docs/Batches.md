@@ -421,19 +421,39 @@ Residual risks / follow-up:
 
 ### Batch B - Auth, Session, Push Routing
 
-Status: Not started
+Status: Implemented (pending manual smoke)
 
-Branch:
+Branch: `batch-b-auth-session-push-routing`
 
 Files changed:
+- `JustTwo/Core/Network/HTTPClient.swift`
+- `JustTwo/Core/Session/SessionStore.swift`
+- `JustTwo/Core/Push/PushRegistrationService.swift`
+- `JustTwo/Core/Push/PushNotificationRoutingCoordinator.swift`
+- `JustTwo/Router/AppRouter.swift`
+- `JustTwo/Shared/Views/Chats/ChatsView.swift`
+- `JustTwoTests/HTTPClientAuthGuardTests.swift` (new)
+- `JustTwoTests/PushNotificationRoutingCoordinatorTests.swift` (new)
+- `JustTwoTests/PushRegistrationTests.swift`
 
 Summary:
+- `HTTPClient` fails fast with `NetworkError.unauthorized` when `requiresAuth` and token is missing/empty.
+- `SessionStore` async tasks capture `sessionUserID` and re-check before side effects (realtime, push sync, foreground sync).
+- `PushRegistrationService.resetSessionState()` on logout; session re-check before network send; `pendingSyncUserID` queue when in-flight sync is for another user.
+- Push routing keeps `pendingRoute` until `openChat` succeeds; `applyingRouteKey` guard; debounced retry when conversation missing.
+- `AppRouter.pendingChatNavigationID` + `ChatRoute.id` includes message target for same-conversation re-navigation.
 
 Build/tests:
+- `xcodebuild -project JustTwo.xcodeproj -scheme JustTwo -destination 'platform=iOS Simulator,id=D1806BCC-C599-4B19-A8F4-96B9A3BCE81E' build` — SUCCEEDED
+- `xcodebuild test ... -only-testing:JustTwoTests/HTTPClientAuthGuardTests -only-testing:JustTwoTests/PushNotificationRoutingCoordinatorTests -only-testing:JustTwoTests/PushRegistrationTests` — 9 tests SUCCEEDED
 
 Manual smoke:
+- Not run (see Batch B checklist in prompt above)
 
 Residual risks / follow-up:
+- Push route retry still depends on later `applyPendingRouteIfPossible` triggers (sign-in, foreground, main reset).
+- Coordinator testing hooks (`testingBypassApplyGuards`, etc.) are internal; production defaults are safe.
+- Batch C–E unchanged.
 
 ### Batch C - Startup And Background Warmup
 

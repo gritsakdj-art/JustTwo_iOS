@@ -16,7 +16,9 @@ struct ChatsView: View {
     private struct ChatRoute: Identifiable, Hashable {
         let conversation: ChatConversationPreview
         var targetMessageID: UUID?
-        var id: UUID { conversation.id }
+        var id: String {
+            "\(conversation.id.uuidString)-\(targetMessageID?.uuidString ?? "latest")"
+        }
     }
 
     init(
@@ -71,11 +73,9 @@ struct ChatsView: View {
                 MessengerDiagnostics.event(.messengerConversationRefreshSkippedChatPop)
                 listViewModel.activateRealtime(session: session, router: router)
             }
-            .onChange(of: router.pendingChatConversation?.id) { _, newValue in
-                if newValue != nil {
-                    isInviteSheetPresented = false
-                }
-                guard !usesPreviewData, let conversation = router.pendingChatConversation else { return }
+            .onChange(of: router.pendingChatNavigationID) { _, newValue in
+                guard !usesPreviewData, newValue != nil, let conversation = router.pendingChatConversation else { return }
+                isInviteSheetPresented = false
                 presentPrivateChat(
                     conversation: conversation,
                     targetMessageID: router.pendingChatMessageID

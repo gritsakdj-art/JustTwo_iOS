@@ -77,6 +77,15 @@ struct PushRegistrationTests {
         #expect(keyA != keyB)
     }
 
+    @Test("resetSessionState clears in-flight sync bookkeeping")
+    @MainActor
+    func resetSessionStateClearsSyncBookkeeping() async {
+        let service = PushRegistrationService(installationIDProvider: InstallationIDProvider.shared)
+        service.resetSessionState()
+        await service.syncCurrentTokenIfPossible(userID: UUID())
+        service.resetSessionState()
+    }
+
     @Test("Token logging helper redacts full token")
     func tokenLoggingRedactsFullToken() {
         let token = String(repeating: "a", count: 64)

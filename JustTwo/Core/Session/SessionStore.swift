@@ -109,16 +109,18 @@ final class SessionStore {
         StartupSessionValidationService.shared.stopWatching()
 
         let pushUnregisterToken = APIAuth.accessToken
+        let loggingOutUserID = currentUser?.id
         Task { @MainActor in
             await PushRegistrationService.shared.unregisterCurrentDevice(accessToken: pushUnregisterToken)
         }
+        PushRegistrationService.shared.resetSessionState()
 
         MessengerRealtimeCoordinator.shared.stop()
         ConversationDeliveryAckCoordinator.shared.reset()
         realtimeClient.disconnect()
         MessengerBadgeStore.shared.reset()
 
-        if let userID = currentUser?.id {
+        if let userID = loggingOutUserID {
             ProfilePhotoLocalOrderStore.shared.clear(userID: userID)
             ProfileAvatarCropStore.shared.clear(userID: userID)
         }
@@ -144,7 +146,13 @@ final class SessionStore {
             return
         }
 
-        Task { @MainActor [realtimeClient] in
+        let sessionUserID = currentUser?.id
+        Task { @MainActor [realtimeClient, weak self] in
+            guard let self,
+                  self.isFullyAuthenticated,
+                  self.currentUser?.id == sessionUserID else {
+                return
+            }
             await realtimeClient.connectIfPossible()
         }
     }
@@ -152,9 +160,19 @@ final class SessionStore {
     func syncPushRegistrationIfEligible() {
         guard isFullyAuthenticated else { return }
 
-        Task { @MainActor in
+        let sessionUserID = currentUser?.id
+        Task { @MainActor [weak self] in
+            guard let self,
+                  self.isFullyAuthenticated,
+                  self.currentUser?.id == sessionUserID else {
+                return
+            }
             await PushRegistrationService.shared.requestAuthorizationIfNeeded()
-            await PushRegistrationService.shared.syncCurrentTokenIfPossible(userID: currentUser?.id)
+            guard self.isFullyAuthenticated,
+                  self.currentUser?.id == sessionUserID else {
+                return
+            }
+            await PushRegistrationService.shared.syncCurrentTokenIfPossible(userID: sessionUserID)
         }
     }
 
@@ -165,10 +183,16 @@ final class SessionStore {
             return
         }
 
+        let sessionUserID = currentUser?.id
         realtimeClient.applicationDidBecomeActive()
         syncPushRegistrationIfEligible()
 
-        Task { @MainActor in
+        Task { @MainActor [weak self] in
+            guard let self,
+                  self.isFullyAuthenticated,
+                  self.currentUser?.id == sessionUserID else {
+                return
+            }
             await MessengerSyncEngine.shared.runGlobalSync(
                 reason: .appForeground,
                 session: self,

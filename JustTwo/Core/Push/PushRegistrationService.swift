@@ -13,6 +13,7 @@ protocol PushRegistrationServicing {
     func syncCurrentTokenIfPossible(userID: UUID?) async
     func unregisterCurrentDevice() async
     func unregisterCurrentDevice(accessToken: String?) async
+    func resetSessionState()
 }
 
 enum PushEnvironment: String, Codable {
@@ -43,6 +44,8 @@ final class PushRegistrationService: NSObject, PushRegistrationServicing {
     private var currentToken: String?
     private var inFlightSyncKey: PushDeviceSyncKey?
     private var lastSuccessfulSyncKey: PushDeviceSyncKey?
+    private var pendingSyncUserID: UUID?
+    private var sessionGeneration = 0
 
     init(installationIDProvider: InstallationIDProviding) {
         self.installationIDProvider = installationIDProvider
@@ -98,7 +101,12 @@ final class PushRegistrationService: NSObject, PushRegistrationServicing {
         )
 
         Task { @MainActor [weak self] in
-            await self?.syncCurrentTokenIfPossible(userID: SessionStore.shared.currentUser?.id)
+            let sessionUserID = SessionStore.shared.currentUser?.id
+            guard SessionStore.shared.isFullyAuthenticated,
+                  SessionStore.shared.currentUser?.id == sessionUserID else {
+                return
+            }
+            await self?.syncCurrentTokenIfPossible(userID: sessionUserID)
         }
     }
 
@@ -111,12 +119,17 @@ final class PushRegistrationService: NSObject, PushRegistrationServicing {
     }
 
     func syncCurrentTokenIfPossible(userID: UUID?) async {
+        let syncSessionGeneration = sessionGeneration
         guard APIAuth.accessToken != nil else {
             NetworkDebug.log("Push device sync skipped: missing JWT")
             return
         }
         guard let userID else {
             NetworkDebug.log("Push device sync skipped: missing user id")
+            return
+        }
+        guard isSessionValid(for: userID, generation: syncSessionGeneration) else {
+            NetworkDebug.log("Push device sync skipped: stale session")
             return
         }
         guard let token = currentToken, !token.isEmpty else {
@@ -144,6 +157,9 @@ final class PushRegistrationService: NSObject, PushRegistrationServicing {
         )
 
         guard inFlightSyncKey == nil else {
+            if inFlightSyncKey?.userID != userID {
+                pendingSyncUserID = userID
+            }
             NetworkDebug.log("Push device sync skipped: sync already in flight")
             return
         }
@@ -154,7 +170,15 @@ final class PushRegistrationService: NSObject, PushRegistrationServicing {
         }
 
         inFlightSyncKey = syncKey
-        defer { inFlightSyncKey = nil }
+        defer {
+            inFlightSyncKey = nil
+            if let pendingUserID = pendingSyncUserID {
+                pendingSyncUserID = nil
+                Task { @MainActor [weak self] in
+                    await self?.syncCurrentTokenIfPossible(userID: pendingUserID)
+                }
+            }
+        }
 
         NetworkDebug.log(
             "Push device sync started environment=\(syncKey.environment) token=\(token.safeTokenDescription)"
@@ -175,8 +199,17 @@ final class PushRegistrationService: NSObject, PushRegistrationServicing {
             authorizationStatus: await center.notificationSettings().authorizationStatus.pushString
         )
 
+        guard isSessionValid(for: userID, generation: syncSessionGeneration) else {
+            NetworkDebug.log("Push device sync skipped: stale session before network send")
+            return
+        }
+
         do {
             _ = try await NetworkExecutor.shared.send(RegisterPushDeviceRequest(bodyValue: body))
+            guard isSessionValid(for: userID, generation: syncSessionGeneration) else {
+                NetworkDebug.log("Push device sync response ignored: stale session")
+                return
+            }
             lastSuccessfulSyncKey = syncKey
             NetworkDebug.log(
                 "Push device sync succeeded environment=\(syncKey.environment) token=\(token.safeTokenDescription)"
@@ -199,6 +232,8 @@ final class PushRegistrationService: NSObject, PushRegistrationServicing {
             return
         }
 
+        await waitForInFlightSyncToFinish()
+
         let installationID: String
         do {
             installationID = try installationIDProvider.installationID()
@@ -220,6 +255,33 @@ final class PushRegistrationService: NSObject, PushRegistrationServicing {
             NetworkDebug.log("Push device unregister succeeded")
         } catch {
             NetworkDebug.logError(error, prefix: "Push device unregister failed")
+        }
+    }
+
+    func resetSessionState() {
+        sessionGeneration += 1
+        lastSuccessfulSyncKey = nil
+        pendingSyncUserID = nil
+    }
+
+    private func isSessionValid(for userID: UUID, generation: Int) -> Bool {
+        sessionGeneration == generation
+            && SessionStore.shared.isFullyAuthenticated
+            && SessionStore.shared.currentUser?.id == userID
+            && APIAuth.accessToken != nil
+    }
+
+    private func waitForInFlightSyncToFinish() async {
+        guard inFlightSyncKey != nil else { return }
+        NetworkDebug.log("Push device unregister waiting for in-flight sync")
+
+        let deadline = Date().addingTimeInterval(5)
+        while inFlightSyncKey != nil, Date() < deadline {
+            try? await Task.sleep(for: .milliseconds(100))
+        }
+
+        if inFlightSyncKey != nil {
+            NetworkDebug.log("Push device unregister continuing after in-flight sync wait timeout")
         }
     }
 }

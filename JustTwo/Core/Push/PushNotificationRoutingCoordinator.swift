@@ -10,6 +10,13 @@ final class PushNotificationRoutingCoordinator {
     private weak var session: SessionStore?
     private var pendingRoute: PushNotificationRoute?
     private var lastAppliedRouteKey: String?
+    private var applyingRouteKey: String?
+    private var lastNotFoundRouteKey: String?
+    private var lastNotFoundAt: Date?
+
+    var testingConversationListViewModel: ConversationListViewModel?
+    var testingSkipConversationRefresh = false
+    var testingBypassApplyGuards = false
 
     private init() {}
 
@@ -49,6 +56,8 @@ final class PushNotificationRoutingCoordinator {
 
         pendingRoute = route
         lastAppliedRouteKey = nil
+        lastNotFoundRouteKey = nil
+        lastNotFoundAt = nil
         NetworkDebug.log("Push route stored as pending")
         applyPendingRouteIfPossible()
     }
@@ -56,6 +65,9 @@ final class PushNotificationRoutingCoordinator {
     func clearPendingRoute() {
         pendingRoute = nil
         lastAppliedRouteKey = nil
+        applyingRouteKey = nil
+        lastNotFoundRouteKey = nil
+        lastNotFoundAt = nil
         NetworkDebug.log("Push pending route cleared")
     }
 
@@ -65,17 +77,14 @@ final class PushNotificationRoutingCoordinator {
             NetworkDebug.log("Push route deferred: router/session not configured")
             return
         }
-        guard session.isFullyAuthenticated else {
-            NetworkDebug.log("Push route deferred: session not fully authenticated")
-            return
-        }
-        guard router.screen == .main else {
-            NetworkDebug.log("Push route deferred: main UI not ready")
-            return
-        }
+        guard canApplyPendingRoute(session: session, router: router) else { return }
 
         let routeKey = routeKey(for: route)
         if lastAppliedRouteKey == routeKey {
+            return
+        }
+        if applyingRouteKey != nil {
+            NetworkDebug.log("Push route deferred: apply already in flight")
             return
         }
 
@@ -91,27 +100,81 @@ final class PushNotificationRoutingCoordinator {
         session: SessionStore
     ) async {
         guard case .conversation(let conversationID, let messageID, _) = route else { return }
+        guard applyingRouteKey == nil else { return }
 
-        let listViewModel = ConversationListViewModel.shared
+        applyingRouteKey = routeKey
+        defer {
+            applyingRouteKey = nil
+            if let pendingRoute,
+               self.routeKey(for: pendingRoute) != lastAppliedRouteKey {
+                applyPendingRouteIfPossible()
+            }
+        }
+
+        let listViewModel = conversationListViewModel
         var conversation = listViewModel.conversations.first(where: { $0.id == conversationID })
 
         if conversation == nil {
-            NetworkDebug.log("Push route applying: refreshing conversations for \(conversationID.uuidString)")
-            await listViewModel.refresh(session: session, router: router)
-            conversation = listViewModel.conversations.first(where: { $0.id == conversationID })
+            let now = Date()
+            if lastNotFoundRouteKey == routeKey,
+               let lastNotFoundAt,
+               now.timeIntervalSince(lastNotFoundAt) < 2 {
+                NetworkDebug.log("Push route deferred: recent conversation refresh miss for \(conversationID.uuidString)")
+                router.selectedMainTab = .chats
+                return
+            }
+
+            if !testingSkipConversationRefresh {
+                NetworkDebug.log("Push route applying: refreshing conversations for \(conversationID.uuidString)")
+                await listViewModel.refresh(session: session, router: router)
+                conversation = listViewModel.conversations.first(where: { $0.id == conversationID })
+            }
         }
 
-        lastAppliedRouteKey = routeKey
-        pendingRoute = nil
-
         guard let conversation else {
-            NetworkDebug.log("Push route failed: conversation not found \(conversationID.uuidString)")
+            NetworkDebug.log("Push route deferred: conversation not found \(conversationID.uuidString)")
+            if pendingRouteKey == routeKey {
+                lastNotFoundRouteKey = routeKey
+                lastNotFoundAt = Date()
+            }
             router.selectedMainTab = .chats
             return
         }
 
         router.openChat(conversation, messageID: messageID)
+        lastAppliedRouteKey = routeKey
+        if pendingRouteKey == routeKey {
+            pendingRoute = nil
+            lastNotFoundRouteKey = nil
+            lastNotFoundAt = nil
+        }
         NetworkDebug.log("Push route applied: conversation \(conversationID.uuidString)")
+    }
+
+    private var pendingRouteKey: String? {
+        pendingRoute.map(routeKey(for:))
+    }
+
+    private var conversationListViewModel: ConversationListViewModel {
+        if let testingConversationListViewModel {
+            return testingConversationListViewModel
+        }
+        return ConversationListViewModel.shared
+    }
+
+    private func canApplyPendingRoute(session: SessionStore, router: AppRouter) -> Bool {
+        if testingBypassApplyGuards {
+            return true
+        }
+        guard session.isFullyAuthenticated else {
+            NetworkDebug.log("Push route deferred: session not fully authenticated")
+            return false
+        }
+        guard router.screen == .main else {
+            NetworkDebug.log("Push route deferred: main UI not ready")
+            return false
+        }
+        return true
     }
 
     private func routeKey(for route: PushNotificationRoute) -> String {
