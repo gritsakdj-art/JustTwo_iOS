@@ -24,6 +24,7 @@ enum MessengerLocalMapping {
             otherParticipantDisplayName: participant?.profile.displayName,
             otherParticipantPrimaryPhotoID: photo?.id.uuidString,
             otherParticipantPrimaryPhotoDownloadURLExpiresAt: nil,
+            otherParticipantLastSeenAt: participant?.profile.presence?.lastSeenAt,
             lastMessageID: lastMessage?.id.uuidString,
             lastMessageKind: preview.kind,
             lastMessageBody: preview.body,
@@ -177,6 +178,7 @@ enum MessengerLocalMapping {
             otherParticipantDisplayName: entity.otherParticipantDisplayName,
             otherParticipantPrimaryPhotoID: entity.otherParticipantPrimaryPhotoID,
             otherParticipantPrimaryPhotoDownloadURLExpiresAt: entity.otherParticipantPrimaryPhotoDownloadURLExpiresAt,
+            otherParticipantLastSeenAt: entity.otherParticipantLastSeenAt,
             lastMessageID: entity.lastMessageID,
             lastMessageKind: entity.lastMessageKind,
             lastMessageBody: entity.lastMessageBody,
@@ -310,6 +312,13 @@ enum MessengerLocalMapping {
         target.otherParticipantDisplayName = source.otherParticipantDisplayName
         target.otherParticipantPrimaryPhotoID = source.otherParticipantPrimaryPhotoID
         target.otherParticipantPrimaryPhotoDownloadURLExpiresAt = source.otherParticipantPrimaryPhotoDownloadURLExpiresAt
+        if let incomingLastSeen = source.otherParticipantLastSeenAt {
+            if let existingLastSeen = target.otherParticipantLastSeenAt {
+                target.otherParticipantLastSeenAt = max(existingLastSeen, incomingLastSeen)
+            } else {
+                target.otherParticipantLastSeenAt = incomingLastSeen
+            }
+        }
         target.lastMessageID = source.lastMessageID
         target.lastMessageKind = source.lastMessageKind
         target.lastMessageBody = source.lastMessageBody

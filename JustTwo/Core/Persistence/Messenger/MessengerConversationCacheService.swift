@@ -43,6 +43,8 @@ enum MessengerConversationCacheService {
                 ChatUIMapping.conversationPreview(from: $0, currentProfileID: currentProfileID)
             }
 
+            PresenceStore.shared.hydrateFromCacheSnapshots(snapshots)
+
             MessengerDiagnostics.event(
                 .messengerConversationCacheLoadSucceeded,
                 metadata: [
@@ -166,6 +168,12 @@ enum MessengerConversationCacheService {
         guard MessengerLocalStorageFeatureFlags.isCachedConversationListEnabled else { return }
         guard !conversations.isEmpty else { return }
 
+        let writeContext = MessengerCacheWriteContext.capture(from: localStore)
+        if let reason = writeContext.staleReason(store: localStore) {
+            MessengerCacheWriteGuard.logIgnored(reason: reason, context: writeContext, source: source, store: localStore)
+            return
+        }
+
         let startedAt = Date()
         MessengerDiagnostics.event(
             .messengerConversationCacheUpsertStarted,
@@ -177,7 +185,24 @@ enum MessengerConversationCacheService {
 
         do {
             try await localStore.upsertConversations(conversations)
+            if let reason = writeContext.staleReason(store: localStore) {
+                MessengerCacheWriteGuard.logIgnored(reason: reason, context: writeContext, source: source, store: localStore)
+                return
+            }
             for conversation in conversations {
+                if let lastSeenAt = conversation.otherParticipant?.profile.presence?.lastSeenAt,
+                   let profileID = conversation.otherParticipant?.profile.id {
+                    MessengerDiagnostics.event(
+                        .presenceCachePersisted,
+                        metadata: [
+                            "profileID": MessengerDiagnostics.sanitizeID(profileID),
+                            "source": source.rawValue,
+                            "hasLastSeenAt": "true",
+                            "incomingOnline": "false"
+                        ]
+                    )
+                    _ = lastSeenAt
+                }
                 if let lastMessage = conversation.lastMessage {
                     try await localStore.upsertLastMessageSnapshot(lastMessage)
                 }
@@ -196,6 +221,13 @@ enum MessengerConversationCacheService {
             } else {
                 MessengerDiagnostics.event(.messengerConversationCacheUpsertSucceeded, metadata: metadata)
             }
+        } catch MessengerLocalStoreError.staleSession {
+            MessengerCacheWriteGuard.logIgnored(
+                reason: "staleSession",
+                context: writeContext,
+                source: source,
+                store: localStore
+            )
         } catch {
             logUpsertFailed(error: error, source: source, startedAt: startedAt, eventType: eventType)
         }

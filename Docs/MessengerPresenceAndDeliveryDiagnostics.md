@@ -1,18 +1,37 @@
-# Messenger Presence And Delivery Diagnostics (PR20A)
+# Messenger Presence And Delivery Diagnostics (PR20A / PR20C)
 
 Audit and stabilization notes for realtime presence and delivery acknowledgements.
 
-**Status:** Implemented on diagnostic/stabilization branches. Manual smoke **NOT RUN**.
+**Status:** PR20A + PR20C implemented on feature branches. Manual smoke **NOT RUN**.
 
 Related roadmap:
 
 | PR | Scope |
 |----|--------|
-| **PR20A** (this doc) | Diagnostics, local defect fixes, tests |
+| **PR20A** | Diagnostics, local defect fixes, tests |
 | PR20B | Backend persisted `lastSeenAt` / presence summary |
-| PR20C | iOS last-seen UI and presence reconciliation |
+| **PR20C** (this doc, iOS) | Last-seen UI, REST/sync/cache reconciliation, formatter |
 | PR20D1 | Backend delivery receipt hardening |
 | PR20D2 | iOS background/foreground delivery acknowledgements |
+
+---
+
+## Backend presence summary (PR20B contract)
+
+Conversation-authorized DTOs include optional profile `presence`:
+
+```json
+{
+  "presence": {
+    "isOnline": false,
+    "lastSeenAt": "2026-07-10T12:00:00Z"
+  }
+}
+```
+
+`lastSeenAt` is always present in JSON and may be `null`. Sources: `GET /conversations`, read/delivered responses, invite accept, live rebuilt sync `ConversationDTO`, and realtime `presence.changed` (`isOnline` + `lastSeenAt`).
+
+Not present on: invite preview, profile/me, message DTO, push payload, persisted sync event rows.
 
 ---
 
@@ -69,19 +88,81 @@ WebSocket /ws/realtime
 
 Audience: other active conversation participants (blocks excluded). Presence does **not** require conversation subscription.
 
-### iOS presence
+### iOS presence (PR20C)
 
 ```text
-RealtimeClient URLSessionWebSocketTask
-  → connection.ready → flush subscriptions
-  → presence.changed → PresenceStore source=realtime (authoritative, no TTL)
-  → typing.started (active chat) → PresenceStore source=typingHint (TTL 15s)
-  → typing.stopped → clearTypingHint only
-  → reconnect → markAllPreservedAcrossReconnect (source=preserved, TTL 90s)
-Conversation list / PrivateChatView read PresenceStore.isOnline
-REST / SwiftData / sync do NOT carry presence
-Explicit disconnect / logout clears PresenceStore
+REST GET /conversations / read / delivered / invite accept
+  → PresenceStore.applySnapshot source=rest
+
+Sync live ConversationDTO (rebuilt server-side, not historical revision)
+  → PresenceStore.applySnapshot source=sync
+
+SwiftData cache hydrate
+  → otherParticipantLastSeenAt only
+  → PresenceStore source=cache (never marks online)
+
+RealtimeClient
+  → presence.changed (isOnline + lastSeenAt) → source=realtime (authoritative per **connection epoch**)
+  → typing.started → typingHint map (TTL 15s, display-only; separate from isOnline)
+  → typing.stopped / TTL / realtime offline → clear hint
+  → reconnect → new socket creates immutable RealtimeConnectionContext (connectionID + epoch + sessionGeneration)
+  → stale events from old socket dropped in RealtimeClient before route; coordinator double-checks
+
+Reconciliation:
+  1. realtime authoritative only for profiles observed in **current connection epoch**
+  2. REST/sync in current epoch may set isOnline until realtime observation in that epoch
+  3. REST/sync started in a **stale connection epoch** (late callback after reconnect) ignores isOnline; may still advance lastSeenAt
+  4. cache never confirms online
+  5. logout / explicit disconnect clears account-scoped presence memory (monotonic lastSeenAt in memory cleared; persisted cache lastSeenAt remains)
+
+UI:
+  PrivateChatView header + conversation row → shared PresenceStore
+  LastSeenStatusFormatter (Calendar today/yesterday, RU/EN, nil → no text)
 ```
+
+#### Source priority (`isOnline`)
+
+| Priority | Source | Notes |
+|----------|--------|-------|
+| 1 | `.realtime` | Authoritative after observation in **current connection epoch** |
+| 2 | `.rest` / `.sync` | Before realtime in epoch; after reconnect can correct missed offline |
+| 3 | `.typingHint` | Display-only ephemeral map; does not set isOnline |
+| 4 | `.preserved` | Reconnect TTL 90s (provisional online) |
+| 5 | `.cache` | Never sets online |
+
+#### `lastSeenAt`
+
+Monotonic `max(current, incoming)` across realtime, REST, sync, cache. Cleared on logout/account switch.
+
+#### Cache policy
+
+SwiftData `LocalMessengerConversation.otherParticipantLastSeenAt` persisted. **Never** persist `isOnline`, typing hints, preserved state, or realtime observation metadata.
+
+#### Offline device semantics
+
+Local network offline does not mark remote peers offline. Cached `lastSeenAt` may display; cached online is not shown.
+
+#### Deep link / chat open
+
+Push routing refreshes conversation list when `ChatConversationPreview` missing; presence appears after cache/REST/realtime hydration. No `GET /conversations/:id` endpoint — gap documented for future PR.
+
+#### Diagnostics (privacy-safe)
+
+| Event | When |
+|-------|------|
+| `presenceSnapshotReceived` | REST/sync conversation snapshot with presence |
+| `presenceSnapshotApplied` | Store accepted snapshot |
+| `presenceSnapshotIgnoredRealtimeNewer` | REST/sync isOnline ignored; may still advance lastSeen |
+| `presenceRealtimeEpochIgnored` | Stale realtime callback from previous connection epoch |
+| `realtimeTransportEpochIgnored` | Stale socket transport event dropped before routing |
+| `presenceStaleRequestIgnored` | REST/sync callback from stale connection epoch |
+| `presencePayloadStatusConflict` | isOnline/status conflict; isOnline applied |
+| `presenceCacheWriteIgnored` | Stale session/account cache write skipped |
+| `presenceLastSeenAdvanced` / `presenceLastSeenIgnoredOlder` | Monotonic lastSeenAt |
+| `presenceCacheHydrated` / `presenceCachePersisted` | Cache read/write of lastSeenAt |
+| `presenceDisplayStateChanged` | Debug-only semantic UI transition |
+
+Fields: truncated `profileID`, `source`, `incomingOnline`, `previousOnline`, `hasLastSeenAt`, `didAdvanceLastSeen`, `sessionGeneration`, `realtimeConnectionEpoch`, `reason`. Never log displayName, message body, JWT, raw payloads.
 
 #### Backend-authoritative presence vs typing hint
 
@@ -95,7 +176,7 @@ Typing hint is **not** authoritative presence and is never written to SwiftData/
 
 #### Reconnect freshness (bounded, not complete)
 
-Preserving presence avoids false offline while typing after short reconnects. Entries are remapped to `.preserved` with a 90s TTL. This is **provisional**, not a new backend observation. Missed offline during long disconnect / backend restart can leave stale online until TTL or next realtime event. Full fix: **PR20B/PR20C**.
+Preserving presence avoids false offline while typing after short reconnects. Entries are remapped to `.preserved` with a 90s TTL. This is **provisional**, not a new backend observation. Missed offline during long disconnect / backend restart can leave stale online until TTL, REST/sync snapshot, or next realtime event.
 
 ### Backend register sequence (close-before-publish safe)
 

@@ -17,6 +17,7 @@ final class RealtimeClient {
 
     private var task: URLSessionWebSocketTask?
     private var receiveTask: Task<Void, Never>?
+    private var receiveConnectionContext: RealtimeConnectionContext?
     private var reconnectTask: Task<Void, Never>?
     private var reconnectAttempt = 0
     private var explicitDisconnect = true
@@ -96,9 +97,11 @@ final class RealtimeClient {
 
         let socket = sessionProvider().webSocketTask(with: request)
         task = socket
+        let connectionContext = RealtimeTransportGuard.beginConnection(presenceStore: .shared)
+        receiveConnectionContext = connectionContext
         socket.resume()
 
-        startReceiveLoop(for: socket)
+        startReceiveLoop(for: socket, context: connectionContext)
     }
 
     func connectIfPossible() async {
@@ -204,7 +207,10 @@ final class RealtimeClient {
         }
     }
 
-    private func startReceiveLoop(for socket: URLSessionWebSocketTask) {
+    private func startReceiveLoop(
+        for socket: URLSessionWebSocketTask,
+        context: RealtimeConnectionContext
+    ) {
         receiveTask?.cancel()
         receiveTask = Task { [weak self, weak socket] in
             guard let socket else { return }
@@ -212,7 +218,7 @@ final class RealtimeClient {
             while !Task.isCancelled {
                 do {
                     let message = try await socket.receive()
-                    await self?.handle(message)
+                    await self?.handle(message, context: context)
                 } catch is CancellationError {
                     return
                 } catch {
@@ -226,29 +232,36 @@ final class RealtimeClient {
         }
     }
 
-    private func handle(_ message: URLSessionWebSocketTask.Message) async {
+    private func handle(
+        _ message: URLSessionWebSocketTask.Message,
+        context: RealtimeConnectionContext
+    ) async {
         switch message {
         case .string(let text):
-            decodeAndRoute(text)
+            decodeAndRoute(text, context: context)
 
         case .data(let data):
             guard let text = String(data: data, encoding: .utf8) else {
                 NetworkDebug.log("Realtime received non-UTF8 data message")
                 return
             }
-            decodeAndRoute(text)
+            decodeAndRoute(text, context: context)
 
         @unknown default:
             NetworkDebug.log("Realtime received unknown WebSocket message")
         }
     }
 
-    private func decodeAndRoute(_ text: String) {
+    private func decodeAndRoute(_ text: String, context: RealtimeConnectionContext) {
         do {
             let dto = try JSONCoding.decoder.decode(RealtimeEventDTO.self, from: Data(text.utf8))
             let event = dto.event
+            guard RealtimeTransportGuard.accepts(context, presenceStore: .shared) else {
+                RealtimeTransportGuard.logIgnoredEvent(event, context: context, presenceStore: .shared)
+                return
+            }
             handleConnectionState(for: event)
-            router.route(event)
+            router.route(event, context: context)
         } catch {
             NetworkDebug.logError(error, prefix: "Realtime decode failed")
         }
@@ -321,6 +334,8 @@ final class RealtimeClient {
 
         receiveTask?.cancel()
         receiveTask = nil
+        receiveConnectionContext = nil
+        RealtimeTransportGuard.invalidateActiveConnection()
 
         task?.cancel(with: .normalClosure, reason: nil)
         task = nil

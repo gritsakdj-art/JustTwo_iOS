@@ -4,6 +4,8 @@ struct ChatConversationRow: View {
     let conversation: ChatConversationPreview
     let isOnline: Bool
     var isTyping: Bool = false
+    var presenceStatusText: String? = nil
+    var presenceAccessibilityLabel: String? = nil
     var onDelete: () -> Void = {}
     var onMute: () -> Void = {}
     let onTap: () -> Void
@@ -76,9 +78,18 @@ struct ChatConversationRow: View {
                     .foregroundStyle(Color.primaryText)
                     .lineLimit(1)
 
+                if let presenceStatusText, !isTyping, !isOnline {
+                    Text(presenceStatusText)
+                        .font(Font.App.manrope(size: 12, weight: .medium))
+                        .foregroundStyle(Color.secondaryText)
+                        .lineLimit(1)
+                }
+
                 messagePreview
             }
             .frame(maxWidth: .infinity, alignment: .leading)
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel(rowAccessibilityLabel)
 
             VStack(alignment: .trailing, spacing: UI.metaStackSpacing) {
                 if let date = conversation.lastMessageAt {
@@ -114,6 +125,21 @@ struct ChatConversationRow: View {
         RoundedRectangle(cornerRadius: UI.unreadBarCornerRadius, style: .continuous)
             .fill(isUnread ? Color.brandPrimary : Color.clear)
             .frame(width: UI.unreadBarWidth, height: UI.unreadBarHeight)
+    }
+
+    private var rowAccessibilityLabel: String {
+        var parts = [conversation.title]
+        if isTyping {
+            parts.append(String(localized: "chats.typing"))
+        } else if let presenceAccessibilityLabel, !presenceAccessibilityLabel.isEmpty {
+            parts.append(presenceAccessibilityLabel)
+        } else if isOnline {
+            parts.append(String(localized: "presence.online"))
+        }
+        if let preview = conversation.lastMessageText, !preview.isEmpty, !isTyping {
+            parts.append(preview)
+        }
+        return parts.joined(separator: ", ")
     }
 
     private var messagePreview: some View {

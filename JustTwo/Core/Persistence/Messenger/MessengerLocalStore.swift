@@ -26,6 +26,16 @@ final class MessengerLocalStore: MessengerLocalStoreProtocol {
         sessionGeneration
     }
 
+    var currentSessionGeneration: Int {
+        sessionGeneration
+    }
+
+    var isResetInFlightPublic: Bool {
+        isResetInFlight
+    }
+
+    private var conversationUpsertChain: Task<Void, Error>?
+
     /// Test-only hook: suspends reset after `isResetInFlight` is set so concurrent access can be verified.
     internal var testingSuspendResetAfterLock = false
     internal var testingOnResetSuspended: (() -> Void)?
@@ -36,6 +46,17 @@ final class MessengerLocalStore: MessengerLocalStoreProtocol {
         testingResumeReset = nil
         testingSuspendResetAfterLock = false
         testingOnResetSuspended = nil
+    }
+
+    internal var testingSuspendUpsertBeforeWrite = false
+    internal var testingOnUpsertSuspended: (() -> Void)?
+    private var testingResumeUpsert: CheckedContinuation<Void, Never>?
+
+    internal func testingResumeSuspendedUpsertForTests() {
+        testingResumeUpsert?.resume()
+        testingResumeUpsert = nil
+        testingSuspendUpsertBeforeWrite = false
+        testingOnUpsertSuspended = nil
     }
 
     init(
@@ -124,8 +145,8 @@ final class MessengerLocalStore: MessengerLocalStoreProtocol {
 
     func upsertConversations(_ conversations: [ConversationDTO]) async throws {
         let startedAt = Date()
-        try await performSessionBoundOperation(operation: "upsertConversations") {
-            try await backingStore.upsertConversations(conversations)
+        try await performSessionBoundOperation(operation: "upsertConversations", isCacheWrite: true) {
+            try await self.serializedConversationUpsert(conversations)
         }
         MessengerDiagnostics.event(
             .messengerLocalConversationUpserted,
@@ -134,6 +155,35 @@ final class MessengerLocalStore: MessengerLocalStoreProtocol {
                 "durationMs": "\(Int(Date().timeIntervalSince(startedAt) * 1_000))"
             ]
         )
+    }
+
+    private func serializedConversationUpsert(_ conversations: [ConversationDTO]) async throws {
+        let capturedGeneration = sessionGeneration
+        let previous = conversationUpsertChain
+        let task = Task<Void, Error> {
+            if let previous {
+                _ = try? await previous.value
+            }
+            try self.validateSessionGeneration(
+                capturedGeneration,
+                operation: "upsertConversations",
+                isCacheWrite: true
+            )
+            if self.testingSuspendUpsertBeforeWrite {
+                self.testingOnUpsertSuspended?()
+                await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+                    self.testingResumeUpsert = continuation
+                }
+            }
+            try self.validateSessionGeneration(
+                capturedGeneration,
+                operation: "upsertConversations",
+                isCacheWrite: true
+            )
+            try await self.backingStore.upsertConversations(conversations)
+        }
+        conversationUpsertChain = task
+        try await task.value
     }
 
     func fetchLocalConversations() async throws -> [LocalConversationSnapshot] {
@@ -460,16 +510,21 @@ final class MessengerLocalStore: MessengerLocalStoreProtocol {
 
     private func performSessionBoundOperation<T>(
         operation: String,
+        isCacheWrite: Bool = false,
         _ work: () async throws -> T
     ) async throws -> T {
         guard !isResetInFlight else {
+            if isCacheWrite {
+                logCacheWriteIgnored(reason: "resetInFlight", operation: operation, capturedGeneration: sessionGeneration)
+            }
             throw MessengerLocalStoreError.storeUnavailable
         }
 
         let generation = sessionGeneration
         do {
+            try validateSessionGeneration(generation, operation: operation, isCacheWrite: isCacheWrite)
             let value = try await work()
-            try validateSessionGeneration(generation, operation: operation)
+            try validateSessionGeneration(generation, operation: operation, isCacheWrite: isCacheWrite)
             return value
         } catch let error as MessengerLocalStoreError {
             throw error
@@ -485,18 +540,44 @@ final class MessengerLocalStore: MessengerLocalStoreProtocol {
         }
     }
 
-    private func validateSessionGeneration(_ generation: Int, operation: String) throws {
+    private func validateSessionGeneration(
+        _ generation: Int,
+        operation: String,
+        isCacheWrite: Bool
+    ) throws {
         guard generation == sessionGeneration, !isResetInFlight else {
-            MessengerDiagnostics.event(
-                .messengerLocalMappingFailed,
-                metadata: [
-                    "operation": operation,
-                    "errorCategory": "staleSession",
-                    "sessionGeneration": "\(generation)"
-                ]
-            )
+            if isCacheWrite {
+                logCacheWriteIgnored(reason: "staleSession", operation: operation, capturedGeneration: generation)
+            } else {
+                MessengerDiagnostics.event(
+                    .messengerLocalMappingFailed,
+                    metadata: [
+                        "operation": operation,
+                        "errorCategory": "staleSession",
+                        "sessionGeneration": "\(generation)"
+                    ]
+                )
+            }
             throw MessengerLocalStoreError.staleSession
         }
+    }
+
+    private func logCacheWriteIgnored(
+        reason: String,
+        operation: String,
+        capturedGeneration: Int
+    ) {
+        MessengerDiagnostics.event(
+            .presenceCacheWriteIgnored,
+            metadata: [
+                "reason": reason,
+                "operation": operation,
+                "source": "localStore",
+                "capturedSessionGeneration": "\(capturedGeneration)",
+                "currentSessionGeneration": "\(sessionGeneration)",
+                "hasAccountMismatch": "false"
+            ]
+        )
     }
 }
 

@@ -267,6 +267,7 @@ final class ConversationListViewModel {
         generation: Int
     ) async throws {
         let networkStartedAt = Date()
+        let requestConnectionEpoch = PresenceStore.shared.currentRealtimeConnectionEpoch
         MessengerDiagnostics.event(.messengerConversationCacheNetworkRefreshStarted)
 
         let response = try await ConversationService.fetchConversations()
@@ -283,6 +284,13 @@ final class ConversationListViewModel {
             ChatUIMapping.conversationPreview(from: $0, currentProfileID: profileID)
         }
         conversations = mergeRESTPreviews(restPreviews, with: conversations)
+        // Live REST snapshot — authoritative only until realtime observation in this session.
+        PresenceStore.shared.applyFromConversations(
+            response.conversations,
+            source: .rest,
+            sessionGeneration: PresenceStore.shared.currentSessionGeneration,
+            requestConnectionEpoch: requestConnectionEpoch
+        )
         bumpListContentGeneration()
         let conversationsForAck = response.conversations
         Task { @MainActor in
@@ -527,7 +535,8 @@ final class ConversationListViewModel {
     func applyDeltaConversation(
         _ dto: ConversationDTO,
         currentProfileID: UUID,
-        activeConversationID: UUID?
+        activeConversationID: UUID?,
+        requestConnectionEpoch: Int? = nil
     ) -> Bool {
         let incoming = ChatUIMapping.conversationPreview(from: dto, currentProfileID: currentProfileID)
         let merged: ChatConversationPreview
@@ -546,6 +555,13 @@ final class ConversationListViewModel {
         } else {
             conversations.insert(merged, at: 0)
         }
+        // Sync rebuilds ConversationDTO live; not a historical presence revision.
+        PresenceStore.shared.applyFromConversation(
+            dto,
+            source: .sync,
+            sessionGeneration: PresenceStore.shared.currentSessionGeneration,
+            requestConnectionEpoch: requestConnectionEpoch
+        )
         sortConversations()
         syncMessengerBadge()
         bumpListContentGeneration()

@@ -65,8 +65,15 @@ final class InvitePreviewViewModel {
         statusMessage = nil
 
         do {
+            let requestConnectionEpoch = PresenceStore.shared.currentRealtimeConnectionEpoch
             let response = try await InviteService.acceptInvite(token: token)
             let profileID = try await MessengerSessionSupport.resolveCurrentProfileID(session: session)
+            PresenceStore.shared.applyFromConversation(
+                response.conversation,
+                source: .rest,
+                sessionGeneration: PresenceStore.shared.currentSessionGeneration,
+                requestConnectionEpoch: requestConnectionEpoch
+            )
             let conversation = ChatUIMapping.conversationPreview(
                 from: response.conversation,
                 currentProfileID: profileID

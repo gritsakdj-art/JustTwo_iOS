@@ -6,7 +6,7 @@ final class RealtimeEventRouter {
 
     static let shared = RealtimeEventRouter()
 
-    private var continuations: [UUID: AsyncStream<RealtimeEvent>.Continuation] = [:]
+    private var continuations: [UUID: AsyncStream<RealtimeRoutedEvent>.Continuation] = [:]
     private(set) var lastEventType: String?
 
     private init() {}
@@ -15,7 +15,7 @@ final class RealtimeEventRouter {
         RealtimeEventRouter()
     }
 
-    func stream() -> AsyncStream<RealtimeEvent> {
+    func stream() -> AsyncStream<RealtimeRoutedEvent> {
         let id = UUID()
 
         return AsyncStream { continuation in
@@ -28,12 +28,13 @@ final class RealtimeEventRouter {
         }
     }
 
-    func route(_ event: RealtimeEvent) {
+    func route(_ event: RealtimeEvent, context: RealtimeConnectionContext) {
         lastEventType = event.type
         NetworkDebug.log("Realtime event received: \(event.type)")
 
+        let routed = RealtimeRoutedEvent(event: event, context: context)
         for continuation in continuations.values {
-            continuation.yield(event)
+            continuation.yield(routed)
         }
     }
 

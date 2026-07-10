@@ -181,15 +181,30 @@ struct RealtimeEventDTO: Decodable, Sendable {
             return .typingStopped(conversationID: id, profileID: profileID)
 
         case "presence.changed":
-            guard let profileID = payload.profileID,
-                  let statusRaw = payload.status else {
+            guard let profileID = payload.profileID else {
                 return .unknown(type: type)
+            }
+            guard let resolved = PresenceRealtimePayloadResolver.resolve(
+                isOnline: payload.isOnline,
+                status: payload.status,
+                lastSeenAt: payload.lastSeenAt
+            ) else {
+                return .unknown(type: type)
+            }
+            if resolved.hadStatusConflict {
+                MessengerDiagnostics.event(
+                    .presencePayloadStatusConflict,
+                    metadata: [
+                        "profileID": MessengerDiagnostics.sanitizeID(profileID),
+                        "incomingOnline": "\(resolved.isOnline)"
+                    ]
+                )
             }
             return .presenceChanged(
                 payload: PresenceChangedPayload(
                     profileID: profileID,
-                    status: PresenceStatus(serverValue: statusRaw),
-                    lastSeenAt: payload.lastSeenAt
+                    isOnline: resolved.isOnline,
+                    lastSeenAt: resolved.lastSeenAt
                 )
             )
 
@@ -368,6 +383,7 @@ struct RealtimePayload: Decodable, Sendable {
     let lastReadAt: Date?
     let lastDeliveredAt: Date?
     let lastSeenAt: Date?
+    let isOnline: Bool?
     let updatedAt: Date?
     let lastMessageAt: Date?
     let status: String?
@@ -391,6 +407,7 @@ struct RealtimePayload: Decodable, Sendable {
         lastReadAt = nil
         lastDeliveredAt = nil
         lastSeenAt = nil
+        isOnline = nil
         updatedAt = nil
         lastMessageAt = nil
         status = nil
@@ -412,6 +429,7 @@ struct RealtimePayload: Decodable, Sendable {
         case lastReadAt
         case lastDeliveredAt
         case lastSeenAt
+        case isOnline
         case updatedAt
         case lastMessageAt
         case status
@@ -434,6 +452,7 @@ struct RealtimePayload: Decodable, Sendable {
         lastReadAt = try container.decodeIfPresent(Date.self, forKey: .lastReadAt)
         lastDeliveredAt = try container.decodeIfPresent(Date.self, forKey: .lastDeliveredAt)
         lastSeenAt = try container.decodeIfPresent(Date.self, forKey: .lastSeenAt)
+        isOnline = try container.decodeIfPresent(Bool.self, forKey: .isOnline)
         updatedAt = try container.decodeIfPresent(Date.self, forKey: .updatedAt)
         lastMessageAt = try container.decodeIfPresent(Date.self, forKey: .lastMessageAt)
         status = try container.decodeIfPresent(String.self, forKey: .status)

@@ -16,7 +16,7 @@ struct PresenceTests {
         }
 
         #expect(payload.profileID.uuidString == "44444444-4444-4444-8444-444444444444".uppercased())
-        #expect(payload.status == .online)
+        #expect(payload.isOnline)
         #expect(payload.lastSeenAt == nil)
     }
 
@@ -30,21 +30,22 @@ struct PresenceTests {
             return
         }
 
-        #expect(payload.status == .offline)
+        #expect(payload.isOnline == false)
         #expect(payload.lastSeenAt != nil)
     }
 
-    @Test("unknown presence status does not crash")
-    func unknownPresenceStatusDoesNotCrash() throws {
-        guard case .presenceChanged(let payload) = try decodeEvent(presenceChangedJSON(
+    @Test("unknown presence status does not apply")
+    func unknownPresenceStatusDoesNotApply() throws {
+        let event = try decodeEvent(presenceChangedJSON(
             status: "away",
-            lastSeenAt: "null"
-        )) else {
-            Issue.record("Expected presence.changed")
+            lastSeenAt: "null",
+            includeStatus: true,
+            includeIsOnline: false
+        ))
+        guard case .unknown = event else {
+            Issue.record("Expected unknown event for unsupported status")
             return
         }
-
-        #expect(payload.status == .unknown)
     }
 
     @MainActor
@@ -98,19 +99,20 @@ struct PresenceTests {
     }
 
     @MainActor
-    @Test("typing hint marks peer online without overwriting realtime offline")
-    func typingHintMarksPeerOnlineWithoutOverwritingRealtimeOffline() {
+    @Test("typing hint does not mark peer authoritative online")
+    func typingHintDoesNotMarkPeerAuthoritativeOnline() {
         let store = PresenceStore.makeForTesting()
         let profileID = fixedOtherProfileID()
 
         #expect(store.applyTypingOnlineHint(profileID: profileID))
-        #expect(store.isOnline(profileID: profileID))
-        #expect(store.source(for: profileID) == .typingHint)
+        #expect(store.isTypingHint(profileID: profileID))
+        #expect(!store.isOnline(profileID: profileID))
+        #expect(store.source(for: profileID) == nil)
 
         store.apply(profileID: profileID, status: .offline, lastSeenAt: Date(), source: .realtime)
         #expect(!store.isOnline(profileID: profileID))
         #expect(store.applyTypingOnlineHint(profileID: profileID) == false)
-        #expect(!store.isOnline(profileID: profileID))
+        #expect(!store.isTypingHint(profileID: profileID))
         #expect(store.source(for: profileID) == .realtime)
     }
 
@@ -122,11 +124,11 @@ struct PresenceTests {
         let profileID = fixedOtherProfileID()
 
         #expect(store.applyTypingOnlineHint(profileID: profileID))
-        #expect(store.isOnline(profileID: profileID))
+        #expect(store.isTypingHint(profileID: profileID))
 
         now = now.addingTimeInterval(PresenceStore.typingHintTTL + 1)
+        #expect(!store.isTypingHint(profileID: profileID))
         #expect(!store.isOnline(profileID: profileID))
-        #expect(store.source(for: profileID) == nil)
     }
 
     @MainActor
@@ -151,19 +153,22 @@ struct PresenceTests {
         var now = Date(timeIntervalSince1970: 2_000)
         let store = PresenceStore.makeForTesting(now: { now })
         let profileID = fixedOtherProfileID()
+        let lastSeen = Date(timeIntervalSince1970: 1_500)
 
-        _ = store.apply(profileID: profileID, status: .online, lastSeenAt: nil, source: .realtime)
-        store.markAllPreservedAcrossReconnect()
+        _ = store.apply(profileID: profileID, status: .online, lastSeenAt: lastSeen, source: .realtime)
+        store.beginRealtimeReconnectCycle()
         #expect(store.source(for: profileID) == .preserved)
         #expect(store.isOnline(profileID: profileID))
 
         now = now.addingTimeInterval(PresenceStore.preservedPresenceTTL + 1)
         #expect(!store.isOnline(profileID: profileID))
+        #expect(store.lastSeenAt(profileID: profileID) == lastSeen)
+        #expect(store.displaySemantic(for: profileID) == .lastSeen)
     }
 
     @MainActor
-    @Test("realtime online overwrites typing hint")
-    func realtimeOnlineOverwritesTypingHint() {
+    @Test("realtime online does not clear active typing hint display")
+    func realtimeOnlineDoesNotClearTypingHintDisplay() {
         let store = PresenceStore.makeForTesting()
         let profileID = fixedOtherProfileID()
 
@@ -171,7 +176,8 @@ struct PresenceTests {
         _ = store.apply(profileID: profileID, status: .online, lastSeenAt: nil, source: .realtime)
 
         #expect(store.isOnline(profileID: profileID))
-        #expect(store.source(for: profileID) == .realtime)
+        #expect(store.isTypingHint(profileID: profileID))
+        #expect(store.displaySemantic(for: profileID) == .typing)
     }
 
     @MainActor
@@ -209,6 +215,9 @@ struct PresenceTests {
 
         session.updateCurrentProfile(try makeProfile(id: currentProfileID))
 
+        RealtimeTransportGuard.resetForTesting()
+        let context = RealtimeTransportGuard.beginConnection(presenceStore: presenceStore)
+
         coordinator.activateConversationList(
             ConversationListViewModel.preview(conversations: []),
             session: session,
@@ -219,9 +228,9 @@ struct PresenceTests {
 
         eventRouter.route(.presenceChanged(payload: PresenceChangedPayload(
             profileID: currentProfileID,
-            status: .online,
+            isOnline: true,
             lastSeenAt: nil
-        )))
+        )), context: context)
 
         try await Task.sleep(for: .milliseconds(100))
 
@@ -250,6 +259,9 @@ struct PresenceTests {
 
         session.updateCurrentProfile(try makeProfile(id: currentProfileID))
 
+        RealtimeTransportGuard.resetForTesting()
+        let context = RealtimeTransportGuard.beginConnection(presenceStore: presenceStore)
+
         coordinator.activateConversationList(
             ConversationListViewModel.preview(conversations: []),
             session: session,
@@ -262,9 +274,9 @@ struct PresenceTests {
 
         eventRouter.route(.presenceChanged(payload: PresenceChangedPayload(
             profileID: otherProfileID,
-            status: .online,
+            isOnline: true,
             lastSeenAt: nil
-        )))
+        )), context: context)
 
         let applied = await waitUntil(timeoutNanoseconds: 2_000_000_000) {
             presenceStore.isOnline(profileID: otherProfileID)
@@ -325,15 +337,28 @@ struct PresenceTests {
         try JSONCoding.decoder.decode(RealtimeEventDTO.self, from: Data(json.utf8)).event
     }
 
-    private func presenceChangedJSON(status: String, lastSeenAt: String) -> String {
-        """
+    private func presenceChangedJSON(
+        status: String,
+        lastSeenAt: String,
+        includeStatus: Bool = true,
+        includeIsOnline: Bool = false
+    ) -> String {
+        let statusField = includeStatus ? "\"status\": \"\(status)\"," : ""
+        let isOnlineField: String
+        if includeIsOnline {
+            isOnlineField = "\"isOnline\": \(status == "online"),"
+        } else {
+            isOnlineField = ""
+        }
+        return """
         {
           "type": "presence.changed",
           "eventID": "00000000-0000-0000-0000-000000000001",
           "occurredAt": "2026-06-26T13:18:31Z",
           "payload": {
             "profileID": "44444444-4444-4444-8444-444444444444",
-            "status": "\(status)",
+            \(statusField)
+            \(isOnlineField)
             "lastSeenAt": \(lastSeenAt)
           }
         }

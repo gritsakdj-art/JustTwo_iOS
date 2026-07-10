@@ -220,10 +220,21 @@ struct ChatsView: View {
         ScrollView {
             LazyVStack(spacing: 12) {
                 ForEach(listViewModel.conversations) { conversation in
+                    let profileID = conversation.otherParticipantProfileID
+                    let isTyping = presenceStore.isTypingHint(profileID: profileID)
+                    let presenceDisplay = PresenceDisplayResolver.resolve(
+                        presenceStore: presenceStore,
+                        profileID: profileID,
+                        isTyping: isTyping
+                    )
                     ChatConversationRow(
                         conversation: conversation,
-                        isOnline: presenceStore.isOnline(profileID: conversation.otherParticipantProfileID),
-                        isTyping: false,
+                        isOnline: presenceStore.isOnline(profileID: profileID),
+                        isTyping: isTyping,
+                        presenceStatusText: isTyping || presenceStore.isOnline(profileID: profileID)
+                            ? nil
+                            : presenceDisplay.text,
+                        presenceAccessibilityLabel: presenceDisplay.accessibilityLabel,
                         onDelete: {
                             MessengerDiagnostics.event(
                                 .conversationRowTapped,

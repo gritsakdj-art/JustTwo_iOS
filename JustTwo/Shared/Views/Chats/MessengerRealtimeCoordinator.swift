@@ -158,13 +158,18 @@ final class MessengerRealtimeCoordinator {
             var iterator = self.eventRouter.stream().makeAsyncIterator()
 
             while !Task.isCancelled {
-                guard let event = await iterator.next() else { break }
-                self.handle(event)
+                guard let routed = await iterator.next() else { break }
+                self.handle(routed.event, context: routed.context)
             }
         }
     }
 
-    private func handle(_ event: RealtimeEvent) {
+    private func handle(_ event: RealtimeEvent, context: RealtimeConnectionContext) {
+        guard RealtimeTransportGuard.accepts(context, presenceStore: presenceStore) else {
+            RealtimeTransportGuard.logIgnoredEvent(event, context: context, presenceStore: presenceStore)
+            return
+        }
+
         let ids = diagnosticIDs(for: event)
         MessengerDiagnostics.event(
             .realtimeEventReceived,
@@ -213,7 +218,7 @@ final class MessengerRealtimeCoordinator {
             handleTypingStopped(profileID: profileID, conversationID: conversationID)
 
         case .presenceChanged(let payload):
-            handlePresenceChanged(payload)
+            handlePresenceChanged(payload, context: context)
 
         case .pong, .error, .subscriptionReady, .subscriptionRemoved, .unknown:
             break
@@ -577,7 +582,6 @@ final class MessengerRealtimeCoordinator {
             guard let self else { return }
             let currentProfileID = await self.currentProfileID()
             await MainActor.run {
-                guard self.activeConversationID == conversationID else { return }
                 if let currentProfileID, profileID == currentProfileID { return }
                 let previousOnline = self.presenceStore.isOnline(profileID: profileID)
                 let applied = self.presenceStore.applyTypingOnlineHint(profileID: profileID)
@@ -592,6 +596,7 @@ final class MessengerRealtimeCoordinator {
                         "profileID": MessengerDiagnostics.sanitizeID(profileID)
                     ]
                 )
+                guard self.activeConversationID == conversationID else { return }
                 self.activeChatViewModel?.applyTypingStarted(profileID: profileID)
             }
         }
@@ -600,23 +605,31 @@ final class MessengerRealtimeCoordinator {
     private func handleTypingStopped(profileID: UUID, conversationID: UUID) {
         Task { [weak self] in
             await MainActor.run {
-                guard self?.activeConversationID == conversationID else { return }
                 self?.presenceStore.clearTypingHint(profileID: profileID)
+                guard self?.activeConversationID == conversationID else { return }
                 self?.activeChatViewModel?.applyTypingStopped(profileID: profileID)
             }
         }
     }
 
-    private func handlePresenceChanged(_ payload: PresenceChangedPayload) {
+    private func handlePresenceChanged(_ payload: PresenceChangedPayload, context: RealtimeConnectionContext) {
         Task { [weak self] in
             guard let self else { return }
             let currentProfileID = await self.currentProfileID()
             await MainActor.run {
+                guard RealtimeTransportGuard.accepts(context, presenceStore: self.presenceStore) else {
+                    RealtimeTransportGuard.logIgnoredEvent(
+                        .presenceChanged(payload: payload),
+                        context: context,
+                        presenceStore: self.presenceStore
+                    )
+                    return
+                }
                 MessengerDiagnostics.event(
                     .presenceEventReceived,
                     metadata: [
                         "source": "realtime",
-                        "incomingOnline": "\(payload.status == .online)",
+                        "incomingOnline": "\(payload.isOnline)",
                         "profileID": MessengerDiagnostics.sanitizeID(payload.profileID)
                     ]
                 )
@@ -632,12 +645,16 @@ final class MessengerRealtimeCoordinator {
                     return
                 }
                 let previousOnline = self.presenceStore.isOnline(profileID: payload.profileID)
-                let applied = self.presenceStore.apply(payload)
+                let applied = self.presenceStore.apply(
+                    payload,
+                    connectionEpoch: context.connectionEpoch,
+                    sessionGeneration: context.sessionGeneration
+                )
                 MessengerDiagnostics.event(
                     applied ? .presenceStateApplied : .presenceStateIgnored,
                     metadata: [
                         "source": "realtime",
-                        "incomingOnline": "\(payload.status == .online)",
+                        "incomingOnline": "\(payload.isOnline)",
                         "previousOnline": "\(previousOnline)",
                         "profileID": MessengerDiagnostics.sanitizeID(payload.profileID)
                     ]
@@ -652,17 +669,8 @@ final class MessengerRealtimeCoordinator {
         NetworkDebug.log("Messenger realtime reconnect reconcile started")
 
         resetTrackedSubscriptions()
-        // Mark retained presence as provisional (TTL-bounded). Not a new backend observation.
-        // Full freshness requires PR20B/PR20C presence summary.
+        // Connection epoch advanced when the new socket was created; preserve provisional online only.
         presenceStore.markAllPreservedAcrossReconnect()
-        MessengerDiagnostics.event(
-            .presenceCacheLoaded,
-            metadata: [
-                "source": "preserved",
-                "reason": "presenceMarkedPreservedAcrossReconnect",
-                "trackedCount": "\(presenceStore.trackedCount)"
-            ]
-        )
 
         if let session, let router {
             await MessengerSyncEngine.shared.runGlobalSync(

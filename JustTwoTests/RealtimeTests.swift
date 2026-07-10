@@ -199,16 +199,21 @@ struct RealtimeTests {
     func routerRoutesEvents() async {
         let router = RealtimeEventRouter.shared
         var iterator = router.stream().makeAsyncIterator()
+        let context = RealtimeConnectionContext(
+            connectionID: UUID(),
+            connectionEpoch: 1,
+            sessionGeneration: 0
+        )
 
-        router.route(.pong)
-        let event = await iterator.next()
+        router.route(.pong, context: context)
+        let routed = await iterator.next()
 
-        #expect(event?.type == "pong")
+        #expect(routed?.event.type == "pong")
 
-        router.route(.unknown(type: "future.event"))
+        router.route(.unknown(type: "future.event"), context: context)
         let unknown = await iterator.next()
 
-        #expect(unknown?.type == "future.event")
+        #expect(unknown?.event.type == "future.event")
     }
 
     @MainActor
@@ -517,10 +522,10 @@ struct RealtimeTests {
     @MainActor
     @Test("coordinator applies message.created through cache when active chat view model is nil")
     func coordinatorAppliesMessageCreatedThroughCacheWhenActiveViewModelNil() async throws {
-        let conversationID = fixedConversationID()
+        let conversationID = UUID(uuidString: "A1111111-1111-4111-8111-111111111111")!
         let currentProfileID = fixedCurrentProfileID()
         let message = try makeMessageDTO(
-            id: fixedMessageID(),
+            id: UUID(uuidString: "A3333333-3333-4333-8333-333333333333")!,
             conversationID: conversationID,
             senderProfileID: fixedOtherProfileID(),
             body: "Fallback hello"
@@ -529,11 +534,12 @@ struct RealtimeTests {
         MessageCacheStore.shared.reset()
         MessengerDiagnosticsStore.shared.clear()
 
+        let presenceStore = PresenceStore.makeForTesting()
         let eventRouter = RealtimeEventRouter.makeForTesting()
         let coordinator = MessengerRealtimeCoordinator(
             realtimeClient: makeTestRealtimeClient(),
             eventRouter: eventRouter,
-            presenceStore: PresenceStore.makeForTesting()
+            presenceStore: presenceStore
         )
 
         let session = SessionStore.shared
@@ -552,16 +558,22 @@ struct RealtimeTests {
         )
         coordinator.testing_simulateActiveConversationWithoutViewModel(conversationID: conversationID)
 
-        try await Task.sleep(for: .milliseconds(50))
+        // Let auto-connect from activateConversationList settle, then isolate transport context.
+        try await Task.sleep(for: .milliseconds(200))
+        RealtimeClient.shared.disconnect()
+        RealtimeTransportGuard.resetForTesting()
+        let context = RealtimeTransportGuard.beginConnection(presenceStore: presenceStore)
 
-        eventRouter.route(.messageCreated(conversationID: conversationID, message: message))
+        eventRouter.route(.messageCreated(conversationID: conversationID, message: message), context: context)
 
         let applied = await waitUntil(timeoutNanoseconds: 2_000_000_000) {
             MessageCacheStore.shared.messages(for: conversationID)?.contains(where: { $0.id == message.id }) == true
         }
 
         #expect(applied)
-        #expect(MessageCacheStore.shared.messages(for: conversationID)?.first?.displayText == "Fallback hello")
+        let cachedMessage = MessageCacheStore.shared.messages(for: conversationID)?
+            .first(where: { $0.id == message.id })
+        #expect(cachedMessage?.displayText == "Fallback hello")
     }
 
     @MainActor

@@ -793,7 +793,13 @@ struct PrivateChatView: View {
     }
 
     private var headerTitle: some View {
-        VStack(spacing: 2) {
+        let presenceDisplay = PresenceDisplayResolver.resolve(
+            presenceStore: presenceStore,
+            profileID: viewModel.conversation.otherParticipantProfileID,
+            isTyping: viewModel.isOtherParticipantTyping
+        )
+
+        return VStack(spacing: 2) {
             Text(viewModel.conversation.title)
                 .font(Font.App.headline(size: 17, weight: .semibold))
                 .foregroundStyle(Color.primaryText)
@@ -807,17 +813,18 @@ struct PrivateChatView: View {
                     TypingDotsView(color: .discoverViolet)
                 }
                 .transition(.opacity)
-            } else if presenceStore.isOnline(profileID: viewModel.conversation.otherParticipantProfileID) {
-                Text("chats.online")
-                    .font(Font.App.caption(weight: .semibold))
-                    .foregroundStyle(Color.discoverOnline)
-            } else {
-                Text("chats.personal")
-                    .font(Font.App.caption())
-                    .foregroundStyle(Color.secondaryText)
+            } else if let statusText = presenceDisplay.text {
+                Text(statusText)
+                    .font(Font.App.caption(weight: presenceStore.isOnline(profileID: viewModel.conversation.otherParticipantProfileID) ? .semibold : .regular))
+                    .foregroundStyle(
+                        presenceStore.isOnline(profileID: viewModel.conversation.otherParticipantProfileID)
+                            ? Color.discoverOnline
+                            : Color.secondaryText
+                    )
             }
         }
         .animation(.easeInOut(duration: 0.2), value: viewModel.isOtherParticipantTyping)
+        .animation(.easeInOut(duration: 0.2), value: presenceDisplay.text)
         .padding(.horizontal, 20)
         .padding(.vertical, 6)
         .frame(maxWidth: 210)
@@ -831,6 +838,16 @@ struct PrivateChatView: View {
         )
         .shadow(color: Color.discoverCardShadow.opacity(0.10), radius: 10, x: 0, y: 4)
         .accessibilityElement(children: .combine)
+        .accessibilityLabel(
+            Text(
+                [
+                    viewModel.conversation.title,
+                    presenceDisplay.accessibilityLabel
+                ]
+                    .compactMap { $0 }
+                    .joined(separator: ", ")
+            )
+        )
     }
 
     private var headerAvatar: some View {

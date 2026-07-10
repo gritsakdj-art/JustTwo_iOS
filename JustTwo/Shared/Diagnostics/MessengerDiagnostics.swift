@@ -119,6 +119,19 @@ enum MessengerDiagnosticEvent: String, Sendable {
     case presenceStateApplied
     case presenceStateIgnored
     case presenceCacheLoaded
+    case presenceSnapshotReceived
+    case presenceSnapshotApplied
+    case presenceSnapshotIgnoredRealtimeNewer
+    case presenceLastSeenAdvanced
+    case presenceLastSeenIgnoredOlder
+    case presenceCacheHydrated
+    case presenceCachePersisted
+    case presenceDisplayStateChanged
+    case presenceRealtimeEpochIgnored
+    case presencePayloadStatusConflict
+    case presenceStaleRequestIgnored
+    case presenceCacheWriteIgnored
+    case realtimeTransportEpochIgnored
 
     case deliveryMessageObserved
     case deliveryAckScheduled

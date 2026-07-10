@@ -25,22 +25,35 @@ struct MessengerConversationCacheTests {
         let older = makeConversationDTO(
             id: UUID(uuidString: "11111111-1111-1111-1111-111111111111")!,
             lastMessageAt: "2026-06-26T10:00:00Z",
-            unreadCount: 1
+            unreadCount: 1,
+            messageID: UUID(uuidString: "22222222-2222-2222-2222-222222222222")!
         )
         let newer = makeConversationDTO(
             id: conversationID,
             lastMessageAt: "2026-06-26T13:18:31Z",
-            unreadCount: 3
+            unreadCount: 3,
+            messageID: UUID(uuidString: "33333333-3333-3333-3333-333333333333")!
         )
 
         try await store.upsertConversations([older, newer])
 
-        let previews = try #require(
-            await MessengerConversationCacheService.hydrateCachedPreviews(currentProfileID: profileID)
+        let snapshots = try await store.fetchLocalConversations()
+        let newestSnapshot = try #require(snapshots.first(where: { $0.id == conversationID.uuidString }))
+        #expect(newestSnapshot.lastMessageBody == "Hello")
+        #expect(newestSnapshot.lastMessageDeletedAt == nil)
+
+        let previews = snapshots.compactMap {
+            ChatUIMapping.conversationPreview(from: $0, currentProfileID: profileID)
+        }
+        let newestPreview = try #require(
+            ChatUIMapping.conversationPreview(from: newestSnapshot, currentProfileID: profileID)
         )
 
         #expect(previews.count == 2)
-        #expect(previews[0].id == conversationID)
+        #expect(newestPreview.id == conversationID)
+        #expect(newestPreview.unreadCount == 3)
+        #expect(newestPreview.lastMessageText == "Hello")
+        #expect(previews.first?.id == conversationID)
         #expect(previews[0].unreadCount == 3)
         #expect(previews[0].lastMessageText == "Hello")
         #expect(previews[0].avatarURL == nil)
@@ -162,12 +175,107 @@ private extension MessengerConversationCacheTests {
         return store
     }
 
+    @Test("cached lastSeenAt persists without online")
+    func cachedLastSeenAtPersists() async throws {
+        let store = makeStore()
+        let dto = makeConversationDTO(
+            presenceJSON: """
+            "presence": {
+              "isOnline": true,
+              "lastSeenAt": "2026-07-10T12:00:00Z"
+            }
+            """
+        )
+
+        await MessengerConversationCacheService.persistRESTConversations([dto])
+
+        let snapshot = try #require(try await store.fetchLocalConversations().first)
+        #expect(snapshot.otherParticipantLastSeenAt != nil)
+    }
+
+    @Test("old cached conversation without lastSeenAt still loads")
+    func oldCacheWithoutLastSeenLoads() async throws {
+        let store = makeStore()
+        try await store.upsertConversations([makeConversationDTO()])
+
+        let snapshot = try #require(try await store.fetchLocalConversations().first)
+        #expect(snapshot.otherParticipantLastSeenAt == nil)
+    }
+
+    @Test("newer lastSeenAt is not decreased by older async merge")
+    func newerLastSeenNotDecreasedByOlderMerge() async throws {
+        let store = makeStore()
+        let newer = makeConversationDTO(
+            presenceJSON: """
+            "presence": {
+              "isOnline": false,
+              "lastSeenAt": "2026-07-10T14:00:00Z"
+            }
+            """
+        )
+        let older = makeConversationDTO(
+            presenceJSON: """
+            "presence": {
+              "isOnline": false,
+              "lastSeenAt": "2026-07-10T12:00:00Z"
+            }
+            """
+        )
+
+        await MessengerConversationCacheService.persistRESTConversations([newer])
+        await MessengerConversationCacheService.persistRESTConversations([older])
+
+        let snapshot = try #require(try await store.fetchLocalConversations().first)
+        let stored = try #require(snapshot.otherParticipantLastSeenAt)
+        #expect(stored > Date(timeIntervalSince1970: 1_752_153_600)) // after 12:00Z
+    }
+
+    @Test("cache hydrate shows lastSeen without online")
+    func cacheHydrateShowsLastSeenWithoutOnline() async throws {
+        let store = PresenceStore.makeForTesting()
+        let profileID = UUID(uuidString: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb")!
+        let lastSeen = Date(timeIntervalSince1970: 1_752_160_000)
+
+        store.hydrateFromCacheSnapshots([
+            LocalConversationSnapshot(
+                id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+                type: "direct",
+                status: "active",
+                connectionID: nil,
+                createdAt: lastSeen,
+                updatedAt: lastSeen,
+                lastMessageAt: lastSeen,
+                lastReadAt: nil,
+                unreadCount: 0,
+                otherParticipantProfileID: profileID.uuidString,
+                otherParticipantDisplayName: "Taylor",
+                otherParticipantPrimaryPhotoID: nil,
+                otherParticipantPrimaryPhotoDownloadURLExpiresAt: nil,
+                otherParticipantLastSeenAt: lastSeen,
+                lastMessageID: nil,
+                lastMessageKind: nil,
+                lastMessageBody: nil,
+                lastMessageSenderProfileID: nil,
+                lastMessageCreatedAt: nil,
+                lastMessageDeletedAt: nil,
+                lastSyncedAt: lastSeen,
+                localUpdatedAt: lastSeen
+            )
+        ])
+
+        #expect(!store.isOnline(profileID: profileID))
+        #expect(store.lastSeenAt(profileID: profileID) == lastSeen)
+    }
+
     func makeConversationDTO(
         id: UUID = UUID(uuidString: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")!,
         lastMessageAt: String = "2026-06-26T13:18:31Z",
         unreadCount: Int = 0,
-        includeSignedPhotoURL: Bool = false
+        includeSignedPhotoURL: Bool = false,
+        presenceJSON: String = "",
+        messageID: UUID? = nil
     ) -> ConversationDTO {
+        let resolvedMessageID = messageID ?? self.messageID
         let photoJSON: String
         if includeSignedPhotoURL {
             photoJSON = """
@@ -183,6 +291,8 @@ private extension MessengerConversationCacheTests {
             """
         }
 
+        let presenceField = presenceJSON.isEmpty ? "" : "\(presenceJSON),"
+
         return try! JSONCoding.decoder.decode(ConversationDTO.self, from: Data("""
         {
           "id": "\(id.uuidString)",
@@ -195,7 +305,7 @@ private extension MessengerConversationCacheTests {
               "displayName": "Taylor",
               "bio": null,
               "city": null,
-              \(photoJSON)
+              \(photoJSON)\(presenceJSON.isEmpty ? "" : ",\n              \(presenceJSON)")
             },
             "role": "member",
             "joinedAt": "2026-06-26T13:18:31Z",
@@ -203,7 +313,7 @@ private extension MessengerConversationCacheTests {
             "lastDeliveredAt": null
           },
           "lastMessage": {
-            "id": "\(messageID.uuidString)",
+            "id": "\(resolvedMessageID.uuidString)",
             "conversationID": "\(id.uuidString)",
             "senderProfileID": "\(otherProfileID.uuidString)",
             "kind": "text",

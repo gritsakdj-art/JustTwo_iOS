@@ -31,12 +31,18 @@ nonisolated struct ConversationParticipantDTO: Decodable, Sendable {
     let lastDeliveredAt: Date?
 }
 
+nonisolated struct PresenceSummaryDTO: Decodable, Sendable, Equatable {
+    let isOnline: Bool
+    let lastSeenAt: Date?
+}
+
 nonisolated struct MessengerProfileSummaryDTO: Decodable, Identifiable, Sendable {
     let id: UUID
     let displayName: String
     let bio: String?
     let city: String?
     let primaryPhoto: MessengerProfilePhotoSummaryDTO?
+    let presence: PresenceSummaryDTO?
 }
 
 nonisolated struct MessengerProfilePhotoSummaryDTO: Decodable, Identifiable, Sendable {

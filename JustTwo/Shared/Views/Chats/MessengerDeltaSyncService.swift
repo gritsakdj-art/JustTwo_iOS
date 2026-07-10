@@ -100,6 +100,7 @@ final class MessengerDeltaSyncService {
         }
 
         let generation = sessionGeneration
+        let requestConnectionEpoch = PresenceStore.shared.currentRealtimeConnectionEpoch
         isInFlight = true
         lastSyncStartedAt = Date()
         defer {
@@ -148,7 +149,8 @@ final class MessengerDeltaSyncService {
                     profileID: profileID,
                     session: session,
                     router: router,
-                    sessionGeneration: generation
+                    sessionGeneration: generation,
+                    requestConnectionEpoch: requestConnectionEpoch
                 )
 
                 guard generation == sessionGeneration else { return false }
@@ -204,6 +206,7 @@ final class MessengerDeltaSyncService {
         guard session.isFullyAuthenticated else { return false }
 
         let generation = sessionGeneration
+        let requestConnectionEpoch = PresenceStore.shared.currentRealtimeConnectionEpoch
         let afterRevision = syncState.currentRevision ?? 0
 
         MessengerDiagnostics.event(
@@ -234,7 +237,8 @@ final class MessengerDeltaSyncService {
                     profileID: profileID,
                     session: session,
                     router: router,
-                    sessionGeneration: generation
+                    sessionGeneration: generation,
+                    requestConnectionEpoch: requestConnectionEpoch
                 )
                 appliedEventCount += page.events.count
                 cursor = page.nextRevision
@@ -307,14 +311,16 @@ final class MessengerDeltaSyncService {
         profileID: UUID,
         session: SessionStore,
         router: AppRouter,
-        sessionGeneration: Int? = nil
+        sessionGeneration: Int? = nil,
+        requestConnectionEpoch: Int? = nil
     ) async throws {
         try await apply(
             events: events,
             profileID: profileID,
             session: session,
             router: router,
-            sessionGeneration: sessionGeneration ?? self.sessionGeneration
+            sessionGeneration: sessionGeneration ?? self.sessionGeneration,
+            requestConnectionEpoch: requestConnectionEpoch ?? PresenceStore.shared.currentRealtimeConnectionEpoch
         )
     }
 
@@ -376,7 +382,8 @@ final class MessengerDeltaSyncService {
         profileID: UUID,
         session: SessionStore,
         router: AppRouter,
-        sessionGeneration: Int
+        sessionGeneration: Int,
+        requestConnectionEpoch: Int
     ) async throws {
         guard !events.isEmpty else { return }
         guard sessionGeneration == self.sessionGeneration else { return }
@@ -428,7 +435,8 @@ final class MessengerDeltaSyncService {
                 profileID: profileID,
                 activeConversationID: activeConversationID,
                 session: session,
-                router: router
+                router: router,
+                requestConnectionEpoch: requestConnectionEpoch
             )
             syncState.markRevisionApplied(event.revision)
 
@@ -462,7 +470,8 @@ final class MessengerDeltaSyncService {
         profileID: UUID,
         activeConversationID: UUID?,
         session: SessionStore,
-        router: AppRouter
+        router: AppRouter,
+        requestConnectionEpoch: Int
     ) {
         switch event.type {
         case .messageCreated, .messageEdited:
@@ -481,7 +490,8 @@ final class MessengerDeltaSyncService {
                 _ = conversationList.applyDeltaConversation(
                     conversation,
                     currentProfileID: profileID,
-                    activeConversationID: activeConversationID
+                    activeConversationID: activeConversationID,
+                    requestConnectionEpoch: requestConnectionEpoch
                 )
                 MessengerDiagnostics.event(
                     .deltaConversationMerged,
@@ -519,7 +529,8 @@ final class MessengerDeltaSyncService {
                 _ = conversationList.applyDeltaConversation(
                     conversation,
                     currentProfileID: profileID,
-                    activeConversationID: activeConversationID
+                    activeConversationID: activeConversationID,
+                    requestConnectionEpoch: requestConnectionEpoch
                 )
                 persistDeltaConversationCache(
                     conversation: conversation,
@@ -557,7 +568,8 @@ final class MessengerDeltaSyncService {
                 _ = conversationList.applyDeltaConversation(
                     conversation,
                     currentProfileID: profileID,
-                    activeConversationID: activeConversationID
+                    activeConversationID: activeConversationID,
+                    requestConnectionEpoch: requestConnectionEpoch
                 )
                 persistDeltaConversationCache(
                     conversation: conversation,
@@ -577,7 +589,8 @@ final class MessengerDeltaSyncService {
                 _ = conversationList.applyDeltaConversation(
                     conversation,
                     currentProfileID: profileID,
-                    activeConversationID: activeConversationID
+                    activeConversationID: activeConversationID,
+                    requestConnectionEpoch: requestConnectionEpoch
                 )
                 persistDeltaConversationCache(
                     conversation: conversation,
@@ -591,7 +604,8 @@ final class MessengerDeltaSyncService {
                 _ = conversationList.applyDeltaConversation(
                     conversation,
                     currentProfileID: profileID,
-                    activeConversationID: activeConversationID
+                    activeConversationID: activeConversationID,
+                    requestConnectionEpoch: requestConnectionEpoch
                 )
                 MessengerDiagnostics.event(
                     .deltaConversationMerged,

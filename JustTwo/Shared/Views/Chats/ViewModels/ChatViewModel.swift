@@ -1380,9 +1380,16 @@ final class ChatViewModel {
         }
 
         do {
-            _ = try await ConversationService.markRead(
+            let requestConnectionEpoch = PresenceStore.shared.currentRealtimeConnectionEpoch
+            let conversationDTO = try await ConversationService.markRead(
                 conversationID: conversation.id,
                 lastReadMessageID: messageID
+            )
+            PresenceStore.shared.applyFromConversation(
+                conversationDTO,
+                source: .rest,
+                sessionGeneration: PresenceStore.shared.currentSessionGeneration,
+                requestConnectionEpoch: requestConnectionEpoch
             )
             deliveryAckCoordinator.markReadAcked(conversationID: conversation.id, messageID: messageID)
             MessengerRealtimeCoordinator.shared.markActiveConversationReadLocally(conversationID: conversation.id)

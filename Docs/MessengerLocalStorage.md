@@ -332,12 +332,16 @@ Six messenger entities (plus `Item.self` in app container):
 
 | Entity | Key fields | Notes |
 |--------|------------|-------|
-| `LocalMessengerConversation` | participant preview, `lastMessageAt`, denormalized lastMessage preview, `unreadCount` | No signed photo URLs |
+| `LocalMessengerConversation` | participant preview, `otherParticipantLastSeenAt` (PR20C), `lastMessageAt`, denormalized lastMessage preview, `unreadCount` | No signed photo URLs; **never** persist `isOnline` |
 | `LocalMessengerMessage` | `id`, `clientMessageID`, tombstone fields | lastMessage metadata only in PR15B |
 | `LocalMessengerAttachment` | metadata only | no signed URL |
 | `LocalMessengerReactionAggregate` | `id = messageID:emoji`, `count`, `reactedByMe` | |
 | `LocalMessengerReceipt` | delivery/read watermarks | |
 | `LocalMessengerSyncMetadata` | `lastAppliedRevision`, sync health fields | runtime global cursor (PR17) |
+
+**PR20C migration:** `otherParticipantLastSeenAt: Date?` added as optional with default `nil` (lightweight SwiftData migration). `MessengerPersistence.schemaVersion` remains `5`. No versioned `SchemaMigrationPlan` in repo. **Automated physical upgrade from a pre-PR20C on-disk store is not reproduced in CI** — manual smoke should open an existing install and verify conversations/messages/outbox survive. On schema open failure, `AppModelContainerFactory` deletes and recreates the store (data loss risk; not silent).
+
+**Cache write policy (PR20C):** only monotonic `otherParticipantLastSeenAt` is merged on upsert (`max(existing, incoming)`). Writes capture `MessengerCacheWriteContext` (store `sessionGeneration` + `SessionStore.currentUser.id`); stale writes after logout/account switch emit `presenceCacheWriteIgnored` and are skipped. Conversation upserts are serialized to preserve monotonic lastSeen under out-of-order completion. `isOnline`, typing, preserved state, and realtime epoch metadata are never persisted.
 
 ### Thread / actor confinement
 

@@ -339,6 +339,22 @@
 - **Manual smoke:** NOT RUN.
 - Deferred: persisted lastSeen (PR20B), last-seen UI (PR20C), delivery hardening (PR20D1), background ack (PR20D2).
 
+## 2026-07-10 (PR20C)
+
+- Branch: `ios-messenger-last-seen-pr20c`.
+- Backend `PresenceSummaryDTO` (`isOnline`, `lastSeenAt` explicit null) decoded on `MessengerProfileSummaryDTO.presence?`.
+- `PresenceStore` reconciliation: connection-epoch realtime authority via immutable `RealtimeConnectionContext` per WebSocket receive cycle; stale old-socket events dropped before route.
+- Cache writes: `MessengerCacheWriteContext` guards (`sessionGeneration` + account user ID); stale post-logout writes emit `presenceCacheWriteIgnored`; serialized conversation upserts for monotonic lastSeen.
+- Typing hint stored separately from `isOnline` (display priority via `PresenceDisplayResolver`); realtime online does not clear active typing; realtime offline clears typing immediately.
+- SwiftData conversation cache stores `otherParticipantLastSeenAt` only — never authoritative `isOnline`. Optional field via lightweight migration; **physical upgrade from production old schema not proven in CI** (see `AppModelContainerFactory` destructive recovery policy).
+- `LastSeenStatusFormatter` uses injected `now`/Calendar/Locale/TimeZone; locale-aware short time (12/24h); nil → no text.
+- UI: conversation row + `PrivateChatView` header share `PresenceStore` + `PresenceDisplayResolver`; no cached online on hydrate.
+- Diagnostics: epoch/stale-request/payload-conflict events added; privacy-safe metadata only.
+- Tests: 131 tests in 12 suites (includes `RealtimeConnectionContextTests`, `MessengerCacheWriteGuardTests`, DST formatter tests).
+- Docs: `Docs/MessengerPresenceAndDeliveryDiagnostics.md`, `Docs/MessengerLocalStorage.md`.
+- **Manual smoke:** NOT RUN.
+- Out of scope: profile preview presence (PR25B), privacy hide-last-seen, new conversation details endpoint (deep-link gap).
+
 ## Notes
 
 - Continue adding completed changes here after each meaningful update.
