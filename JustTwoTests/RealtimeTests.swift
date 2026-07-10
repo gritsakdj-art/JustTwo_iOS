@@ -257,7 +257,7 @@ struct RealtimeTests {
         )
 
         #expect(viewModel.applyRealtimeMessage(original, currentProfileID: currentProfileID))
-        #expect(!viewModel.applyRealtimeMessage(edited, currentProfileID: currentProfileID))
+        #expect(viewModel.applyRealtimeMessage(edited, currentProfileID: currentProfileID))
         #expect(viewModel.messages.count == 1)
         #expect(viewModel.messages.first?.displayText == "After")
         #expect(viewModel.messages.first?.isEdited == true)
@@ -314,9 +314,10 @@ struct RealtimeTests {
 
         _ = viewModel.applyRealtimeMessage(message, currentProfileID: currentProfileID)
         #expect(viewModel.applyRealtimeReactionAdded(addPayload))
-        #expect(viewModel.applyRealtimeReactionAdded(addPayload))
+        #expect(!viewModel.applyRealtimeReactionAdded(addPayload))
         #expect(viewModel.messages.first?.reactions.count == 1)
         #expect(viewModel.messages.first?.reactions.first?.count == 1)
+        #expect(viewModel.messages.first?.reactions.first?.reactedByMe == true)
 
         #expect(viewModel.applyRealtimeReactionRemoved(
             ReactionRemovedPayload(
@@ -511,6 +512,104 @@ struct RealtimeTests {
 
         #expect(!viewModel.applyDeliveryStatus(.delivered, messageID: firstID, cutoffDate: nil))
         #expect(viewModel.messages[0].deliveryStatus == .read)
+    }
+
+    @MainActor
+    @Test("coordinator applies message.created through cache when active chat view model is nil")
+    func coordinatorAppliesMessageCreatedThroughCacheWhenActiveViewModelNil() async throws {
+        let conversationID = fixedConversationID()
+        let currentProfileID = fixedCurrentProfileID()
+        let message = try makeMessageDTO(
+            id: fixedMessageID(),
+            conversationID: conversationID,
+            senderProfileID: fixedOtherProfileID(),
+            body: "Fallback hello"
+        )
+
+        MessageCacheStore.shared.reset()
+        MessengerDiagnosticsStore.shared.clear()
+
+        let eventRouter = RealtimeEventRouter.makeForTesting()
+        let coordinator = MessengerRealtimeCoordinator(
+            realtimeClient: makeTestRealtimeClient(),
+            eventRouter: eventRouter,
+            presenceStore: PresenceStore.makeForTesting()
+        )
+
+        let session = SessionStore.shared
+        let previousProfile = session.currentProfile
+        defer {
+            session.updateCurrentProfile(previousProfile)
+            coordinator.stop()
+            MessageCacheStore.shared.reset()
+        }
+
+        session.updateCurrentProfile(try makeProfile(id: currentProfileID))
+        coordinator.activateConversationList(
+            ConversationListViewModel.preview(conversations: [makeConversation(id: conversationID)]),
+            session: session,
+            router: AppRouter.shared
+        )
+        coordinator.testing_simulateActiveConversationWithoutViewModel(conversationID: conversationID)
+
+        try await Task.sleep(for: .milliseconds(50))
+
+        eventRouter.route(.messageCreated(conversationID: conversationID, message: message))
+
+        let applied = await waitUntil(timeoutNanoseconds: 2_000_000_000) {
+            MessageCacheStore.shared.messages(for: conversationID)?.contains(where: { $0.id == message.id }) == true
+        }
+
+        #expect(applied)
+        #expect(MessageCacheStore.shared.messages(for: conversationID)?.first?.displayText == "Fallback hello")
+    }
+
+    @MainActor
+    private func makeTestRealtimeClient() -> RealtimeClient {
+        RealtimeClient(
+            router: .shared,
+            reconnectPolicy: RealtimeReconnectPolicy(
+                initialDelay: 60,
+                multiplier: 2,
+                maxDelay: 60
+            ),
+            tokenProvider: { "test-token" }
+        )
+    }
+
+    @MainActor
+    private func makeProfile(id: UUID) throws -> UserProfileDTO {
+        try JSONCoding.decoder.decode(UserProfileDTO.self, from: Data("""
+        {
+          "id": "\(id.uuidString)",
+          "displayName": "Me",
+          "birthDate": "1990-01-01",
+          "gender": "other",
+          "bio": null,
+          "city": null,
+          "latitude": null,
+          "longitude": null,
+          "moodModeEnabled": false,
+          "activityModeEnabled": false,
+          "isVisibleInDiscovery": true
+        }
+        """.utf8))
+    }
+
+    @MainActor
+    private func waitUntil(
+        timeoutNanoseconds: UInt64,
+        pollIntervalNanoseconds: UInt64 = 20_000_000,
+        condition: @escaping () -> Bool
+    ) async -> Bool {
+        let deadline = DispatchTime.now().uptimeNanoseconds + timeoutNanoseconds
+        while DispatchTime.now().uptimeNanoseconds < deadline {
+            if condition() {
+                return true
+            }
+            try? await Task.sleep(nanoseconds: pollIntervalNanoseconds)
+        }
+        return condition()
     }
 
     private func jsonObject(for message: RealtimeClientMessageDTO) throws -> [String: Any] {

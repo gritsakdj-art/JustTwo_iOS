@@ -387,19 +387,37 @@ Cursor should append/update the relevant subsection after each batch is implemen
 
 ### Batch A - Realtime Consistency
 
-Status: Not started
+Status: Implemented (pending manual smoke)
 
-Branch:
+Branch: `batch-a-realtime-consistency`
 
 Files changed:
+- `JustTwo/Shared/Views/Chats/MessengerRealtimeCoordinator.swift`
+- `JustTwo/Shared/Views/Chats/MessageCacheStore.swift`
+- `JustTwo/Shared/Views/Chats/ViewModels/ChatViewModel.swift`
+- `JustTwo/Shared/Diagnostics/MessengerDiagnostics.swift`
+- `JustTwoTests/RealtimeTests.swift`
+- `JustTwoTests/MessageCacheStoreTests.swift`
 
 Summary:
+- Added `applyToActiveConversation` helper: when `activeConversationID` matches but `activeChatViewModel` is nil, events apply through `MessageCacheStore` instead of being dropped.
+- Fixed cache Bool semantics: `upsertMessage` returns `true` on edits; delete/reaction methods return `false` on no-op.
+- New diagnostic `realtimeActiveChatViewModelNilFallback`; message event reasons renamed to `activeChatApplied` / path metadata.
+- Follow-up fix: duplicate/no-op reaction events no longer trigger active-chat refresh when the message is already present.
+- Follow-up fix: realtime `reaction.added` now preserves `reactedByMe` from payload in active chat and cache fallback paths.
+- No broad `PrivateChatView` observers re-added.
 
 Build/tests:
+- `xcodebuild -project JustTwo.xcodeproj -scheme JustTwo -destination 'platform=iOS Simulator,id=D1806BCC-C599-4B19-A8F4-96B9A3BCE81E' build` — SUCCEEDED
+- `xcodebuild test ... -only-testing:JustTwoTests/RealtimeTests -only-testing:JustTwoTests/MessageCacheStoreTests` — 38 tests SUCCEEDED
 
 Manual smoke:
+- Not run (see Batch A checklist in prompt above)
 
 Residual risks / follow-up:
+- Nil-VM fallback relies on `MessageCacheStore` + `MessengerConversationNotification`; open `ChatViewModel` must still be subscribed for UI refresh.
+- `refreshActiveChatFromRealtime()` remains no-op without a live view model (by design).
+- Batch B–E unchanged.
 
 ### Batch B - Auth, Session, Push Routing
 

@@ -61,10 +61,82 @@ struct MessageCacheStoreTests {
         )
 
         store.setMessages([original], for: conversationID)
-        store.upsertMessage(edited, conversationID: conversationID)
+        #expect(store.upsertMessage(edited, conversationID: conversationID))
 
         #expect(store.messages(for: conversationID)?.first?.displayText == "Edited")
         #expect(store.messages(for: conversationID)?.first?.isEdited == true)
+    }
+
+    @Test
+    func upsertMessageReturnsFalseForExactDuplicate() {
+        let store = MessageCacheStore.shared
+        store.reset()
+        let message = ChatMessage(
+            id: UUID(),
+            displayText: "Hello",
+            rawBody: "Hello",
+            createdAt: .now,
+            isMine: false,
+            isDeleted: false,
+            isEdited: false,
+            replyPreview: nil,
+            reactions: [],
+            deliveryStatus: nil
+        )
+
+        store.setMessages([message], for: conversationID)
+        #expect(!store.upsertMessage(message, conversationID: conversationID))
+    }
+
+    @Test
+    func markMessageDeletedIsIdempotent() {
+        let store = MessageCacheStore.shared
+        store.reset()
+        let messageID = UUID()
+        let message = ChatMessage(
+            id: messageID,
+            displayText: "Secret",
+            rawBody: "Secret",
+            createdAt: .now,
+            isMine: false,
+            isDeleted: false,
+            isEdited: false,
+            replyPreview: nil,
+            reactions: [],
+            deliveryStatus: nil
+        )
+
+        store.setMessages([message], for: conversationID)
+        #expect(store.markMessageDeleted(conversationID: conversationID, messageID: messageID, deletedAt: .now))
+        #expect(!store.markMessageDeleted(conversationID: conversationID, messageID: messageID, deletedAt: .now))
+    }
+
+    @Test
+    func applyRealtimeReactionAddedPreservesReactedByMe() {
+        let store = MessageCacheStore.shared
+        store.reset()
+        let messageID = UUID()
+        let message = ChatMessage(
+            id: messageID,
+            displayText: "React to me",
+            rawBody: "React to me",
+            createdAt: .now,
+            isMine: false,
+            isDeleted: false,
+            isEdited: false,
+            replyPreview: nil,
+            reactions: [],
+            deliveryStatus: nil
+        )
+        let payload = ReactionAddedPayload(
+            messageID: messageID,
+            reaction: RealtimeReactionDTO(emoji: "❤️", count: .bool(true), reactedByMe: true)
+        )
+
+        store.setMessages([message], for: conversationID)
+        #expect(store.applyRealtimeReactionAdded(payload, conversationID: conversationID))
+        #expect(!store.applyRealtimeReactionAdded(payload, conversationID: conversationID))
+        #expect(store.messages(for: conversationID)?.first?.reactions.first?.reactedByMe == true)
     }
 
     @Test

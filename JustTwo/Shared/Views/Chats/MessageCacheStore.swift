@@ -826,7 +826,7 @@ final class MessageCacheStore {
             entry.loadedAt = .now
             entries[conversationID] = entry
             notifyMessagesDidChange(conversationID: conversationID)
-            return false
+            return true
         }
 
         entry.messages.append(message)
@@ -1051,7 +1051,13 @@ final class MessageCacheStore {
             return false
         }
 
-        entry.messages[index] = entry.messages[index].markingDeleted(deletedAt: deletedAt)
+        let current = entry.messages[index]
+        guard !current.isDeleted else { return false }
+
+        let updated = current.markingDeleted(deletedAt: deletedAt)
+        guard updated != current else { return false }
+
+        entry.messages[index] = updated
         entry.loadedAt = .now
         entries[conversationID] = entry
         notifyMessagesDidChange(conversationID: conversationID)
@@ -1069,28 +1075,32 @@ final class MessageCacheStore {
         }
 
         let normalizedEmoji = ReactionEmoji.normalized(payload.reaction.emoji)
-        var reactions = entry.messages[index].reactions
+        let original = entry.messages[index]
+        var reactions = original.reactions
 
         if let reactionIndex = reactions.firstIndex(where: { ReactionEmoji.normalized($0.emoji) == normalizedEmoji }) {
             let current = reactions[reactionIndex]
             let nextCount = payload.reaction.count.intValue ?? max(current.count, 1)
             reactions[reactionIndex] = current.replacing(
                 count: max(current.count, nextCount),
-                reactedByMe: current.reactedByMe
+                reactedByMe: current.reactedByMe || payload.reaction.reactedByMe
             )
         } else {
             reactions.append(
                 ChatMessageReaction(
                     emoji: normalizedEmoji,
                     count: payload.reaction.count.intValue ?? 1,
-                    reactedByMe: false
+                    reactedByMe: payload.reaction.reactedByMe
                 )
             )
         }
 
-        entry.messages[index] = entry.messages[index].replacingReactions(
+        let updated = original.replacingReactions(
             reactions.sorted { $0.displayEmoji < $1.displayEmoji }
         )
+        guard updated != original else { return false }
+
+        entry.messages[index] = updated
         entry.loadedAt = .now
         entries[conversationID] = entry
         notifyMessagesDidChange(conversationID: conversationID)
@@ -1109,9 +1119,10 @@ final class MessageCacheStore {
         }
 
         let normalizedEmoji = ReactionEmoji.normalized(payload.emoji)
-        var reactions = entry.messages[index].reactions
+        let original = entry.messages[index]
+        var reactions = original.reactions
         guard let reactionIndex = reactions.firstIndex(where: { ReactionEmoji.normalized($0.emoji) == normalizedEmoji }) else {
-            return true
+            return false
         }
 
         let current = reactions[reactionIndex]
@@ -1127,7 +1138,10 @@ final class MessageCacheStore {
             )
         }
 
-        entry.messages[index] = entry.messages[index].replacingReactions(reactions)
+        let updated = original.replacingReactions(reactions)
+        guard updated != original else { return false }
+
+        entry.messages[index] = updated
         entry.loadedAt = .now
         entries[conversationID] = entry
         notifyMessagesDidChange(conversationID: conversationID)
