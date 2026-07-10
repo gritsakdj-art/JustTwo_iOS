@@ -1590,27 +1590,31 @@ final class ChatViewModel {
         }
 
         let normalizedEmoji = ReactionEmoji.normalized(payload.reaction.emoji)
-        var reactions = messages[index].reactions
+        let original = messages[index]
+        var reactions = original.reactions
 
         if let reactionIndex = reactions.firstIndex(where: { ReactionEmoji.normalized($0.emoji) == normalizedEmoji }) {
             let current = reactions[reactionIndex]
             let nextCount = payload.reaction.count.intValue ?? max(current.count, 1)
             reactions[reactionIndex] = current.replacing(
                 count: max(current.count, nextCount),
-                reactedByMe: current.reactedByMe
+                reactedByMe: current.reactedByMe || payload.reaction.reactedByMe
             )
         } else {
             reactions.append(
                 ChatMessageReaction(
                     emoji: normalizedEmoji,
                     count: payload.reaction.count.intValue ?? 1,
-                    reactedByMe: false
+                    reactedByMe: payload.reaction.reactedByMe
                 )
             )
         }
 
-        messages[index] = messages[index].replacingReactions(reactions.sorted { $0.displayEmoji < $1.displayEmoji })
-        messageCache.upsertMessage(messages[index], conversationID: conversation.id)
+        let updated = original.replacingReactions(reactions.sorted { $0.displayEmoji < $1.displayEmoji })
+        guard updated != original else { return false }
+
+        messages[index] = updated
+        messageCache.upsertMessage(updated, conversationID: conversation.id)
         return true
     }
 
@@ -1624,9 +1628,10 @@ final class ChatViewModel {
         }
 
         let normalizedEmoji = ReactionEmoji.normalized(payload.emoji)
-        var reactions = messages[index].reactions
+        let original = messages[index]
+        var reactions = original.reactions
         guard let reactionIndex = reactions.firstIndex(where: { ReactionEmoji.normalized($0.emoji) == normalizedEmoji }) else {
-            return true
+            return false
         }
 
         let current = reactions[reactionIndex]
@@ -1642,8 +1647,11 @@ final class ChatViewModel {
             )
         }
 
-        messages[index] = messages[index].replacingReactions(reactions)
-        messageCache.upsertMessage(messages[index], conversationID: conversation.id)
+        let updated = original.replacingReactions(reactions)
+        guard updated != original else { return false }
+
+        messages[index] = updated
+        messageCache.upsertMessage(updated, conversationID: conversation.id)
         return true
     }
 
