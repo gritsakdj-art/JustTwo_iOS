@@ -528,16 +528,37 @@ Residual risks / follow-up:
 
 ### Batch E - Profile Photo And Misc MainActor I/O
 
-Status: Not started
+Status: Implemented (pending manual smoke)
 
-Branch:
+Branch: `batch-e-profile-photo-mainactor-io`
 
 Files changed:
+- `JustTwo/Core/Session/ProfilePhotoImageCache.swift`
+- `JustTwo/Core/Session/ProfilePhotoStore.swift`
+- `JustTwo/Shared/Helpers/ProfilePhotoImagePipeline.swift`
+- `JustTwo/Shared/Components/RemoteProfilePhotoView.swift`
+- `JustTwo/Shared/Components/Chat/ChatAvatarView.swift`
+- `JustTwo/Shared/Views/Chats/ChatPartnerAvatarCache.swift`
+- `JustTwo/Shared/Views/Profile/AvatarCropEditorView.swift`
+- `JustTwo/Shared/Views/Profile/ProfilePhotosView.swift`
+- `JustTwo/Shared/Views/Profile/ProfileView.swift`
+- `JustTwoTests/ProfilePhotoImageCacheTests.swift` (new)
 
 Summary:
+- `ProfilePhotoImageCache`: sync lookups are memory-only; disk read/decode moved to `loadImage(for:)` / `loadAvatarFallback()` on the cache IO queue; JPEG encode/write stays off-main.
+- `ProfilePhotoImagePipeline`: async helpers for decode, resize/encode (`prepareJPEG`, `jpegData`) via detached tasks.
+- Profile/avatar callers (`ProfilePhotoStore`, `RemoteProfilePhotoView`, `ChatAvatarView`, crop editor, gallery upload) use async cache/pipeline paths instead of main-thread `Data(contentsOf:)` / `UIImage(data:)` / `jpegData`.
+- Avatar crop save exports JPEG off-main before calling `onSave`; UI/gestures unchanged.
+- Follow-up audit fix: crop save uses `isSaving` guard to block double-tap duplicate uploads; `didReplaceImage` is snapshotted before async export.
 
 Build/tests:
+- `xcodebuild -project JustTwo.xcodeproj -scheme JustTwo -destination 'platform=iOS Simulator,id=D1806BCC-C599-4B19-A8F4-96B9A3BCE81E' build` — SUCCEEDED
+- `xcodebuild test ... -only-testing:JustTwoTests/ProfilePhotoImageCacheTests -only-testing:JustTwoTests/ProfilePhotoImagePipelineTests` — 5 tests SUCCEEDED
 
 Manual smoke:
+- Not run (see Batch E checklist in prompt above)
 
 Residual risks / follow-up:
+- `ProfileView.avatarUIImage` still uses sync memory-only cache for instant render; cold disk hits rely on `RemoteProfilePhotoView` until memory warms.
+- `ProfilePhotoImageCache.save` still updates memory on caller thread; only encode/write is off-main (unchanged ergonomics for SwiftUI).
+- Chat media cache paths were not changed in this batch.

@@ -10,6 +10,7 @@ final class ProfilePhotoImageCache {
     private let ioQueue = DispatchQueue(label: "com.justtwo.profile-photo-cache", qos: .utility)
 
     private let avatarFallbackFileName = "avatar-fallback.jpg"
+    private let jpegCompressionQuality: CGFloat = 0.85
 
     private init() {
         memoryCache.countLimit = 48
@@ -32,62 +33,87 @@ final class ProfilePhotoImageCache {
         "avatar-fallback" as NSString
     }
 
+    /// Returns an in-memory cached image when available. Does not read from disk.
     func image(for photoID: UUID) -> UIImage? {
+        memoryCache.object(forKey: photoID.uuidString as NSString)
+    }
+
+    func loadImage(for photoID: UUID) async -> UIImage? {
         let key = photoID.uuidString as NSString
         if let cached = memoryCache.object(forKey: key) {
             return cached
         }
 
-        let url = photoFileURL(for: photoID)
-        guard let data = try? Data(contentsOf: url),
-              let image = UIImage(data: data) else {
-            return nil
-        }
+        return await performOnIOQueue { [weak self] in
+            guard let self else { return nil as UIImage? }
 
-        memoryCache.setObject(image, forKey: key)
-        return image
+            let url = self.photoFileURL(for: photoID)
+            guard let data = try? Data(contentsOf: url),
+                  let image = UIImage(data: data) else {
+                return nil
+            }
+
+            self.memoryCache.setObject(image, forKey: key)
+            return image
+        }
     }
 
     func save(_ image: UIImage, for photoID: UUID) {
         memoryCache.setObject(image, forKey: photoID.uuidString as NSString)
 
-        guard let data = image.jpegData(compressionQuality: 0.85) else { return }
-        let url = photoFileURL(for: photoID)
-
         ioQueue.async { [weak self] in
-            self?.ensureCacheDirectory()
-            try? data.write(to: url, options: .atomic)
+            guard let self,
+                  let data = image.jpegData(compressionQuality: self.jpegCompressionQuality) else {
+                return
+            }
+            self.writeJPEGData(data, to: self.photoFileURL(for: photoID))
         }
     }
 
-    func saveJPEGData(_ data: Data, for photoID: UUID) {
-        guard let image = UIImage(data: data) else { return }
-        save(image, for: photoID)
+    func saveJPEGData(_ data: Data, for photoID: UUID) async {
+        guard let image = await ProfilePhotoImagePipeline.decodeImage(from: data) else { return }
+
+        let key = photoID.uuidString as NSString
+        memoryCache.setObject(image, forKey: key)
+
+        await performOnIOQueue { [weak self] in
+            self?.writeJPEGData(data, to: self?.photoFileURL(for: photoID))
+        }
     }
 
+    /// Returns an in-memory avatar fallback when available. Does not read from disk.
     func avatarFallback() -> UIImage? {
-        if let cached = memoryCache.object(forKey: avatarMemoryKey()) {
+        memoryCache.object(forKey: avatarMemoryKey())
+    }
+
+    func loadAvatarFallback() async -> UIImage? {
+        let key = avatarMemoryKey()
+        if let cached = memoryCache.object(forKey: key) {
             return cached
         }
 
-        guard let data = try? Data(contentsOf: avatarFallbackURL),
-              let image = UIImage(data: data) else {
-            return nil
-        }
+        return await performOnIOQueue { [weak self] in
+            guard let self else { return nil as UIImage? }
 
-        memoryCache.setObject(image, forKey: avatarMemoryKey())
-        return image
+            guard let data = try? Data(contentsOf: self.avatarFallbackURL),
+                  let image = UIImage(data: data) else {
+                return nil
+            }
+
+            self.memoryCache.setObject(image, forKey: key)
+            return image
+        }
     }
 
     func saveAvatarFallback(_ image: UIImage) {
         memoryCache.setObject(image, forKey: avatarMemoryKey())
 
-        guard let data = image.jpegData(compressionQuality: 0.85) else { return }
-        let url = avatarFallbackURL
-
         ioQueue.async { [weak self] in
-            self?.ensureCacheDirectory()
-            try? data.write(to: url, options: .atomic)
+            guard let self,
+                  let data = image.jpegData(compressionQuality: self.jpegCompressionQuality) else {
+                return
+            }
+            self.writeJPEGData(data, to: self.avatarFallbackURL)
         }
     }
 
@@ -119,10 +145,24 @@ final class ProfilePhotoImageCache {
         }
     }
 
+    private func writeJPEGData(_ data: Data, to url: URL?) {
+        guard let url else { return }
+        ensureCacheDirectory()
+        try? data.write(to: url, options: .atomic)
+    }
+
     private func ensureCacheDirectory() {
         let directory = cacheDirectory
         if !fileManager.fileExists(atPath: directory.path) {
             try? fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
+        }
+    }
+
+    private func performOnIOQueue<T>(_ work: @escaping () -> T) async -> T {
+        await withCheckedContinuation { continuation in
+            ioQueue.async {
+                continuation.resume(returning: work())
+            }
         }
     }
 }

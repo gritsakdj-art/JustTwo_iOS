@@ -41,8 +41,9 @@ struct ChatAvatarView: View {
 
     @MainActor
     private func loadImageIfNeeded() async {
-        if let cachedImage {
-            displayedImage = cachedImage
+        if let photoID,
+           let cached = await ProfilePhotoImageCache.shared.loadImage(for: photoID) {
+            displayedImage = cached
             return
         }
 
@@ -52,7 +53,7 @@ struct ChatAvatarView: View {
             let (data, response) = try await ImageDownloadClient.data(from: photoURL)
             guard let http = response as? HTTPURLResponse,
                   (200..<300).contains(http.statusCode),
-                  let image = UIImage(data: data) else {
+                  let image = await ProfilePhotoImagePipeline.decodeImage(from: data) else {
                 return
             }
 

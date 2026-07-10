@@ -31,7 +31,22 @@ final class ProfilePhotoStore {
         if imageCache.image(for: photoID) != nil {
             return
         }
+        if await imageCache.loadImage(for: photoID) != nil {
+            return
+        }
         await downloadAndCachePhoto(photoID: photoID, asAvatarFallback: false)
+    }
+
+    func loadCachedImage(for photoID: UUID) async -> UIImage? {
+        await imageCache.loadImage(for: photoID)
+    }
+
+    func loadAvatarFallbackImage() async -> UIImage? {
+        if let primaryPhoto,
+           let cached = await imageCache.loadImage(for: primaryPhoto.id) {
+            return cached
+        }
+        return await imageCache.loadAvatarFallback()
     }
 
     var canAddPhoto: Bool {
@@ -108,7 +123,7 @@ final class ProfilePhotoStore {
 
     @discardableResult
     func uploadPhoto(data: Data, isPrimary: Bool) async throws -> ProfilePhotoDTO {
-        guard let prepared = ProfilePhotoImagePipeline.prepareJPEG(from: data) else {
+        guard let prepared = await ProfilePhotoImagePipeline.prepareJPEG(from: data) else {
             throw ProfilePhotoStoreError.invalidImage
         }
         return try await uploadPreparedPhoto(prepared, isPrimary: isPrimary)
@@ -134,7 +149,7 @@ final class ProfilePhotoStore {
             isPrimary: shouldBePrimary
         )
 
-        cacheUploadedImage(prepared, for: photo.id, isPrimary: photo.isPrimary || shouldBePrimary)
+        await cacheUploadedImage(prepared, for: photo.id, isPrimary: photo.isPrimary || shouldBePrimary)
         await reloadPhotos()
         return photo
     }
@@ -144,13 +159,13 @@ final class ProfilePhotoStore {
         lastErrorMessage = nil
         defer { isMutating = false }
 
-        promoteToAvatarFallback(photoID: photoID)
+        await promoteToAvatarFallback(photoID: photoID)
 
         _ = try await ProfilePhotoService.setPrimary(photoID: photoID)
         await reloadPhotos()
         primaryPhotoRevision += 1
 
-        if imageCache.avatarFallback() == nil {
+        if await imageCache.loadAvatarFallback() == nil {
             await downloadAndCachePhoto(photoID: photoID, asAvatarFallback: true)
         }
     }
@@ -199,8 +214,8 @@ final class ProfilePhotoStore {
 
         if wasPrimary {
             if let newPrimary = primaryPhoto {
-                promoteToAvatarFallback(photoID: newPrimary.id)
-                if imageCache.image(for: newPrimary.id) == nil {
+                await promoteToAvatarFallback(photoID: newPrimary.id)
+                if await imageCache.loadImage(for: newPrimary.id) == nil {
                     await downloadAndCachePhoto(photoID: newPrimary.id, asAvatarFallback: true)
                 }
             } else {
@@ -251,16 +266,20 @@ final class ProfilePhotoStore {
         return (0..<ProfilePhotoService.maxPhotoCount).first { !usedPositions.contains($0) }
     }
 
-    private func cacheUploadedImage(_ prepared: PreparedProfilePhoto, for photoID: UUID, isPrimary: Bool) {
-        imageCache.saveJPEGData(prepared.data, for: photoID)
-        if isPrimary, let image = UIImage(data: prepared.data) {
+    private func cacheUploadedImage(_ prepared: PreparedProfilePhoto, for photoID: UUID, isPrimary: Bool) async {
+        await imageCache.saveJPEGData(prepared.data, for: photoID)
+        if isPrimary, let image = imageCache.image(for: photoID) {
             imageCache.saveAvatarFallback(image)
             primaryPhotoRevision += 1
         }
     }
 
-    private func promoteToAvatarFallback(photoID: UUID) {
+    private func promoteToAvatarFallback(photoID: UUID) async {
         if let image = imageCache.image(for: photoID) {
+            imageCache.saveAvatarFallback(image)
+            return
+        }
+        if let image = await imageCache.loadImage(for: photoID) {
             imageCache.saveAvatarFallback(image)
         }
     }
@@ -268,8 +287,8 @@ final class ProfilePhotoStore {
     private func cachePrimaryPhotoIfNeeded() async {
         guard let primaryPhoto else { return }
 
-        if imageCache.image(for: primaryPhoto.id) != nil {
-            promoteToAvatarFallback(photoID: primaryPhoto.id)
+        if await imageCache.loadImage(for: primaryPhoto.id) != nil {
+            await promoteToAvatarFallback(photoID: primaryPhoto.id)
             return
         }
 
@@ -285,7 +304,7 @@ final class ProfilePhotoStore {
         do {
             let (data, response) = try await ImageDownloadClient.data(from: url)
             guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode),
-                  let image = UIImage(data: data) else {
+                  let image = await ProfilePhotoImagePipeline.decodeImage(from: data) else {
                 return
             }
 

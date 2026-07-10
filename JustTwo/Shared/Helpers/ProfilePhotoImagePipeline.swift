@@ -2,15 +2,15 @@ import UIKit
 
 enum ProfilePhotoImagePipeline {
 
-    private static let maxDimension: CGFloat = 1024
-    private static let jpegQuality: CGFloat = 0.8
+    nonisolated private static let maxDimension: CGFloat = 1024
+    nonisolated private static let jpegQuality: CGFloat = 0.8
 
-    static func prepareJPEG(from data: Data) -> PreparedProfilePhoto? {
+    nonisolated static func prepareJPEG(from data: Data) -> PreparedProfilePhoto? {
         guard let image = UIImage(data: data) else { return nil }
         return prepareJPEG(from: image)
     }
 
-    static func prepareJPEG(from image: UIImage) -> PreparedProfilePhoto? {
+    nonisolated static func prepareJPEG(from image: UIImage) -> PreparedProfilePhoto? {
         let resized = resize(image, maxDimension: maxDimension)
         guard let jpegData = resized.jpegData(compressionQuality: jpegQuality) else { return nil }
 
@@ -23,7 +23,31 @@ enum ProfilePhotoImagePipeline {
         )
     }
 
-    private static func resize(_ image: UIImage, maxDimension: CGFloat) -> UIImage {
+    static func prepareJPEG(from data: Data) async -> PreparedProfilePhoto? {
+        await Task.detached(priority: .userInitiated) {
+            Self.prepareJPEG(from: data)
+        }.value
+    }
+
+    static func prepareJPEG(from image: UIImage) async -> PreparedProfilePhoto? {
+        await Task.detached(priority: .userInitiated) {
+            Self.prepareJPEG(from: image)
+        }.value
+    }
+
+    nonisolated static func decodeImage(from data: Data) async -> UIImage? {
+        await Task.detached(priority: .userInitiated) {
+            UIImage(data: data)
+        }.value
+    }
+
+    nonisolated static func jpegData(from image: UIImage, compressionQuality: CGFloat) async -> Data? {
+        await Task.detached(priority: .userInitiated) {
+            image.jpegData(compressionQuality: compressionQuality)
+        }.value
+    }
+
+    nonisolated private static func resize(_ image: UIImage, maxDimension: CGFloat) -> UIImage {
         let size = image.size
         guard size.width > 0, size.height > 0 else { return image }
 

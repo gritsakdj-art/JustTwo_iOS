@@ -46,7 +46,7 @@ struct RemoteProfilePhotoView: View {
 
     @MainActor
     private func loadImage() async {
-        if let cached = ProfilePhotoImageCache.shared.image(for: photo.id) {
+        if let cached = await ProfilePhotoImageCache.shared.loadImage(for: photo.id) {
             displayedImage = cached
             if photo.isPrimary {
                 ProfilePhotoImageCache.shared.saveAvatarFallback(cached)
@@ -64,7 +64,7 @@ struct RemoteProfilePhotoView: View {
         do {
             let (data, response) = try await ImageDownloadClient.data(from: url)
             guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode),
-                  let image = UIImage(data: data) else {
+                  let image = await ProfilePhotoImagePipeline.decodeImage(from: data) else {
                 await handleLoadFailureIfNeeded()
                 return
             }

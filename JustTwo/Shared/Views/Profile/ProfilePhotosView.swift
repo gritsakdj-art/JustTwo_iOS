@@ -441,7 +441,7 @@ struct ProfilePhotosView: View {
             return
         }
 
-        if let prepared = ProfilePhotoImagePipeline.prepareJPEG(from: data) {
+        if let prepared = await ProfilePhotoImagePipeline.prepareJPEG(from: data) {
             do {
                 _ = try await photoStore.uploadPreparedPhoto(
                     prepared,

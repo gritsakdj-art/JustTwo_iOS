@@ -21,6 +21,7 @@ struct AvatarCropEditorView: View {
     @State private var scale: CGFloat = 1
     @State private var accumulatedScale: CGFloat = 1
     @State private var hasAppliedInitialTransform = false
+    @State private var isSaving = false
 
     private let cropSize: CGFloat = 280
 
@@ -63,8 +64,8 @@ struct AvatarCropEditorView: View {
                         .font(.system(size: 16, weight: .bold))
                 }
                 .accessibilityLabel(Text("profile.avatar_editor.save"))
-                .disabled(sourceImage == nil)
-                .foregroundStyle(sourceImage == nil ? Color.secondaryText : Color.brandPrimary)
+                .disabled(sourceImage == nil || isSaving)
+                .foregroundStyle(sourceImage == nil || isSaving ? Color.secondaryText : Color.brandPrimary)
             }
         }
         .onAppear {
@@ -134,6 +135,7 @@ struct AvatarCropEditorView: View {
                 .shadow(color: Color.brandPrimaryGlow.opacity(0.22), radius: 16, x: 0, y: 8)
             }
             .buttonStyle(.spring(pressedScale: 0.98, response: 0.2, dampingFraction: 0.75))
+            .disabled(isSaving)
 
             if sourceImage != nil {
                 Button(role: .destructive) {
@@ -157,6 +159,7 @@ struct AvatarCropEditorView: View {
                     )
                 }
                 .buttonStyle(.spring(pressedScale: 0.98, response: 0.2, dampingFraction: 0.75))
+                .disabled(isSaving)
             }
         }
     }
@@ -316,7 +319,7 @@ struct AvatarCropEditorView: View {
     private func loadSelectedImage() async {
         guard let selectedItem else { return }
         if let data = try? await selectedItem.loadTransferable(type: Data.self),
-           let image = UIImage(data: data) {
+           let image = await ProfilePhotoImagePipeline.decodeImage(from: data) {
             applySelectedImage(image)
         }
     }
@@ -349,31 +352,46 @@ struct AvatarCropEditorView: View {
     }
 
     private func saveCroppedAvatar() {
-        guard let sourceImage else { return }
+        guard let sourceImage, !isSaving else { return }
 
         let viewport = viewportSize.width > 0
             ? viewportSize
             : CGSize(width: cropSize, height: cropSize)
         let transform = AvatarCropTransform(offset: offset, scale: scale, viewport: viewport)
+        let shouldExportImage = didReplaceImage || initialImage == nil
+        let replacedImage = didReplaceImage
+        let imageToExport = sourceImage
 
-        let imageData: Data?
-        if didReplaceImage || initialImage == nil {
-            guard let data = sourceImage.jpegData(compressionQuality: 0.9) else {
-                return
+        isSaving = true
+
+        Task {
+            let imageData: Data?
+            if shouldExportImage {
+                imageData = await ProfilePhotoImagePipeline.jpegData(
+                    from: imageToExport,
+                    compressionQuality: 0.9
+                )
+                guard imageData != nil else {
+                    await MainActor.run {
+                        isSaving = false
+                    }
+                    return
+                }
+            } else {
+                imageData = nil
             }
-            imageData = data
-        } else {
-            imageData = nil
-        }
 
-        onSave(
-            AvatarCropSaveResult(
-                imageData: imageData,
-                transform: transform,
-                didReplaceImage: didReplaceImage
-            )
-        )
-        dismiss()
+            await MainActor.run {
+                onSave(
+                    AvatarCropSaveResult(
+                        imageData: imageData,
+                        transform: transform,
+                        didReplaceImage: replacedImage
+                    )
+                )
+                dismiss()
+            }
+        }
     }
 
 }

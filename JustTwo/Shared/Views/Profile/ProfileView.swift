@@ -212,17 +212,21 @@ struct ProfileView: View {
         }
 
         guard let primaryPhoto = photoStore.primaryPhoto else {
-            editorSourceImage = photoStore.avatarFallbackImage()
+            editorSourceImage = await photoStore.loadAvatarFallbackImage()
             return
         }
 
-        if let cached = photoStore.cachedImage(for: primaryPhoto.id) {
+        if let cached = await photoStore.loadCachedImage(for: primaryPhoto.id) {
             editorSourceImage = cached
             return
         }
 
         await photoStore.ensureCachedImage(for: primaryPhoto.id)
-        editorSourceImage = photoStore.cachedImage(for: primaryPhoto.id) ?? photoStore.avatarFallbackImage()
+        if let cached = await photoStore.loadCachedImage(for: primaryPhoto.id) {
+            editorSourceImage = cached
+            return
+        }
+        editorSourceImage = await photoStore.loadAvatarFallbackImage()
     }
 
     private func handleAvatarSave(_ result: AvatarCropSaveResult) {
@@ -293,16 +297,18 @@ struct ProfileView: View {
             return
         }
 
-        guard let image = UIImage(data: data) else {
-            avatarErrorMessage = String(localized: "profile.photos.error.invalid_image")
-            isAvatarErrorPresented = true
-            return
-        }
-
-        pendingLocalAvatar = image
         isUploadingAvatar = true
 
         Task { @MainActor in
+            guard let image = await ProfilePhotoImagePipeline.decodeImage(from: data) else {
+                isUploadingAvatar = false
+                avatarErrorMessage = String(localized: "profile.photos.error.invalid_image")
+                isAvatarErrorPresented = true
+                return
+            }
+
+            pendingLocalAvatar = image
+
             do {
                 let uploaded = try await photoStore.uploadPhoto(data: data, isPrimary: true)
                 try await photoStore.updateAvatarPresentation(
