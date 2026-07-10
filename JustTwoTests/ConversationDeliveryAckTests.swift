@@ -7,6 +7,17 @@ import Testing
 @Suite("Conversation Delivery Ack Tests")
 struct ConversationDeliveryAckTests {
 
+    @Test("read ack implies delivered boundary locally")
+    func readAckImpliesDeliveredBoundaryLocally() {
+        let coordinator = ConversationDeliveryAckCoordinator.makeForTesting()
+        let conversationID = fixedConversationID()
+        let messageID = fixedMessageID()
+
+        coordinator.markReadAcked(conversationID: conversationID, messageID: messageID)
+        #expect(!coordinator.shouldSendDelivered(conversationID: conversationID, messageID: messageID))
+        #expect(!coordinator.shouldSendRead(conversationID: conversationID, messageID: messageID))
+    }
+
     @Test("dedup prevents repeated delivered ack for same message")
     func dedupPreventsRepeatedDeliveredAck() {
         let coordinator = ConversationDeliveryAckCoordinator.makeForTesting()
@@ -133,6 +144,60 @@ struct ConversationDeliveryAckTests {
         )
 
         #expect(deliveredCalls.count == 1)
+    }
+
+    @Test("sync source schedules delivered ack without requiring chat open")
+    func syncSourceSchedulesDeliveredAckWithoutChatOpen() async throws {
+        let coordinator = ConversationDeliveryAckCoordinator.makeForTesting()
+        var deliveredCalls: [(UUID, UUID)] = []
+        coordinator.markDeliveredHandler = { conversationID, messageID in
+            deliveredCalls.append((conversationID, messageID))
+        }
+
+        let message = try makeMessageDTO(
+            id: fixedMessageID(),
+            conversationID: fixedConversationID(),
+            senderProfileID: fixedOtherProfileID()
+        )
+
+        await coordinator.acknowledgeDeliveredIfNeeded(
+            conversationID: fixedConversationID(),
+            message: message,
+            currentProfileID: fixedCurrentProfileID(),
+            session: makeAuthenticatedSession(),
+            router: AppRouter.shared,
+            source: "sync"
+        )
+
+        #expect(deliveredCalls.count == 1)
+        #expect(deliveredCalls[0].0 == fixedConversationID())
+        #expect(deliveredCalls[0].1 == fixedMessageID())
+    }
+
+    @Test("own outgoing message does not schedule delivered ack")
+    func ownOutgoingMessageDoesNotScheduleDeliveredAck() async throws {
+        let coordinator = ConversationDeliveryAckCoordinator.makeForTesting()
+        var deliveredCalls = 0
+        coordinator.markDeliveredHandler = { _, _ in
+            deliveredCalls += 1
+        }
+
+        let message = try makeMessageDTO(
+            id: fixedMessageID(),
+            conversationID: fixedConversationID(),
+            senderProfileID: fixedCurrentProfileID()
+        )
+
+        await coordinator.acknowledgeDeliveredIfNeeded(
+            conversationID: fixedConversationID(),
+            message: message,
+            currentProfileID: fixedCurrentProfileID(),
+            session: makeAuthenticatedSession(),
+            router: AppRouter.shared,
+            source: "sync"
+        )
+
+        #expect(deliveredCalls == 0)
     }
 
     @Test("initial scroll target centers unread separator when unread exists")

@@ -672,6 +672,17 @@ final class MessengerDeltaSyncService {
                 ]
             )
             persistDeltaMessageCache(message, eventType: eventType.rawValue)
+            if eventType == .messageCreated {
+                // Active-chat path: apply completed above before scheduling ack.
+                scheduleDeliveryAckIfNeeded(
+                    message: message,
+                    conversationID: conversationID,
+                    profileID: profileID,
+                    session: session,
+                    router: router,
+                    source: "sync"
+                )
+            }
             return
         }
 
@@ -711,6 +722,66 @@ final class MessengerDeltaSyncService {
             ]
         )
         persistDeltaMessageCache(message, eventType: eventType.rawValue)
+        if eventType == .messageCreated {
+            // Ack only after local apply/dedup attempt completed. Coordinator + backend
+            // keep boundary monotonic for duplicates.
+            scheduleDeliveryAckIfNeeded(
+                message: message,
+                conversationID: conversationID,
+                profileID: profileID,
+                session: session,
+                router: router,
+                source: "sync"
+            )
+        }
+    }
+
+    private func scheduleDeliveryAckIfNeeded(
+        message: MessageDTO,
+        conversationID: UUID,
+        profileID: UUID,
+        session: SessionStore,
+        router: AppRouter,
+        source: String
+    ) {
+        guard message.deletedAt == nil else { return }
+        guard message.senderProfileID != profileID else { return }
+        guard session.isFullyAuthenticated else {
+            MessengerDiagnostics.event(
+                .deliveredAckSkipped,
+                conversationID: conversationID,
+                messageID: message.id,
+                metadata: ["reason": "unauthenticated", "source": source]
+            )
+            return
+        }
+
+        MessengerDiagnostics.event(
+            .deliveryMessageObserved,
+            conversationID: conversationID,
+            messageID: message.id,
+            metadata: [
+                "source": source,
+                "isAppForeground": "\(MessengerSessionSupport.isAppForegroundActive)"
+            ]
+        )
+        MessengerDiagnostics.event(
+            .deliveryAckScheduled,
+            conversationID: conversationID,
+            messageID: message.id,
+            metadata: ["source": source]
+        )
+
+        Task { @MainActor in
+            await ConversationDeliveryAckCoordinator.shared.acknowledgeDeliveredIfNeeded(
+                conversationID: conversationID,
+                message: message,
+                currentProfileID: profileID,
+                session: session,
+                router: router,
+                source: source
+            )
+        }
     }
 
     private func persistDeltaMessageCache(_ message: MessageDTO, eventType: String) {

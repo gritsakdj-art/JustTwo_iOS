@@ -109,6 +109,21 @@ enum MessengerDiagnosticEvent: String, Sendable {
     case realtimeEventSkipped
     case realtimeEventFallbackRefresh
     case realtimeActiveChatViewModelNilFallback
+    case realtimeConnectRequested
+    case realtimeConnectionReady
+    case realtimeDisconnected
+    case realtimeReconnectScheduled
+    case realtimeSubscriptionRequested
+
+    case presenceEventReceived
+    case presenceStateApplied
+    case presenceStateIgnored
+    case presenceCacheLoaded
+
+    case deliveryMessageObserved
+    case deliveryAckScheduled
+    case deliveryStatusEventReceived
+    case deliveryStatusApplied
 
     case cacheMergeStarted
     case cacheMergeCompleted

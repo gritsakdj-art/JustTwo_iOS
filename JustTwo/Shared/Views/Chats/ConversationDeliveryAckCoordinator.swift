@@ -119,7 +119,8 @@ final class ConversationDeliveryAckCoordinator {
         message: MessageDTO,
         currentProfileID: UUID,
         session: SessionStore?,
-        router: AppRouter?
+        router: AppRouter?,
+        source: String = "realtime"
     ) async {
         guard let session, let router else {
             NetworkDebug.log("Messenger delivered ack skipped: missing session/router")
@@ -127,7 +128,7 @@ final class ConversationDeliveryAckCoordinator {
                 .deliveredAckSkipped,
                 conversationID: conversationID,
                 messageID: message.id,
-                metadata: ["reason": "missingSessionOrRouter", "source": "realtimeInactiveConversation"]
+                metadata: ["reason": "missingSessionOrRouter", "source": source]
             )
             return
         }
@@ -142,7 +143,7 @@ final class ConversationDeliveryAckCoordinator {
             isDeleted: message.deletedAt != nil,
             session: session,
             router: router,
-            source: "realtime inactive conversation"
+            source: source
         )
     }
 

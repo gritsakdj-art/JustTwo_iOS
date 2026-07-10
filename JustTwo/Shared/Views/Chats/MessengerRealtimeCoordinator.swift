@@ -294,7 +294,8 @@ final class MessengerRealtimeCoordinator {
                     message: message,
                     currentProfileID: profileID,
                     session: self.session,
-                    router: self.router
+                    router: self.router,
+                    source: "realtime"
                 )
             }
 
@@ -578,6 +579,19 @@ final class MessengerRealtimeCoordinator {
             await MainActor.run {
                 guard self.activeConversationID == conversationID else { return }
                 if let currentProfileID, profileID == currentProfileID { return }
+                let previousOnline = self.presenceStore.isOnline(profileID: profileID)
+                let applied = self.presenceStore.applyTypingOnlineHint(profileID: profileID)
+                MessengerDiagnostics.event(
+                    .presenceStateApplied,
+                    conversationID: conversationID,
+                    metadata: [
+                        "source": "typingHint",
+                        "incomingOnline": "true",
+                        "previousOnline": "\(previousOnline)",
+                        "applied": "\(applied)",
+                        "profileID": MessengerDiagnostics.sanitizeID(profileID)
+                    ]
+                )
                 self.activeChatViewModel?.applyTypingStarted(profileID: profileID)
             }
         }
@@ -587,6 +601,7 @@ final class MessengerRealtimeCoordinator {
         Task { [weak self] in
             await MainActor.run {
                 guard self?.activeConversationID == conversationID else { return }
+                self?.presenceStore.clearTypingHint(profileID: profileID)
                 self?.activeChatViewModel?.applyTypingStopped(profileID: profileID)
             }
         }
@@ -597,10 +612,36 @@ final class MessengerRealtimeCoordinator {
             guard let self else { return }
             let currentProfileID = await self.currentProfileID()
             await MainActor.run {
+                MessengerDiagnostics.event(
+                    .presenceEventReceived,
+                    metadata: [
+                        "source": "realtime",
+                        "incomingOnline": "\(payload.status == .online)",
+                        "profileID": MessengerDiagnostics.sanitizeID(payload.profileID)
+                    ]
+                )
                 if let currentProfileID, payload.profileID == currentProfileID {
+                    MessengerDiagnostics.event(
+                        .presenceStateIgnored,
+                        metadata: [
+                            "source": "realtime",
+                            "reason": "selfEvent",
+                            "profileID": MessengerDiagnostics.sanitizeID(payload.profileID)
+                        ]
+                    )
                     return
                 }
-                self.presenceStore.apply(payload)
+                let previousOnline = self.presenceStore.isOnline(profileID: payload.profileID)
+                let applied = self.presenceStore.apply(payload)
+                MessengerDiagnostics.event(
+                    applied ? .presenceStateApplied : .presenceStateIgnored,
+                    metadata: [
+                        "source": "realtime",
+                        "incomingOnline": "\(payload.status == .online)",
+                        "previousOnline": "\(previousOnline)",
+                        "profileID": MessengerDiagnostics.sanitizeID(payload.profileID)
+                    ]
+                )
             }
         }
     }
@@ -611,7 +652,17 @@ final class MessengerRealtimeCoordinator {
         NetworkDebug.log("Messenger realtime reconnect reconcile started")
 
         resetTrackedSubscriptions()
-        presenceStore.clearAll()
+        // Mark retained presence as provisional (TTL-bounded). Not a new backend observation.
+        // Full freshness requires PR20B/PR20C presence summary.
+        presenceStore.markAllPreservedAcrossReconnect()
+        MessengerDiagnostics.event(
+            .presenceCacheLoaded,
+            metadata: [
+                "source": "preserved",
+                "reason": "presenceMarkedPreservedAcrossReconnect",
+                "trackedCount": "\(presenceStore.trackedCount)"
+            ]
+        )
 
         if let session, let router {
             await MessengerSyncEngine.shared.runGlobalSync(

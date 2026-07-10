@@ -86,6 +86,13 @@ final class RealtimeClient {
         request.setValue("Bearer \(jwt)", forHTTPHeaderField: "Authorization")
 
         NetworkDebug.log("Realtime connect start")
+        MessengerDiagnostics.event(
+            .realtimeConnectRequested,
+            metadata: [
+                "connectionState": reconnectAttempt == 0 ? "connecting" : "reconnecting",
+                "retryAttempt": "\(reconnectAttempt)"
+            ]
+        )
 
         let socket = sessionProvider().webSocketTask(with: request)
         task = socket
@@ -253,6 +260,13 @@ final class RealtimeClient {
             reconnectAttempt = 0
             state = .connected(connectionID: payload.connectionID)
             NetworkDebug.log("Realtime connection ready")
+            MessengerDiagnostics.event(
+                .realtimeConnectionReady,
+                metadata: [
+                    "connectionState": "connected",
+                    "hasConnectionID": payload.connectionID == nil ? "false" : "true"
+                ]
+            )
             Task { [weak self] in
                 await self?.flushPendingSubscriptions()
             }
@@ -321,6 +335,13 @@ final class RealtimeClient {
             state = .disconnected
             PresenceStore.shared.clearAll()
             NetworkDebug.log("Realtime disconnected")
+            MessengerDiagnostics.event(
+                .realtimeDisconnected,
+                metadata: [
+                    "reason": "explicitDisconnect",
+                    "connectionState": "disconnected"
+                ]
+            )
         }
     }
 
@@ -347,6 +368,14 @@ final class RealtimeClient {
         state = .reconnecting(attempt: attempt)
 
         NetworkDebug.log("Realtime reconnect scheduled attempt=\(attempt) delay=\(delay)s")
+        MessengerDiagnostics.event(
+            .realtimeReconnectScheduled,
+            metadata: [
+                "retryAttempt": "\(attempt)",
+                "durationMs": "\(Int(delay * 1_000))",
+                "connectionState": "reconnecting"
+            ]
+        )
 
         reconnectTask = Task { [weak self] in
             if delay > 0 {

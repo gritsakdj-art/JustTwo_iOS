@@ -323,6 +323,22 @@
 - **Manual smoke:** not run (checklist in PR19 report).
 - Out of scope: backend retention/metrics (PR20).
 
+## 2026-07-10 (PR20A)
+
+- Branch: `ios-messenger-presence-delivery-audit-pr20a`.
+- Presence/delivery diagnostics audit: architecture map, privacy-safe events, local stabilizations.
+- `PresenceStore`: authoritative realtime vs ephemeral typingHint (TTL 15s) vs provisional preserved (TTL 90s).
+- Reconnect marks presence `.preserved` (not a new backend observation); logout/explicit disconnect still clear.
+- Delta sync schedules delivered ack only after local apply completes (still foreground-gated).
+- Active chat: `markDelivered` then `markRead` independently; backend read implies delivered.
+- Diagnostics: realtime connect/ready/disconnect/reconnect; presence apply/ignore; delivery observed/scheduled.
+- Tests: PresenceTests TTL/hint/preserved; ConversationDeliveryAckTests sync + read-implies-delivered local.
+- Docs: `Docs/MessengerPresenceAndDeliveryDiagnostics.md`.
+- Backend companion: `backend-messenger-presence-delivery-audit-pr20a` (close-before-publish guards + barrier tests).
+- Backend has **no** `ProjectStatus.md`; status lives in `Docs/REALTIME.md`.
+- **Manual smoke:** NOT RUN.
+- Deferred: persisted lastSeen (PR20B), last-seen UI (PR20C), delivery hardening (PR20D1), background ack (PR20D2).
+
 ## Notes
 
 - Continue adding completed changes here after each meaningful update.

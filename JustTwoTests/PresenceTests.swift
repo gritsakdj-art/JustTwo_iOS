@@ -98,6 +98,83 @@ struct PresenceTests {
     }
 
     @MainActor
+    @Test("typing hint marks peer online without overwriting realtime offline")
+    func typingHintMarksPeerOnlineWithoutOverwritingRealtimeOffline() {
+        let store = PresenceStore.makeForTesting()
+        let profileID = fixedOtherProfileID()
+
+        #expect(store.applyTypingOnlineHint(profileID: profileID))
+        #expect(store.isOnline(profileID: profileID))
+        #expect(store.source(for: profileID) == .typingHint)
+
+        store.apply(profileID: profileID, status: .offline, lastSeenAt: Date(), source: .realtime)
+        #expect(!store.isOnline(profileID: profileID))
+        #expect(store.applyTypingOnlineHint(profileID: profileID) == false)
+        #expect(!store.isOnline(profileID: profileID))
+        #expect(store.source(for: profileID) == .realtime)
+    }
+
+    @MainActor
+    @Test("typing hint expires after TTL")
+    func typingHintExpiresAfterTTL() {
+        var now = Date(timeIntervalSince1970: 1_000)
+        let store = PresenceStore.makeForTesting(now: { now })
+        let profileID = fixedOtherProfileID()
+
+        #expect(store.applyTypingOnlineHint(profileID: profileID))
+        #expect(store.isOnline(profileID: profileID))
+
+        now = now.addingTimeInterval(PresenceStore.typingHintTTL + 1)
+        #expect(!store.isOnline(profileID: profileID))
+        #expect(store.source(for: profileID) == nil)
+    }
+
+    @MainActor
+    @Test("typing stopped clears typing hint only")
+    func typingStoppedClearsTypingHintOnly() {
+        let store = PresenceStore.makeForTesting()
+        let profileID = fixedOtherProfileID()
+
+        _ = store.applyTypingOnlineHint(profileID: profileID)
+        store.clearTypingHint(profileID: profileID)
+        #expect(!store.isOnline(profileID: profileID))
+
+        _ = store.apply(profileID: profileID, status: .online, lastSeenAt: nil, source: .realtime)
+        store.clearTypingHint(profileID: profileID)
+        #expect(store.isOnline(profileID: profileID))
+        #expect(store.source(for: profileID) == .realtime)
+    }
+
+    @MainActor
+    @Test("preserved reconnect presence expires without realtime confirmation")
+    func preservedReconnectPresenceExpiresWithoutRealtimeConfirmation() {
+        var now = Date(timeIntervalSince1970: 2_000)
+        let store = PresenceStore.makeForTesting(now: { now })
+        let profileID = fixedOtherProfileID()
+
+        _ = store.apply(profileID: profileID, status: .online, lastSeenAt: nil, source: .realtime)
+        store.markAllPreservedAcrossReconnect()
+        #expect(store.source(for: profileID) == .preserved)
+        #expect(store.isOnline(profileID: profileID))
+
+        now = now.addingTimeInterval(PresenceStore.preservedPresenceTTL + 1)
+        #expect(!store.isOnline(profileID: profileID))
+    }
+
+    @MainActor
+    @Test("realtime online overwrites typing hint")
+    func realtimeOnlineOverwritesTypingHint() {
+        let store = PresenceStore.makeForTesting()
+        let profileID = fixedOtherProfileID()
+
+        _ = store.applyTypingOnlineHint(profileID: profileID)
+        _ = store.apply(profileID: profileID, status: .online, lastSeenAt: nil, source: .realtime)
+
+        #expect(store.isOnline(profileID: profileID))
+        #expect(store.source(for: profileID) == .realtime)
+    }
+
+    @MainActor
     @Test("conversation row online state reflects presence store")
     func conversationRowOnlineState() {
         let store = PresenceStore.makeForTesting()
