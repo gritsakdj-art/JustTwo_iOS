@@ -125,26 +125,44 @@ final class SwiftDataMessengerLocalStore: MessengerLocalStoreProtocol {
         let context = modelContext
         let conversationKey = conversationID.uuidString
 
-        var descriptor = FetchDescriptor<LocalMessengerMessage>(
-            predicate: #Predicate { message in
-                message.conversationID == conversationKey
-            },
-            sortBy: [SortDescriptor(\.createdAt, order: .reverse)]
+        let entities: [LocalMessengerMessage]
+        if let cutoff = before {
+            var descriptor = FetchDescriptor<LocalMessengerMessage>(
+                predicate: #Predicate { message in
+                    message.conversationID == conversationKey && message.createdAt < cutoff
+                },
+                sortBy: [SortDescriptor(\.createdAt, order: .reverse)]
+            )
+            descriptor.fetchLimit = max(1, limit)
+            entities = try context.fetch(descriptor)
+        } else {
+            var descriptor = FetchDescriptor<LocalMessengerMessage>(
+                predicate: #Predicate { message in
+                    message.conversationID == conversationKey
+                },
+                sortBy: [SortDescriptor(\.createdAt, order: .reverse)]
+            )
+            descriptor.fetchLimit = max(1, limit)
+            entities = try context.fetch(descriptor)
+        }
+
+        let messageIDs = Set(entities.map(\.id))
+        let attachmentsByMessageID = try fetchAttachmentSnapshots(
+            messageIDs: messageIDs,
+            conversationID: conversationKey,
+            context: context
         )
-        descriptor.fetchLimit = max(1, limit)
+        let reactionsByMessageID = try fetchReactionAggregateSnapshots(
+            messageIDs: messageIDs,
+            conversationID: conversationKey,
+            context: context
+        )
 
-        let entities = try context.fetch(descriptor)
-        let filtered = before.map { cutoff in
-            entities.filter { $0.createdAt < cutoff }
-        } ?? entities
-
-        return try filtered.map { entity in
-            let attachments = try fetchAttachmentSnapshots(messageID: entity.id, context: context)
-            let reactions = try fetchReactionAggregateSnapshots(messageID: entity.id, context: context)
-            return MessengerLocalMapping.messageSnapshot(
+        return entities.map { entity in
+            MessengerLocalMapping.messageSnapshot(
                 from: entity,
-                attachments: attachments,
-                reactions: reactions
+                attachments: attachmentsByMessageID[entity.id] ?? [],
+                reactions: reactionsByMessageID[entity.id] ?? []
             )
         }
     }
@@ -764,6 +782,24 @@ private extension SwiftDataMessengerLocalStore {
         return try context.fetch(descriptor).map(MessengerLocalMapping.attachmentSnapshot(from:))
     }
 
+    func fetchAttachmentSnapshots(
+        messageIDs: Set<String>,
+        conversationID: String,
+        context: ModelContext
+    ) throws -> [String: [LocalAttachmentSnapshot]] {
+        guard !messageIDs.isEmpty else { return [:] }
+
+        let descriptor = FetchDescriptor<LocalMessengerAttachment>(
+            predicate: #Predicate { attachment in
+                attachment.conversationID == conversationID
+            }
+        )
+        let snapshots = try context.fetch(descriptor)
+            .filter { messageIDs.contains($0.messageID) }
+            .map(MessengerLocalMapping.attachmentSnapshot(from:))
+        return Dictionary(grouping: snapshots, by: \.messageID)
+    }
+
     func fetchReactionAggregateSnapshots(
         messageID: String,
         context: ModelContext
@@ -772,6 +808,24 @@ private extension SwiftDataMessengerLocalStore {
             predicate: #Predicate { $0.messageID == messageID }
         )
         return try context.fetch(descriptor).map(MessengerLocalMapping.reactionAggregateSnapshot(from:))
+    }
+
+    func fetchReactionAggregateSnapshots(
+        messageIDs: Set<String>,
+        conversationID: String,
+        context: ModelContext
+    ) throws -> [String: [LocalReactionAggregateSnapshot]] {
+        guard !messageIDs.isEmpty else { return [:] }
+
+        let descriptor = FetchDescriptor<LocalMessengerReactionAggregate>(
+            predicate: #Predicate { aggregate in
+                aggregate.conversationID == conversationID
+            }
+        )
+        let snapshots = try context.fetch(descriptor)
+            .filter { messageIDs.contains($0.messageID) }
+            .map(MessengerLocalMapping.reactionAggregateSnapshot(from:))
+        return Dictionary(grouping: snapshots, by: \.messageID)
     }
 
     func fetchAttachmentEntity(id: String, context: ModelContext) throws -> LocalMessengerAttachment? {

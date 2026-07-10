@@ -177,6 +177,169 @@ struct MessengerLocalStoreTests {
     }
 
     @Test
+    func fetchLocalMessagesWithNilBeforeReturnsNewestLimit() async throws {
+        let store = makeStore()
+        let seeded = try await seedPaginatedMessages(count: 25, store: store)
+
+        let page = try await store.fetchLocalMessages(
+            conversationID: conversationID,
+            limit: 5,
+            before: nil
+        )
+
+        #expect(page.count == 5)
+        let expectedNewestIDs = Array(seeded.suffix(5).reversed()).map(\.uuidString)
+        #expect(page.map(\.id) == expectedNewestIDs)
+    }
+
+    @Test
+    func fetchLocalMessagesWithBeforeReturnsPageOlderThanCutoff() async throws {
+        let store = makeStore()
+        let seeded = try await seedPaginatedMessages(count: 25, store: store)
+        let cutoffMessage = seeded[15]
+        let cutoff = isoDate("2026-06-26T10:\(String(format: "%02d", 15)):00Z")
+
+        let page = try await store.fetchLocalMessages(
+            conversationID: conversationID,
+            limit: 5,
+            before: cutoff
+        )
+
+        #expect(page.count == 5)
+        #expect(page.allSatisfy { $0.createdAt < cutoff })
+        let expectedOlderIDs = (10...14).reversed().map { seeded[$0].uuidString }
+        #expect(page.map(\.id) == expectedOlderIDs)
+        #expect(!page.contains(where: { $0.id == cutoffMessage.uuidString }))
+    }
+
+    @Test
+    func fetchLocalMessagesWithBeforeReturnsFullEligiblePageNotNewestWindow() async throws {
+        let store = makeStore()
+        let seeded = try await seedPaginatedMessages(count: 25, store: store)
+        let cutoff = isoDate("2026-06-26T10:10:00Z")
+
+        let page = try await store.fetchLocalMessages(
+            conversationID: conversationID,
+            limit: 20,
+            before: cutoff
+        )
+
+        #expect(page.count == 10)
+        #expect(page.allSatisfy { $0.createdAt < cutoff })
+        let expectedEligibleIDs = (0...9).reversed().map { seeded[$0].uuidString }
+        #expect(page.map(\.id) == expectedEligibleIDs)
+    }
+
+    @Test
+    func fetchLocalMessagesBatchLoadsAttachmentsForMultipleMessages() async throws {
+        let store = makeStore()
+        let firstID = UUID(uuidString: "11111111-1111-1111-1111-111111111111")!
+        let secondID = UUID(uuidString: "22222222-2222-2222-2222-222222222222")!
+        let thirdID = UUID(uuidString: "33333333-3333-3333-3333-333333333333")!
+        let firstAttachmentID = UUID(uuidString: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")!
+        let secondAttachmentID = UUID(uuidString: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb")!
+        let thirdAttachmentID = UUID(uuidString: "cccccccc-cccc-cccc-cccc-cccccccccccc")!
+
+        try await store.upsertMessages([
+            makeImageMessageDTO(id: firstID, attachmentID: firstAttachmentID, createdAt: "2026-06-26T10:22:00Z"),
+            makeImageMessageDTO(id: secondID, attachmentID: secondAttachmentID, createdAt: "2026-06-26T10:21:00Z"),
+            makeImageMessageDTO(id: thirdID, attachmentID: thirdAttachmentID, createdAt: "2026-06-26T10:20:00Z")
+        ], conversationID: conversationID)
+
+        let page = try await store.fetchLocalMessages(
+            conversationID: conversationID,
+            limit: 3,
+            before: nil
+        )
+
+        #expect(page.count == 3)
+        #expect(page[0].attachments.first?.id == firstAttachmentID.uuidString.lowercased())
+        #expect(page[1].attachments.first?.id == secondAttachmentID.uuidString.lowercased())
+        #expect(page[2].attachments.first?.id == thirdAttachmentID.uuidString.lowercased())
+    }
+
+    @Test
+    func fetchLocalMessagesBatchLoadsReactionsForMultipleMessages() async throws {
+        let store = makeStore()
+        let firstID = UUID(uuidString: "44444444-4444-4444-4444-444444444444")!
+        let secondID = UUID(uuidString: "55555555-5555-5555-5555-555555555555")!
+        let thirdID = UUID(uuidString: "66666666-6666-6666-6666-666666666666")!
+        let first = try makeTextMessageDTO(
+            id: firstID,
+            clientMessageID: "reaction-client-1",
+            body: "First",
+            createdAt: "2026-06-26T10:32:00Z",
+            reactions: """
+            [
+              { "emoji": "👍", "count": 3, "reactedByMe": true }
+            ]
+            """
+        )
+        let second = try makeTextMessageDTO(
+            id: secondID,
+            clientMessageID: "reaction-client-2",
+            body: "Second",
+            createdAt: "2026-06-26T10:31:00Z",
+            reactions: """
+            [
+              { "emoji": "❤️", "count": 2, "reactedByMe": false },
+              { "emoji": "😂", "count": 1, "reactedByMe": true }
+            ]
+            """
+        )
+        let third = try makeTextMessageDTO(
+            id: thirdID,
+            clientMessageID: "reaction-client-3",
+            body: "Third",
+            createdAt: "2026-06-26T10:30:00Z",
+            reactions: """
+            [
+              { "emoji": "🔥", "count": 4, "reactedByMe": false }
+            ]
+            """
+        )
+
+        try await store.upsertMessages([first, second, third], conversationID: conversationID)
+        try await store.upsertReactions(from: first)
+        try await store.upsertReactions(from: second)
+        try await store.upsertReactions(from: third)
+
+        let page = try await store.fetchLocalMessages(
+            conversationID: conversationID,
+            limit: 3,
+            before: nil
+        )
+
+        #expect(page.count == 3)
+        let reactionsByMessageID = Dictionary(uniqueKeysWithValues: page.map { ($0.id, $0.reactions) })
+
+        let firstReactions = try #require(reactionsByMessageID[firstID.uuidString])
+        #expect(firstReactions.count == 1)
+        let thumbsUp = try #require(firstReactions.first { $0.emoji == "👍" })
+        #expect(thumbsUp.count == 3)
+        #expect(thumbsUp.reactedByMe == true)
+        #expect(thumbsUp.id == "\(firstID.uuidString):👍")
+
+        let secondReactions = try #require(reactionsByMessageID[secondID.uuidString])
+        #expect(secondReactions.count == 2)
+        let heart = try #require(secondReactions.first { $0.emoji == "❤️" })
+        #expect(heart.count == 2)
+        #expect(heart.reactedByMe == false)
+        #expect(heart.id == "\(secondID.uuidString):❤️")
+        let joy = try #require(secondReactions.first { $0.emoji == "😂" })
+        #expect(joy.count == 1)
+        #expect(joy.reactedByMe == true)
+        #expect(joy.id == "\(secondID.uuidString):😂")
+
+        let thirdReactions = try #require(reactionsByMessageID[thirdID.uuidString])
+        #expect(thirdReactions.count == 1)
+        let fire = try #require(thirdReactions.first { $0.emoji == "🔥" })
+        #expect(fire.count == 4)
+        #expect(fire.reactedByMe == false)
+        #expect(fire.id == "\(thirdID.uuidString):🔥")
+    }
+
+    @Test
     func reactionAggregatesMapEmojiCountAndReactedByMe() async throws {
         let store = makeStore()
         let dto = try makeTextMessageDTO(
@@ -420,6 +583,7 @@ private extension MessengerLocalStoreTests {
         id: UUID? = nil,
         clientMessageID: String = "client-1",
         body: String = "Hello",
+        createdAt: String = "2026-06-26T13:18:31Z",
         editedAt: String? = nil,
         reactions: String = "[]"
     ) throws -> MessageDTO {
@@ -439,17 +603,41 @@ private extension MessengerLocalStoreTests {
           "reactions": \(reactions),
           "deliveryStatus": "sent",
           "clientMessageID": "\(clientMessageID)",
-          "createdAt": "2026-06-26T13:18:31Z",
+          "createdAt": "\(createdAt)",
           "editedAt": \(editedAt == nil ? "null" : "\"\(editedAt!)\""),
           "deletedAt": null
         }
         """.utf8))
     }
 
-    func makeImageMessageDTO(deleted: Bool = false) -> MessageDTO {
+    func seedPaginatedMessages(count: Int, store: MessengerLocalStore) async throws -> [UUID] {
+        var ids: [UUID] = []
+        var dtos: [MessageDTO] = []
+
+        for index in 0..<count {
+            let id = UUID(uuidString: String(format: "00000000-0000-4000-8000-%012x", index))!
+            ids.append(id)
+            dtos.append(try makeTextMessageDTO(
+                id: id,
+                clientMessageID: "client-\(index)",
+                body: "Message \(index)",
+                createdAt: "2026-06-26T10:\(String(format: "%02d", index)):00Z"
+            ))
+        }
+
+        try await store.upsertMessages(dtos, conversationID: conversationID)
+        return ids
+    }
+
+    func makeImageMessageDTO(
+        id: UUID = UUID(uuidString: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb")!,
+        attachmentID: UUID = UUID(uuidString: "dddddddd-dddd-dddd-dddd-dddddddddddd")!,
+        createdAt: String = "2026-06-26T13:18:31Z",
+        deleted: Bool = false
+    ) -> MessageDTO {
         try! JSONCoding.decoder.decode(MessageDTO.self, from: Data("""
         {
-          "id": "\(messageID.uuidString)",
+          "id": "\(id.uuidString)",
           "conversationID": "\(conversationID.uuidString)",
           "senderProfileID": "\(profileID.uuidString)",
           "kind": "image",
@@ -468,8 +656,8 @@ private extension MessengerLocalStoreTests {
           "replyTo": null,
           "reactions": [],
           "deliveryStatus": "sent",
-          "clientMessageID": "image-client",
-          "createdAt": "2026-06-26T13:18:31Z",
+          "clientMessageID": "image-client-\(id.uuidString)",
+          "createdAt": "\(createdAt)",
           "editedAt": null,
           "deletedAt": \(deleted ? "\"2026-07-02T13:45:00Z\"" : "null")
         }

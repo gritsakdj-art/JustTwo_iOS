@@ -495,23 +495,36 @@ Manual smoke:
 
 Residual risks / follow-up:
 - Long background warmup awaits are still cooperative only at explicit checkpoint guards; this is acceptable for Batch C but should stay visible during smoke.
-- Batch D–E unchanged.
+- Batch E unchanged.
 
 ### Batch D - Persistence And Local Cache
 
-Status: Not started
+Status: Implemented (pending manual smoke)
 
-Branch:
+Branch: `batch-d-persistence-local-cache`
 
 Files changed:
+- `JustTwo/Core/Persistence/Messenger/SwiftDataMessengerLocalStore.swift`
+- `JustTwoTests/MessengerLocalStoreTests.swift`
 
 Summary:
+- `fetchLocalMessages(before:limit:)`: `before` cutoff is applied in the SwiftData predicate (`createdAt < cutoff`) before `fetchLimit`, so pagination returns older messages instead of the newest window post-filtered in memory.
+- Attachment and reaction snapshots for a page are loaded in two batched fetches keyed by message ID (removes per-message N+1 queries while preserving entity order and mapping).
+- Follow-up audit fix: added multi-message batched reaction coverage to ensure grouped reaction snapshots stay attached to the correct message.
+- Pending media file I/O left unchanged: `MessengerPendingMediaStore.delete/clearAll` are already `nonisolated`.
 
 Build/tests:
+- `xcodebuild -project JustTwo.xcodeproj -scheme JustTwo -destination 'platform=iOS Simulator,id=D1806BCC-C599-4B19-A8F4-96B9A3BCE81E' build` — SUCCEEDED
+- `xcodebuild test ... -only-testing:JustTwoTests/MessengerLocalStoreTests` — 20 tests SUCCEEDED
+- Follow-up audit fix validation: `git diff --check` — SUCCEEDED
 
 Manual smoke:
+- Not run (see Batch D checklist in prompt above)
 
 Residual risks / follow-up:
+- `fetchLocalMessages(before:)` is not yet wired from `MessageCacheStore` pagination (still REST-only); local before-pagination is fixed and tested but needs integration smoke when offline pagination is enabled.
+- Batched attachment/reaction fetch still loads all conversation rows then filters in memory; acceptable for typical chat sizes but could move to an `IN`-style predicate later if profiles grow large.
+- Batch E unchanged.
 
 ### Batch E - Profile Photo And Misc MainActor I/O
 
