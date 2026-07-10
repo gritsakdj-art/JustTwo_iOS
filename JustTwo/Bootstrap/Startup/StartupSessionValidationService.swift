@@ -79,7 +79,7 @@ final class StartupSessionValidationService {
             session.connectRealtimeIfEligible()
             session.syncPushRegistrationIfEligible()
 
-            await AppStartupCoordinator.shared.runBackgroundNetworkWarmup(
+            AppStartupCoordinator.shared.scheduleBackgroundNetworkWarmup(
                 session: session,
                 router: router
             )

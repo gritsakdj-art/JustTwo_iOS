@@ -22,6 +22,7 @@ final class ConversationListViewModel {
     }
     private var didLoad = false
     private var refreshTask: Task<Void, Never>?
+    private var networkRefreshTask: Task<Void, Never>?
     private var refreshGeneration = 0
     private var listContentGeneration = 0
     private var appliedRealtimeMessageIDs: Set<UUID> = []
@@ -36,6 +37,8 @@ final class ConversationListViewModel {
     func reset() {
         refreshTask?.cancel()
         refreshTask = nil
+        networkRefreshTask?.cancel()
+        networkRefreshTask = nil
         conversations = []
         isLoading = false
         errorMessage = nil
@@ -93,7 +96,7 @@ final class ConversationListViewModel {
             return
         }
 
-        await refreshNetwork(session: session, router: router)
+        await refreshNetworkCoalesced(session: session, router: router)
     }
 
     func activateRealtime(session: SessionStore, router: AppRouter) {
@@ -113,7 +116,7 @@ final class ConversationListViewModel {
 
         let task = Task { @MainActor in
             _ = await self.performLocalHydrate(session: session)
-            await self.refreshNetwork(session: session, router: router)
+            await self.refreshNetworkCoalesced(session: session, router: router)
         }
         refreshTask = task
         await task.value
@@ -123,6 +126,31 @@ final class ConversationListViewModel {
     }
 
     func refreshNetwork(session: SessionStore, router: AppRouter) async {
+        await refreshNetworkCoalesced(session: session, router: router)
+    }
+
+    private func refreshNetworkCoalesced(session: SessionStore, router: AppRouter) async {
+        if let networkRefreshTask {
+            MessengerDiagnostics.event(
+                .messengerConversationCacheNetworkRefreshCoalesced,
+                metadata: ["cachedCount": "\(conversations.count)"]
+            )
+            await networkRefreshTask.value
+            return
+        }
+
+        let task = Task { @MainActor in
+            await self.performNetworkRefreshFlow(session: session, router: router)
+        }
+        networkRefreshTask = task
+        await task.value
+
+        if networkRefreshTask == task {
+            networkRefreshTask = nil
+        }
+    }
+
+    private func performNetworkRefreshFlow(session: SessionStore, router: AppRouter) async {
         if NetworkPathMonitor.shared.shouldSkipNetworkBecauseOffline {
             MessengerDiagnostics.event(
                 .messengerNetworkRequestSkippedOffline,
@@ -182,7 +210,7 @@ final class ConversationListViewModel {
             MessengerDiagnostics.event(.messengerConversationRefreshSkippedRecent)
             return
         }
-        await refreshNetwork(session: session, router: router)
+        await refreshNetworkCoalesced(session: session, router: router)
     }
 
     @discardableResult
@@ -229,7 +257,7 @@ final class ConversationListViewModel {
 
     private func performRefresh(session: SessionStore, router: AppRouter) async {
         _ = await performLocalHydrate(session: session)
-        await refreshNetwork(session: session, router: router)
+        await refreshNetworkCoalesced(session: session, router: router)
     }
 
     private func performNetworkRefresh(
