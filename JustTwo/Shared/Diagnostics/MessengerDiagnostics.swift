@@ -274,6 +274,7 @@ enum MessengerDiagnosticEvent: String, Sendable {
     case messengerConversationCacheHydratedUI
     case messengerConversationCacheEmpty
     case messengerConversationCacheNetworkRefreshStarted
+    case messengerConversationCacheNetworkRefreshCoalesced
     case messengerConversationCacheNetworkRefreshSucceeded
     case messengerConversationCacheNetworkRefreshFailed
     case messengerConversationCacheUpsertStarted
@@ -371,6 +372,8 @@ enum MessengerDiagnosticEvent: String, Sendable {
     case startupBackgroundNetworkWarmupScheduled
     case startupBackgroundNetworkWarmupSucceeded
     case startupBackgroundNetworkWarmupFailed
+    case startupBackgroundNetworkWarmupSkippedDuplicate
+    case startupBackgroundNetworkWarmupStaleSessionAborted
 
     case startupSkippedNetworkCriticalBecauseCacheAvailable
     case startupProfilePhotosDeferred

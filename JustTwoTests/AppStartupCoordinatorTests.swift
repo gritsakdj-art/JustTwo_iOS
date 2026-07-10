@@ -32,6 +32,22 @@ struct AppStartupCoordinatorTests {
 
         #expect(try await MessengerLocalStore.shared.fetchLocalConversations().isEmpty)
     }
+
+    @Test
+    func backgroundWarmupSkipsDuplicateForLoadedUser() async {
+        let flight = StartupSingleFlight()
+        var runCount = 0
+
+        await flight.run(key: "user-1", force: false) {
+            runCount += 1
+        }
+        await flight.run(key: "user-1", force: false) {
+            runCount += 1
+        }
+
+        #expect(runCount == 1)
+        #expect(flight.loadedKey == "user-1")
+    }
 }
 
 private func makeConversationDTOForResetTest() throws -> ConversationDTO {

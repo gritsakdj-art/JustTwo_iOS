@@ -410,17 +410,15 @@ final class MessageCacheStore {
         }
 
         if entries[conversationID]?.messages.isEmpty == false {
-            Task { @MainActor in
-                _ = await self.loadRecentMessagesIfNeeded(
-                    conversationID: conversationID,
-                    limit: messagesPerConversation,
-                    session: session,
-                    router: router,
-                    force: false,
-                    reason: .startupPreload,
-                    conversationLastMessageAt: conversation.lastMessageAt
-                )
-            }
+            _ = await loadRecentMessagesIfNeeded(
+                conversationID: conversationID,
+                limit: messagesPerConversation,
+                session: session,
+                router: router,
+                force: false,
+                reason: .startupPreload,
+                conversationLastMessageAt: conversation.lastMessageAt
+            )
             return
         }
 
@@ -772,16 +770,22 @@ final class MessageCacheStore {
         messagesPerConversation: Int = StartupLoadingLimits.preloadMessagesPerConversation
     ) async {
         let targets = Array(conversations.prefix(maxConversations))
+        let workerCount = min(StartupLoadingLimits.preloadConcurrency, max(targets.count, 1))
 
         await withTaskGroup(of: Void.self) { group in
-            for conversation in targets {
+            for workerIndex in 0..<workerCount {
                 group.addTask { @MainActor in
-                    await self.preloadConversationMessages(
-                        conversation: conversation,
-                        session: session,
-                        router: router,
-                        messagesPerConversation: messagesPerConversation
-                    )
+                    var index = workerIndex
+                    while index < targets.count {
+                        let conversation = targets[index]
+                        await self.preloadConversationMessages(
+                            conversation: conversation,
+                            session: session,
+                            router: router,
+                            messagesPerConversation: messagesPerConversation
+                        )
+                        index += workerCount
+                    }
                 }
             }
             await group.waitForAll()

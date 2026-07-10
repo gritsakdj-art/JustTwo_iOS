@@ -457,19 +457,45 @@ Residual risks / follow-up:
 
 ### Batch C - Startup And Background Warmup
 
-Status: Not started
+Status: Implemented (pending manual smoke)
 
-Branch:
+Branch: `batch-c-startup-background-warmup`
 
 Files changed:
+- `JustTwo/Bootstrap/Startup/StartupSingleFlight.swift`
+- `JustTwo/Bootstrap/Startup/AppStartupCoordinator.swift`
+- `JustTwo/Bootstrap/Startup/StartupSessionValidationService.swift`
+- `JustTwo/Bootstrap/Startup/StartupLoadingLimits.swift`
+- `JustTwo/Shared/Views/Chats/MessageCacheStore.swift`
+- `JustTwo/Shared/Diagnostics/MessengerDiagnostics.swift`
+- `JustTwoTests/StartupSingleFlightTests.swift`
+- `JustTwoTests/AppStartupCoordinatorTests.swift`
 
 Summary:
+- `StartupSingleFlight`: waiter loop coalesces replaced tasks; canceled ops no longer set `loadedKey` (operation ID guard).
+- Follow-up fix: operations can report unsuccessful completion; aborted/stale background warmup no longer marks its user key as loaded.
+- Follow-up fix: waiters that were suspended on an old task exit after `reset()` instead of starting stale work.
+- Background warmup uses `backgroundWarmupFlight` per user; duplicate calls emit `startupBackgroundNetworkWarmupSkippedDuplicate`.
+- Follow-up fix: forced background warmup now propagates `force` into profile photo, conversation network refresh, and message preload loaders.
+- Follow-up fix: background warmup wrapper uses operation ID ownership so stale/canceled wrappers cannot clear a newer task reference.
+- `performBackgroundNetworkWarmup` re-checks `expectedUserID` and `Task.isCancelled` at key stages; stale abort diagnostic added.
+- Child sync/outbox/cleanup tasks guard session before running.
+- `StartupSessionValidationService` routes through `scheduleBackgroundNetworkWarmup` instead of direct duplicate call.
+- Conversation list network refresh now coalesces in-flight refreshes so main tab loading and background warmup do not issue duplicate `/conversations` requests; coalesced callers emit `messengerConversationCacheNetworkRefreshCoalesced`.
+- Message preload bounded to 3 concurrent workers; removed fire-and-forget partial-cache network preload task.
 
 Build/tests:
+- Initial Cursor run: `xcodebuild -project JustTwo.xcodeproj -scheme JustTwo -destination 'platform=iOS Simulator,id=D1806BCC-C599-4B19-A8F4-96B9A3BCE81E' build` — SUCCEEDED
+- Initial Cursor run: `xcodebuild test ... -only-testing:JustTwoTests/StartupSingleFlightTests -only-testing:JustTwoTests/AppStartupCoordinatorTests` — 9 tests SUCCEEDED
+- Follow-up check: `git diff --check` — PASSED
+- Follow-up xcodebuild retry in Codex sandbox did not complete because CoreSimulator/runtime services were unavailable (`No available simulator runtimes` / `iOS 26.5 Platform Not Installed`); no Swift compiler errors were observed before asset/storyboard compilation failed.
 
 Manual smoke:
+- Not run (see Batch C checklist in prompt above)
 
 Residual risks / follow-up:
+- Long background warmup awaits are still cooperative only at explicit checkpoint guards; this is acceptable for Batch C but should stay visible during smoke.
+- Batch D–E unchanged.
 
 ### Batch D - Persistence And Local Cache
 

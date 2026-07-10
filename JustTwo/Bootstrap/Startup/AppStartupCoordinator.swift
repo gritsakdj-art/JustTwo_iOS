@@ -10,7 +10,10 @@ final class AppStartupCoordinator {
     private(set) var warmedUserID: UUID?
 
     private var criticalTask: Task<Void, Never>?
+    private var criticalOperationID: UUID?
     private var backgroundNetworkTask: Task<Void, Never>?
+    private var backgroundOperationID: UUID?
+    private let backgroundWarmupFlight = StartupSingleFlight()
 
     private init() {}
 
@@ -42,6 +45,7 @@ final class AppStartupCoordinator {
         if force {
             criticalTask?.cancel()
             criticalTask = nil
+            criticalOperationID = nil
             warmedUserID = nil
         }
 
@@ -50,6 +54,9 @@ final class AppStartupCoordinator {
 
         let startedAt = Date()
         MessengerDiagnostics.event(.startupCriticalLocalWarmupStarted)
+
+        let operationID = UUID()
+        criticalOperationID = operationID
 
         let task = Task { @MainActor in
             await MessengerOutboxProcessor.shared.recoverOnLaunch()
@@ -78,11 +85,11 @@ final class AppStartupCoordinator {
         criticalTask = task
         await task.value
 
-        if criticalTask == task {
-            criticalTask = nil
-            warmedUserID = userID
-            scheduleBackgroundNetworkWarmup(session: session, router: router, force: force)
-        }
+        guard criticalOperationID == operationID, !task.isCancelled else { return }
+        criticalTask = nil
+        criticalOperationID = nil
+        warmedUserID = userID
+        scheduleBackgroundNetworkWarmup(session: session, router: router, force: force)
     }
 
     func scheduleBackgroundNetworkWarmup(
@@ -91,10 +98,15 @@ final class AppStartupCoordinator {
         force: Bool = false
     ) {
         backgroundNetworkTask?.cancel()
-        backgroundNetworkTask = Task { @MainActor in
+        let operationID = UUID()
+        backgroundOperationID = operationID
+        let task = Task { @MainActor in
             await self.runBackgroundNetworkWarmup(session: session, router: router, force: force)
+            guard self.backgroundOperationID == operationID else { return }
             self.backgroundNetworkTask = nil
+            self.backgroundOperationID = nil
         }
+        backgroundNetworkTask = task
     }
 
     func runBackgroundNetworkWarmup(
@@ -103,16 +115,52 @@ final class AppStartupCoordinator {
         force: Bool = false
     ) async {
         guard let userID = session.currentUser?.id else { return }
+        let warmupKey = userID.uuidString
+
+        if !force, backgroundWarmupFlight.loadedKey == warmupKey {
+            MessengerDiagnostics.event(
+                .startupBackgroundNetworkWarmupSkippedDuplicate,
+                metadata: ["userID": MessengerDiagnostics.sanitizeID(userID)]
+            )
+            return
+        }
+
+        await backgroundWarmupFlight.runReportingCompletion(key: warmupKey, force: force) {
+            await self.performBackgroundNetworkWarmup(
+                session: session,
+                router: router,
+                expectedUserID: userID,
+                force: force
+            )
+        }
+    }
+
+    private func performBackgroundNetworkWarmup(
+        session: SessionStore,
+        router: AppRouter,
+        expectedUserID: UUID,
+        force: Bool
+    ) async -> Bool {
+        guard !Task.isCancelled else {
+            logStaleWarmupAbort(expectedUserID: expectedUserID, reason: "cancelledBeforeStart")
+            return false
+        }
+        guard isSessionStillValid(expectedUserID, session: session) else {
+            logStaleWarmupAbort(expectedUserID: expectedUserID, reason: "sessionChangedBeforeStart")
+            return false
+        }
 
         let startedAt = Date()
         MessengerDiagnostics.event(.startupBackgroundNetworkWarmupScheduled)
 
         await MessengerSyncEngine.shared.hydrateFromLocalStore()
+        guard !shouldAbortWarmup(expectedUserID: expectedUserID, session: session, reason: "afterHydrate") else { return false }
 
         let baselineRevision = await MessengerSyncEngine.shared.prepareStartupBaselineIfNeeded(
             session: session,
             router: router
         )
+        guard !shouldAbortWarmup(expectedUserID: expectedUserID, session: session, reason: "afterBaseline") else { return false }
 
         MessengerDiagnostics.event(.startupProfilePhotosDeferred)
         MessengerDiagnostics.event(.startupConversationAvatarsDeferred)
@@ -130,10 +178,12 @@ final class AppStartupCoordinator {
             }
             await group.waitForAll()
         }
+        guard !shouldAbortWarmup(expectedUserID: expectedUserID, session: session, reason: "afterNetworkRefresh") else { return false }
 
         if MessengerSyncStateStore.shared.currentRevision == nil, let baselineRevision {
             await MessengerSyncEngine.shared.finishBootstrap(revision: baselineRevision)
         }
+        guard !shouldAbortWarmup(expectedUserID: expectedUserID, session: session, reason: "afterBootstrap") else { return false }
 
         ConversationsStartupLoader.shared.activateRealtime(session: session, router: router)
         session.connectRealtimeIfEligible()
@@ -141,17 +191,21 @@ final class AppStartupCoordinator {
 
         let conversations = ConversationListViewModel.shared.conversations
         await ConversationAvatarsStartupLoader.shared.preloadCritical(for: conversations)
+        guard !shouldAbortWarmup(expectedUserID: expectedUserID, session: session, reason: "afterAvatarPreload") else { return false }
 
         MessengerSyncEngine.shared.activate(session: session, router: router)
         MessengerOutboxProcessor.shared.activate(session: session, router: router)
-        Task {
+
+        Task { @MainActor [weak self] in
+            guard let self, self.isSessionStillValid(expectedUserID, session: session) else { return }
             await MessengerSyncEngine.shared.runGlobalSync(
                 reason: .bootstrap,
                 session: session,
                 router: router
             )
         }
-        Task {
+        Task { @MainActor [weak self] in
+            guard let self, self.isSessionStillValid(expectedUserID, session: session) else { return }
             await MessengerOutboxProcessor.shared.processReadyItems(session: session, router: router)
         }
 
@@ -163,15 +217,53 @@ final class AppStartupCoordinator {
             force: force
         )
 
-        Task {
+        Task { @MainActor [weak self] in
+            guard let self, self.isSessionStillValid(expectedUserID, session: session) else { return }
             await MessengerMediaCacheService.runCleanupIfNeeded()
+        }
+
+        guard isSessionStillValid(expectedUserID, session: session) else {
+            logStaleWarmupAbort(expectedUserID: expectedUserID, reason: "beforeSuccess")
+            return false
         }
 
         MessengerDiagnostics.event(
             .startupBackgroundNetworkWarmupSucceeded,
             metadata: [
-                "userID": MessengerDiagnostics.sanitizeID(userID),
+                "userID": MessengerDiagnostics.sanitizeID(expectedUserID),
                 "durationMs": "\(durationMilliseconds(since: startedAt))"
+            ]
+        )
+        return true
+    }
+
+    private func isSessionStillValid(_ expectedUserID: UUID, session: SessionStore) -> Bool {
+        session.currentUser?.id == expectedUserID
+    }
+
+    @discardableResult
+    private func shouldAbortWarmup(
+        expectedUserID: UUID,
+        session: SessionStore,
+        reason: String
+    ) -> Bool {
+        if Task.isCancelled {
+            logStaleWarmupAbort(expectedUserID: expectedUserID, reason: "cancelled:\(reason)")
+            return true
+        }
+        guard isSessionStillValid(expectedUserID, session: session) else {
+            logStaleWarmupAbort(expectedUserID: expectedUserID, reason: reason)
+            return true
+        }
+        return false
+    }
+
+    private func logStaleWarmupAbort(expectedUserID: UUID, reason: String) {
+        MessengerDiagnostics.event(
+            .startupBackgroundNetworkWarmupStaleSessionAborted,
+            metadata: [
+                "userID": MessengerDiagnostics.sanitizeID(expectedUserID),
+                "reason": reason
             ]
         )
     }
@@ -206,8 +298,11 @@ final class AppStartupCoordinator {
     private func performReset() async {
         criticalTask?.cancel()
         criticalTask = nil
+        criticalOperationID = nil
         backgroundNetworkTask?.cancel()
         backgroundNetworkTask = nil
+        backgroundOperationID = nil
+        backgroundWarmupFlight.reset()
         isRunningCritical = false
         warmedUserID = nil
 
