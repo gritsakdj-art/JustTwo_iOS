@@ -196,6 +196,13 @@ final class AppStartupCoordinator {
         MessengerSyncEngine.shared.activate(session: session, router: router)
         MessengerOutboxProcessor.shared.activate(session: session, router: router)
 
+        await bootstrapDurableDeliveryAcks(
+            session: session,
+            router: router,
+            expectedUserID: expectedUserID
+        )
+        guard !shouldAbortWarmup(expectedUserID: expectedUserID, session: session, reason: "afterDeliveryAckBootstrap") else { return false }
+
         Task { @MainActor [weak self] in
             guard let self, self.isSessionStillValid(expectedUserID, session: session) else { return }
             await MessengerSyncEngine.shared.runGlobalSync(
@@ -235,6 +242,29 @@ final class AppStartupCoordinator {
             ]
         )
         return true
+    }
+
+    /// Cold-start recovery of durable pending delivery ACKs for the authenticated
+    /// owner. Runs during background warmup so a proven-safe boundary that failed
+    /// to ACK (or was interrupted by process termination) is replayed without
+    /// requiring any chat view to open.
+    private func bootstrapDurableDeliveryAcks(
+        session: SessionStore,
+        router: AppRouter,
+        expectedUserID: UUID
+    ) async {
+        ConversationDeliveryAckCoordinator.shared.boundaryStore = MessengerLocalStore.shared
+
+        guard let profileID = try? await MessengerSessionSupport.resolveCurrentProfileID(session: session) else {
+            return
+        }
+        guard isSessionStillValid(expectedUserID, session: session) else { return }
+
+        await ConversationDeliveryAckCoordinator.shared.bootstrapPersistedBoundaries(
+            ownerProfileID: profileID,
+            session: session,
+            router: router
+        )
     }
 
     private func isSessionStillValid(_ expectedUserID: UUID, session: SessionStore) -> Bool {

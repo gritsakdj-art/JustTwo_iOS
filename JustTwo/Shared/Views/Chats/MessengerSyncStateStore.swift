@@ -46,6 +46,16 @@ final class MessengerSyncStateStore {
         }
     }
 
+    func unmarkRevisionApplied(_ revision: Int64) {
+        appliedRevisions.remove(revision)
+    }
+
+    func unmarkRevisionsApplied(_ revisions: some Sequence<Int64>) {
+        for revision in revisions {
+            appliedRevisions.remove(revision)
+        }
+    }
+
     func reset() {
         currentRevision = nil
         lastSyncAt = nil

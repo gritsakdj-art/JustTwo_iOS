@@ -3,7 +3,7 @@ import SwiftData
 
 enum MessengerPersistence {
     static let syncMetadataGlobalID = "global"
-    static let schemaVersion = 5
+    static let schemaVersion = 6
 
     static var messengerSchema: Schema {
         Schema([
@@ -15,6 +15,7 @@ enum MessengerPersistence {
             LocalMessengerSyncMetadata.self,
             LocalMessengerOutboxItem.self,
             LocalMessengerPendingMedia.self,
+            LocalMessengerPendingDeliveryReceipt.self,
         ])
     }
 
@@ -41,6 +42,7 @@ enum MessengerPersistence {
             LocalMessengerSyncMetadata.self,
             LocalMessengerOutboxItem.self,
             LocalMessengerPendingMedia.self,
+            LocalMessengerPendingDeliveryReceipt.self,
         ]
     }
 }

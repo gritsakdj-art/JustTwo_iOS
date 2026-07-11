@@ -236,7 +236,6 @@ final class MessengerRealtimeCoordinator {
                         conversationID: conversationID,
                         viaViewModel: { chat in
                             let applied = chat.applyRealtimeMessage(message, currentProfileID: profileID)
-                            chat.acknowledgeVisibleMessages(session: self.session, router: self.router)
                             return applied
                         },
                         viaCache: {
@@ -291,23 +290,38 @@ final class MessengerRealtimeCoordinator {
                 }
             }
 
-            if let profileID,
-               self.activeConversationID != conversationID,
-               message.senderProfileID != profileID {
-                await ConversationDeliveryAckCoordinator.shared.acknowledgeDeliveredIfNeeded(
-                    conversationID: conversationID,
-                    message: message,
-                    currentProfileID: profileID,
-                    session: self.session,
-                    router: self.router,
-                    source: "realtime"
-                )
-            }
-
-            await MessengerMessageCacheService.persistRealtimeMessage(
+            let persisted = await MessengerMessageCacheService.persistRealtimeMessage(
                 message,
                 eventType: "message.created"
             )
+            guard persisted else {
+                MessengerDiagnostics.event(
+                    .messengerDeliveryAckApplyFailed,
+                    conversationID: conversationID,
+                    messageID: message.id,
+                    metadata: ["source": "realtime", "phase": "persistRealtimeMessage"]
+                )
+                return
+            }
+
+            if let profileID,
+               message.senderProfileID != profileID {
+                if self.activeConversationID == conversationID {
+                    await MainActor.run {
+                        self.activeChatViewModel?.acknowledgeVisibleMessages(
+                            session: self.session,
+                            router: self.router
+                        )
+                    }
+                }
+                if let session = self.session, let router = self.router {
+                    await MessengerSyncEngine.shared.runGlobalSync(
+                        reason: .appForeground,
+                        session: session,
+                        router: router
+                    )
+                }
+            }
         }
     }
 

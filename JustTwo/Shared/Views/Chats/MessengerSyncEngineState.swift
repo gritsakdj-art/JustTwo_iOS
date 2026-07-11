@@ -15,6 +15,7 @@ enum MessengerSyncEngineError: Error, Equatable {
     case cursorAheadOfServer
     case unauthorized
     case notAuthenticated
+    case applyFailed
 }
 
 enum MessengerSyncEngineLimits {

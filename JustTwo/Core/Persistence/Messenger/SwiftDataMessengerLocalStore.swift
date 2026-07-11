@@ -272,6 +272,103 @@ final class SwiftDataMessengerLocalStore: MessengerLocalStoreProtocol {
         return MessengerLocalMapping.syncMetadataSnapshot(from: entity)
     }
 
+    func commitAuthoritativeSyncPage(
+        ownerProfileID: UUID,
+        advancedRevision: Int64?,
+        safeBoundaries: [UUID: MessageReceiptBoundary]
+    ) async throws -> [UUID: MessageReceiptBoundary] {
+        let context = modelContext
+        let now = Date()
+
+        if let advancedRevision {
+            try advanceSyncCursor(
+                to: advancedRevision,
+                syncedAt: now,
+                context: context
+            )
+        }
+
+        var committed: [UUID: MessageReceiptBoundary] = [:]
+        for (conversationID, boundary) in safeBoundaries {
+            let merged = try mergePendingDeliveryBoundary(
+                ownerProfileID: ownerProfileID,
+                conversationID: conversationID,
+                boundary: boundary,
+                updatedAt: now,
+                context: context
+            )
+            committed[conversationID] = merged
+        }
+
+        try context.save()
+        return committed
+    }
+
+    func loadPendingDeliveryBoundaries(
+        ownerProfileID: UUID
+    ) async throws -> [UUID: MessageReceiptBoundary] {
+        let context = modelContext
+        let descriptor = FetchDescriptor<LocalMessengerPendingDeliveryReceipt>(
+            predicate: #Predicate { $0.ownerProfileID == ownerProfileID }
+        )
+        var result: [UUID: MessageReceiptBoundary] = [:]
+        for entity in try context.fetch(descriptor) {
+            result[entity.conversationID] = MessageReceiptBoundary(
+                createdAt: entity.createdAt,
+                messageID: entity.messageID
+            )
+        }
+        return result
+    }
+
+    func clearPendingDeliveryBoundary(
+        ownerProfileID: UUID,
+        conversationID: UUID,
+        through boundary: MessageReceiptBoundary
+    ) async throws {
+        let context = modelContext
+        let key = LocalMessengerPendingDeliveryReceipt.makeKey(
+            ownerProfileID: ownerProfileID,
+            conversationID: conversationID
+        )
+        guard let entity = try fetchPendingDeliveryReceiptEntity(key: key, context: context) else {
+            return
+        }
+
+        let persisted = MessageReceiptBoundary(
+            createdAt: entity.createdAt,
+            messageID: entity.messageID
+        )
+
+        if persisted > boundary {
+            MessengerDiagnostics.event(
+                .messengerDeliveryAckPendingRetainedHigherBoundary,
+                conversationID: conversationID,
+                messageID: entity.messageID,
+                metadata: ["reason": "persistedHigherThanAck"]
+            )
+            return
+        }
+
+        context.delete(entity)
+        try context.save()
+    }
+
+    func clearPendingDeliveryBoundaries(
+        ownerProfileID: UUID
+    ) async throws {
+        let context = modelContext
+        let descriptor = FetchDescriptor<LocalMessengerPendingDeliveryReceipt>(
+            predicate: #Predicate { $0.ownerProfileID == ownerProfileID }
+        )
+        let entities = try context.fetch(descriptor)
+        guard !entities.isEmpty else { return }
+        for entity in entities {
+            context.delete(entity)
+        }
+        try context.save()
+    }
+
     func updateAttachmentMediaCacheMetadata(
         attachmentID: String,
         variant: MessengerMediaVariant,
@@ -770,6 +867,83 @@ private extension SwiftDataMessengerLocalStore {
     func fetchSyncMetadataEntity(id: String, context: ModelContext) throws -> LocalMessengerSyncMetadata? {
         var descriptor = FetchDescriptor<LocalMessengerSyncMetadata>(
             predicate: #Predicate { $0.id == id }
+        )
+        descriptor.fetchLimit = 1
+        return try context.fetch(descriptor).first
+    }
+
+    /// Monotonically advances the persisted sync cursor without saving; the caller
+    /// owns the single `context.save()` so the cursor commit is atomic with the
+    /// proven-safe delivery boundary merge.
+    func advanceSyncCursor(
+        to revision: Int64,
+        syncedAt: Date,
+        context: ModelContext
+    ) throws {
+        let globalID = MessengerPersistence.syncMetadataGlobalID
+        if let existing = try fetchSyncMetadataEntity(id: globalID, context: context) {
+            let current = existing.lastAppliedRevision ?? revision
+            existing.lastAppliedRevision = Swift.max(current, revision)
+            existing.localUpdatedAt = syncedAt
+        } else {
+            let entity = LocalMessengerSyncMetadata(
+                id: globalID,
+                lastAppliedRevision: revision,
+                lastSuccessfulSyncAt: nil,
+                lastFullRefreshAt: nil,
+                schemaVersion: MessengerPersistence.schemaVersion,
+                localUpdatedAt: syncedAt
+            )
+            context.insert(entity)
+        }
+    }
+
+    /// Monotonically merges a proven-safe delivery boundary without saving.
+    /// Returns the resulting highest persisted boundary for the conversation.
+    func mergePendingDeliveryBoundary(
+        ownerProfileID: UUID,
+        conversationID: UUID,
+        boundary: MessageReceiptBoundary,
+        updatedAt: Date,
+        context: ModelContext
+    ) throws -> MessageReceiptBoundary {
+        let key = LocalMessengerPendingDeliveryReceipt.makeKey(
+            ownerProfileID: ownerProfileID,
+            conversationID: conversationID
+        )
+
+        if let existing = try fetchPendingDeliveryReceiptEntity(key: key, context: context) {
+            let persisted = MessageReceiptBoundary(
+                createdAt: existing.createdAt,
+                messageID: existing.messageID
+            )
+            guard boundary > persisted else {
+                return persisted
+            }
+            existing.createdAt = boundary.createdAt
+            existing.messageID = boundary.messageID
+            existing.updatedAt = updatedAt
+            return boundary
+        }
+
+        let entity = LocalMessengerPendingDeliveryReceipt(
+            key: key,
+            ownerProfileID: ownerProfileID,
+            conversationID: conversationID,
+            createdAt: boundary.createdAt,
+            messageID: boundary.messageID,
+            updatedAt: updatedAt
+        )
+        context.insert(entity)
+        return boundary
+    }
+
+    func fetchPendingDeliveryReceiptEntity(
+        key: String,
+        context: ModelContext
+    ) throws -> LocalMessengerPendingDeliveryReceipt? {
+        var descriptor = FetchDescriptor<LocalMessengerPendingDeliveryReceipt>(
+            predicate: #Predicate { $0.key == key }
         )
         descriptor.fetchLimit = 1
         return try context.fetch(descriptor).first

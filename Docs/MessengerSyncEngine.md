@@ -10,7 +10,7 @@ After PR17, messenger sync resumes from a **durable** `lastAppliedRevision` stor
 REST remains authoritative.
 Local DB provides immediate UI/cache/offline.
 Realtime is foreground accelerator.
-Delta sync repairs missed events.
+Delta sync repairs missed events and is the authoritative delivered-ACK coverage proof.
 MessengerSyncEngine owns the persistent global cursor.
 ```
 
@@ -60,12 +60,61 @@ Hard rule:
 Never advance lastAppliedRevision before events are successfully applied locally.
 ```
 
-Order:
+Order (PR20D2 — cursor + proven-safe boundary are one atomic save):
 
 ```text
-fetch page → validate revision order → apply events → persist local changes
-→ advance in-memory cursor → persist lastAppliedRevision → update UI
+fetch page → validate revision order → apply events → persist local message changes
+→ commitAuthoritativeSyncPage(advancedRevision, safeBoundaries) [single ModelContext.save]
+→ advance in-memory cursor → return committed boundaries → schedule delivered ACK → update UI
 ```
+
+`MessengerLocalStore.commitAuthoritativeSyncPage` advances `lastAppliedRevision` and
+monotonically merges the owner-scoped proven-safe delivery boundaries in a **single
+`ModelContext.save()`**. If that save throws, neither the cursor nor the boundary is
+durably updated, in-memory `appliedRevisions` for that page are rolled back, and the
+sync page stays retryable. The delivered ACK is scheduled only after the commit returns,
+so a proven-safe boundary is durable before any network ACK.
+
+Conversation-filtered repair (`syncConversationRepair`) uses the same rule: a failed
+`commitAuthoritativeSyncPage` emits `messengerDeliveryAckBoundaryPersistenceFailed`,
+does **not** schedule ACK, rolls back page revisions, and remains retryable. Repair
+does not advance the global cursor (`advancedRevision: nil`).
+
+Delivered ACK rule (PR20D2):
+
+```text
+local apply alone is not enough
+realtime / REST / pagination → request delta reconciliation
+global delta page apply + atomic cursor/boundary commit → authoritativeSync evidence → delivered ACK
+```
+
+`ConversationDeliveryAckCoordinator` tracks applied local boundaries separately from proven-safe boundaries. Conversation previews and pagination pages never ACK directly.
+
+### Durable proven-safe boundary recovery (PR20D2)
+
+The highest authoritative proven-safe boundary `(createdAt, messageID)` for which a
+backend delivered-ACK may still be required is persisted durably per
+`ownerProfileID` + `conversationID` in `LocalMessengerPendingDeliveryReceipt`
+(SwiftData). This survives process termination:
+
+```text
+delta commit persists cursor + boundary atomically
+→ ACK network request fails or app is killed
+→ persisted pending boundary survives
+→ cold-start bootstrap loads owner boundaries and replays the ACK
+→ backend duplicate ACK is a safe no-op (PR20D1)
+→ successful ACK clears only the covered boundary (a strictly higher boundary is retained)
+```
+
+- Cold-start recovery runs in `AppStartupCoordinator` background warmup via
+  `ConversationDeliveryAckCoordinator.bootstrapPersistedBoundaries(ownerProfileID:…)`;
+  it does **not** require opening `ChatsView` / `PrivateChatView`.
+- All persistence is account-scoped; logout wipes the records via
+  `resetAllMessengerData()` and bumps the coordinator generation so stale
+  callbacks and timers cannot ACK a prior owner with a new owner's JWT.
+- A cleanup failure after a successful backend ACK never lowers in-memory
+  confirmed state; the durable record may survive and a duplicate ACK after
+  restart is a safe backend no-op that clears it on the next success.
 
 ## Global vs conversation-filtered sync
 
@@ -110,11 +159,13 @@ Behavior:
 
 ## Realtime / REST / outbox
 
-| Source | Cursor owner |
-|--------|----------------|
-| Realtime | No — accelerator only |
-| REST refresh | No — authoritative baseline |
-| MessengerSyncEngine delta | Yes — global cursor |
+| Source | Cursor owner | Delivered ACK coverage |
+|--------|--------------|------------------------|
+| Realtime | No — accelerator only | No direct ACK; requests delta reconciliation |
+| REST refresh | No — authoritative baseline | No direct ACK; requests delta reconciliation |
+| Pagination | No | Never ACKs directly |
+| MessengerSyncEngine delta | Yes — global cursor | Yes, after atomic cursor + proven-safe boundary commit |
+| Cold-start bootstrap | No | Replays durable proven-safe boundaries for the current owner |
 
 Outbox reconciliation by `clientMessageID` unchanged (PR16). Full refresh does not wipe pending outgoing messages.
 
@@ -148,7 +199,12 @@ Forbidden: message body, caption, JWT, signed URLs, storage keys, absolute paths
 
 - Backend retention/metrics not implemented (PR20)
 - Realtime does not advance persistent cursor (by design)
-- Manual smoke required before release
+- Durable persisted delivered-ACK recovery boundary shipped in PR20D2
+  (`LocalMessengerPendingDeliveryReceipt`, atomic cursor+boundary commit, cold-start bootstrap)
+- Background remote-notification delivery ACK remains PR20D3 (not implemented; `AppDelegate` unchanged)
+- SwiftData schema bumped to v6 (additive entity); container has a destructive
+  recreate fallback on load failure — an upgrade smoke test is required
+- Manual smoke required before release (status: NOT RUN)
 
 ## Components
 

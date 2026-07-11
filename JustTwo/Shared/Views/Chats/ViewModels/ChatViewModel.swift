@@ -1356,7 +1356,7 @@ final class ChatViewModel {
             )
             return
         }
-        guard let messageID = latestInboundMessageID() else {
+        guard let message = latestInboundMessage() else {
             NetworkDebug.log("Messenger read ack skipped: no inbound message")
             MessengerDiagnostics.event(
                 .readAckSkipped,
@@ -1365,6 +1365,7 @@ final class ChatViewModel {
             )
             return
         }
+        let messageID = message.id
         guard deliveryAckCoordinator.shouldSendRead(
             conversationID: conversation.id,
             messageID: messageID
@@ -1456,7 +1457,7 @@ final class ChatViewModel {
             )
             return
         }
-        guard let messageID = latestInboundMessageID() else {
+        guard let message = latestInboundMessage() else {
             NetworkDebug.log("Messenger delivered ack skipped: no inbound message")
             MessengerDiagnostics.event(
                 .deliveredAckSkipped,
@@ -1465,6 +1466,7 @@ final class ChatViewModel {
             )
             return
         }
+        let messageID = message.id
         guard deliveryAckCoordinator.shouldSendDelivered(
             conversationID: conversation.id,
             messageID: messageID
@@ -1479,39 +1481,28 @@ final class ChatViewModel {
             return
         }
 
-        do {
-            _ = try await ConversationService.markDelivered(
-                conversationID: conversation.id,
-                messageID: messageID
-            )
-            deliveryAckCoordinator.markDeliveredAcked(conversationID: conversation.id, messageID: messageID)
-            NetworkDebug.log("Messenger delivered ack sent from active chat: \(conversation.id)")
+        guard let profileID = currentProfileID ?? session.currentProfile?.id else {
             MessengerDiagnostics.event(
-                .deliveredAckSent,
+                .deliveredAckSkipped,
                 conversationID: conversation.id,
                 messageID: messageID,
-                metadata: [
-                    "isActiveConversation": "\(isOpen)",
-                    "isAppForeground": "\(MessengerSessionSupport.isAppForegroundActive)"
-                ]
+                metadata: ["reason": "missingCurrentProfileID", "source": "activeChat"]
             )
-        } catch let error as NetworkError {
-            MessengerDiagnostics.event(
-                .deliveredAckFailed,
-                conversationID: conversation.id,
-                messageID: messageID,
-                metadata: ["errorCategory": MessengerDiagnostics.sanitizeError(error)]
-            )
-            _ = MessengerSessionSupport.handleNetworkError(error, session: session, router: router)
-        } catch {
-            MessengerDiagnostics.event(
-                .deliveredAckFailed,
-                conversationID: conversation.id,
-                messageID: messageID,
-                metadata: ["errorCategory": MessengerDiagnostics.sanitizeError(error)]
-            )
-            // Non-blocking: delivery receipt failure should not block chat UI.
+            return
         }
+
+        await deliveryAckCoordinator.acknowledgeAppliedInboundBoundary(
+            conversationID: conversation.id,
+            messageID: message.id,
+            createdAt: message.createdAt,
+            kind: message.kind,
+            isMine: message.isMine,
+            isDeleted: message.isDeleted,
+            currentProfileID: profileID,
+            session: session,
+            router: router,
+            source: "activeChat"
+        )
     }
 
     @discardableResult
@@ -1670,7 +1661,11 @@ final class ChatViewModel {
     }
 
     private func latestInboundMessageID() -> UUID? {
-        messages.last(where: { !$0.isMine && !$0.isDeleted })?.id
+        latestInboundMessage()?.id
+    }
+
+    private func latestInboundMessage() -> ChatMessage? {
+        messages.last(where: { !$0.isMine && !$0.isDeleted && $0.localSendState == nil })
     }
 
     private func shouldApplyReceipt(

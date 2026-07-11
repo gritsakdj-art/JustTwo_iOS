@@ -149,9 +149,10 @@ Chat screen opens from local cached messages when available, then REST remains a
 5. REST success merges in-memory state and upserts local DB message rows.
 6. Pagination writes older pages to local DB.
 7. Delta/realtime message events update in-memory state and persist to local message cache.
-8. Network failure does NOT clear cached messages.
-9. Stale/cancelled network loads do NOT overwrite current chat.
-10. Logout reset clears local message cache (PR15A hardening preserved).
+8. Delivered ACK is not driven by the highest locally cached message. Realtime/REST apply requests delta reconciliation; only authoritative delta coverage may schedule delivered ACK.
+9. Network failure does NOT clear cached messages.
+10. Stale/cancelled network loads do NOT overwrite current chat.
+11. Logout reset clears local message cache (PR15A hardening preserved).
 ```
 
 ### Offline / network failure (chat)
@@ -178,6 +179,7 @@ Chat screen opens from local cached messages when available, then REST remains a
 - Delta reactions persist when event includes full `MessageDTO` snapshot.
 - Delta `conversation.read` / `conversation.delivered` persist receipts (monotonic).
 - Realtime `message.created` / `message.edited` / `message.deleted` persist to local DB.
+- PR20D2: local persistence records the applied message but is not sufficient delivery coverage proof by itself. Realtime/REST/pagination paths never call delivered ACK directly.
 - **Limitation:** realtime `reaction.added` / `reaction.removed` without full `MessageDTO` update in-memory UI only; local DB is repaired on next delta/REST refresh.
 
 ### Optimistic sends (PR15C limitation)
@@ -328,7 +330,7 @@ LocalMessengerConversation → LocalConversationSnapshot → ChatConversationPre
 
 ### SwiftData schema
 
-Six messenger entities (plus `Item.self` in app container):
+Messenger entities (plus `Item.self` in app container):
 
 | Entity | Key fields | Notes |
 |--------|------------|-------|
@@ -338,8 +340,14 @@ Six messenger entities (plus `Item.self` in app container):
 | `LocalMessengerReactionAggregate` | `id = messageID:emoji`, `count`, `reactedByMe` | |
 | `LocalMessengerReceipt` | delivery/read watermarks | |
 | `LocalMessengerSyncMetadata` | `lastAppliedRevision`, sync health fields | runtime global cursor (PR17) |
+| `LocalMessengerOutboxItem` / `LocalMessengerPendingMedia` | outgoing send jobs | PR16A/B |
+| `LocalMessengerPendingDeliveryReceipt` (PR20D2) | unique `key = ownerProfileID\|conversationID`, `ownerProfileID`, `conversationID`, `createdAt`, `messageID`, `updatedAt` | Durable, account-scoped highest proven-safe delivery boundary awaiting a backend ACK. `key` is **never** logged in full |
 
-**PR20C migration:** `otherParticipantLastSeenAt: Date?` added as optional with default `nil` (lightweight SwiftData migration). `MessengerPersistence.schemaVersion` remains `5`. No versioned `SchemaMigrationPlan` in repo. **Automated physical upgrade from a pre-PR20C on-disk store is not reproduced in CI** — manual smoke should open an existing install and verify conversations/messages/outbox survive. On schema open failure, `AppModelContainerFactory` deletes and recreates the store (data loss risk; not silent).
+**PR20D2 durable delivery-ACK boundary + atomic commit:** `commitAuthoritativeSyncPage(ownerProfileID:advancedRevision:safeBoundaries:)` advances the global cursor (`LocalMessengerSyncMetadata.lastAppliedRevision`, monotonic) **and** monotonically merges the owner-scoped proven-safe boundaries into `LocalMessengerPendingDeliveryReceipt` in a **single `ModelContext.save()`** — the cursor is never durably advanced without its boundary and vice versa (rollback is guaranteed by the single-context single-save). `loadPendingDeliveryBoundaries(ownerProfileID:)`, `clearPendingDeliveryBoundary(ownerProfileID:conversationID:through:)` (retains a strictly higher persisted boundary), and `clearPendingDeliveryBoundaries(ownerProfileID:)` complete the surface. No JWT/token is ever persisted.
+
+**PR20C migration:** `otherParticipantLastSeenAt: Date?` added as optional with default `nil` (lightweight SwiftData migration).
+
+**PR20D2 migration:** `LocalMessengerPendingDeliveryReceipt` added as a **new, purely additive** entity. `MessengerPersistence.schemaVersion` bumped `5 → 6`. No versioned `SchemaMigrationPlan` in repo; SwiftData lightweight migration handles the additive entity. Successful store open emits `messengerSwiftDataContainerOpened` (privacy-safe: `storeName`, `schemaVersion`). On schema open failure, `AppModelContainerFactory` deletes and recreates the store (**destructive fallback — data loss risk; not silent**, emits `messengerSwiftDataContainerRecoveredAfterSchemaMismatch`). **Automated physical upgrade from a pre-PR20D2 on-disk store is not reproduced in CI** — manual smoke must open an existing install and verify conversations/messages/outbox/media survive and the new pending-boundary storage works.
 
 **Cache write policy (PR20C):** only monotonic `otherParticipantLastSeenAt` is merged on upsert (`max(existing, incoming)`). Writes capture `MessengerCacheWriteContext` (store `sessionGeneration` + `SessionStore.currentUser.id`); stale writes after logout/account switch emit `presenceCacheWriteIgnored` and are skipped. Conversation upserts are serialized to preserve monotonic lastSeen under out-of-order completion. `isOnline`, typing, preserved state, and realtime epoch metadata are never persisted.
 

@@ -294,6 +294,7 @@ enum MessengerDiagnosticEvent: String, Sendable {
     case messengerLocalMappingFailed
 
     case messengerSwiftDataContainerLoadFailed
+    case messengerSwiftDataContainerOpened
     case messengerSwiftDataContainerRecoveredAfterSchemaMismatch
 
     case messengerConversationCacheLoadStarted
@@ -357,6 +358,23 @@ enum MessengerDiagnosticEvent: String, Sendable {
     case messengerDeliveryAckScheduled
     case messengerDeliveryAckSucceeded
     case messengerDeliveryAckFailed
+    case messengerDeliveryAckRetryScheduled
+    case messengerDeliveryAckNetworkRestored
+    case messengerDeliveryAckPendingCleared
+    case messengerDeliveryAckApplyFailed
+    case messengerDeliveryAckBackgroundPushReceived
+    case messengerDeliveryAckBackgroundPushSkipped
+    case messengerDeliveryAckDeferredCoverage
+    case messengerDeliveryAckDeferredRevisionGap
+    case messengerDeliveryAckBoundaryPersisted
+    case messengerDeliveryAckBoundaryPersistenceFailed
+    case messengerDeliveryAckBootstrapStarted
+    case messengerDeliveryAckBootstrapLoaded
+    case messengerDeliveryAckBootstrapIgnoredStaleSession
+    case messengerDeliveryAckBootstrapScheduled
+    case messengerDeliveryAckPendingRetainedHigherBoundary
+    case messengerDeliveryAckPendingCleanupFailed
+    case messengerDeliveryAckIgnoredWrongOwner
     case messengerReadAckScheduled
     case messengerReadAckSucceeded
     case messengerReadAckFailed

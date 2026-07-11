@@ -13,6 +13,8 @@ enum MessengerMessageCacheService {
 
     #if DEBUG
     static var testingStore: MessengerLocalStore?
+    /// When non-empty, `persistDeltaMessage` returns false for matching message IDs.
+    static var testingFailPersistForMessageIDs: Set<UUID> = []
     #endif
 
     private static var localStore: MessengerLocalStore {
@@ -79,31 +81,40 @@ enum MessengerMessageCacheService {
         }
     }
 
+    @discardableResult
     static func persistRESTMessages(
         _ messages: [MessageDTO],
         conversationID: UUID
-    ) async {
+    ) async -> Bool {
         await upsertMessages(messages, conversationID: conversationID, source: .rest)
     }
 
+    @discardableResult
     static func persistPaginationMessages(
         _ messages: [MessageDTO],
         conversationID: UUID
-    ) async {
+    ) async -> Bool {
         await upsertMessages(messages, conversationID: conversationID, source: .pagination)
     }
 
+    @discardableResult
     static func persistDeltaMessage(
         _ message: MessageDTO,
         eventType: String
-    ) async {
-        await upsertMessages([message], conversationID: message.conversationID, source: .delta, eventType: eventType)
+    ) async -> Bool {
+        #if DEBUG
+        if testingFailPersistForMessageIDs.contains(message.id) {
+            return false
+        }
+        #endif
+        return await upsertMessages([message], conversationID: message.conversationID, source: .delta, eventType: eventType)
     }
 
+    @discardableResult
     static func persistRealtimeMessage(
         _ message: MessageDTO,
         eventType: String?
-    ) async {
+    ) async -> Bool {
         await upsertMessages(
             [message],
             conversationID: message.conversationID,
@@ -182,13 +193,14 @@ enum MessengerMessageCacheService {
         }
     }
 
+    @discardableResult
     private static func upsertMessages(
         _ messages: [MessageDTO],
         conversationID: UUID,
         source: MessengerMessageCacheSource,
         eventType: String? = nil
-    ) async {
-        guard !messages.isEmpty else { return }
+    ) async -> Bool {
+        guard !messages.isEmpty else { return true }
 
         let startedAt = Date()
         MessengerDiagnostics.event(
@@ -222,6 +234,7 @@ enum MessengerMessageCacheService {
             default:
                 MessengerDiagnostics.event(.messengerMessageCacheUpsertSucceeded, conversationID: conversationID, metadata: metadata)
             }
+            return true
         } catch {
             logUpsertFailed(
                 error: error,
@@ -230,6 +243,7 @@ enum MessengerMessageCacheService {
                 eventType: eventType,
                 conversationID: conversationID
             )
+            return false
         }
     }
 

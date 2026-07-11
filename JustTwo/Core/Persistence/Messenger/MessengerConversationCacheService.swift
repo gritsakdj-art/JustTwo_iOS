@@ -65,7 +65,8 @@ enum MessengerConversationCacheService {
         }
     }
 
-    static func persistRESTConversations(_ conversations: [ConversationDTO]) async {
+    @discardableResult
+    static func persistRESTConversations(_ conversations: [ConversationDTO]) async -> Bool {
         await upsertConversations(conversations, source: .rest)
     }
 
@@ -160,18 +161,19 @@ enum MessengerConversationCacheService {
         }
     }
 
+    @discardableResult
     private static func upsertConversations(
         _ conversations: [ConversationDTO],
         source: MessengerConversationCacheSource,
         eventType: String? = nil
-    ) async {
-        guard MessengerLocalStorageFeatureFlags.isCachedConversationListEnabled else { return }
-        guard !conversations.isEmpty else { return }
+    ) async -> Bool {
+        guard MessengerLocalStorageFeatureFlags.isCachedConversationListEnabled else { return true }
+        guard !conversations.isEmpty else { return true }
 
         let writeContext = MessengerCacheWriteContext.capture(from: localStore)
         if let reason = writeContext.staleReason(store: localStore) {
             MessengerCacheWriteGuard.logIgnored(reason: reason, context: writeContext, source: source, store: localStore)
-            return
+            return false
         }
 
         let startedAt = Date()
@@ -187,7 +189,7 @@ enum MessengerConversationCacheService {
             try await localStore.upsertConversations(conversations)
             if let reason = writeContext.staleReason(store: localStore) {
                 MessengerCacheWriteGuard.logIgnored(reason: reason, context: writeContext, source: source, store: localStore)
-                return
+                return false
             }
             for conversation in conversations {
                 if let lastSeenAt = conversation.otherParticipant?.profile.presence?.lastSeenAt,
@@ -221,6 +223,7 @@ enum MessengerConversationCacheService {
             } else {
                 MessengerDiagnostics.event(.messengerConversationCacheUpsertSucceeded, metadata: metadata)
             }
+            return true
         } catch MessengerLocalStoreError.staleSession {
             MessengerCacheWriteGuard.logIgnored(
                 reason: "staleSession",
@@ -228,8 +231,10 @@ enum MessengerConversationCacheService {
                 source: source,
                 store: localStore
             )
+            return false
         } catch {
             logUpsertFailed(error: error, source: source, startedAt: startedAt, eventType: eventType)
+            return false
         }
     }
 

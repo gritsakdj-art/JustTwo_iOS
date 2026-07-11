@@ -291,10 +291,23 @@ final class MessageCacheStore {
                     response: response,
                     fetchedMessages: mapped
                 )
-                await MessengerMessageCacheService.persistRESTMessages(
+                let persisted = await MessengerMessageCacheService.persistRESTMessages(
                     response.messages,
                     conversationID: conversationID
                 )
+                if persisted {
+                    await MessengerSyncEngine.shared.runGlobalSync(
+                        reason: .chatOpened,
+                        session: session,
+                        router: router
+                    )
+                } else {
+                    MessengerDiagnostics.event(
+                        .messengerDeliveryAckApplyFailed,
+                        conversationID: conversationID,
+                        metadata: ["source": "restMessages", "phase": "persistRESTMessages"]
+                    )
+                }
                 emitNetworkRefreshSucceeded(
                     reason: reason,
                     conversationID: conversationID,
@@ -665,10 +678,17 @@ final class MessageCacheStore {
                 response: response,
                 fetchedMessages: mapped
             )
-            await MessengerMessageCacheService.persistPaginationMessages(
+            let persisted = await MessengerMessageCacheService.persistPaginationMessages(
                 response.messages,
                 conversationID: conversationID
             )
+            if !persisted {
+                MessengerDiagnostics.event(
+                    .messengerDeliveryAckApplyFailed,
+                    conversationID: conversationID,
+                    metadata: ["source": "pagination", "phase": "persistPaginationMessages"]
+                )
+            }
             let nextCursorLabel = entries[conversationID]?.olderMessagesCursor.map { String($0.prefix(8)) } ?? "nil"
             NetworkDebug.log("Older messages loaded incoming=\(mapped.count) total=\(entries[conversationID]?.messages.count ?? 0) nextCursor=\(nextCursorLabel)")
             MessengerDiagnostics.event(

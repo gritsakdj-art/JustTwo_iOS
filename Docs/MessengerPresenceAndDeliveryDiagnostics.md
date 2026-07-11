@@ -1,8 +1,8 @@
-# Messenger Presence And Delivery Diagnostics (PR20A / PR20C)
+# Messenger Presence And Delivery Diagnostics (PR20A / PR20C / PR20D2)
 
 Audit and stabilization notes for realtime presence and delivery acknowledgements.
 
-**Status:** PR20A + PR20C implemented on feature branches. Manual smoke **NOT RUN**.
+**Status:** PR20A + PR20C implemented on feature branches. PR20D2 iOS delivery ACK coverage hardening implemented on `ios-messenger-delivery-acks-pr20d2`. Manual smoke **NOT RUN**.
 
 Related roadmap:
 
@@ -201,7 +201,7 @@ Sender → message persisted → message.created + optional APNs
 Recipient applies message via:
   realtime | sync delta | REST list/fetch | chat open
   → local apply/dedup in messenger layer completes
-  → ConversationDeliveryAckCoordinator (dedup, foreground gate)
+  → ConversationDeliveryAckCoordinator (monotonic boundary, coalescing, retry)
   → PATCH /conversations/:id/delivered
 Backend advances lastDeliveredAt if newer
   → conversation.delivered realtime + sync event (if advanced)
@@ -210,7 +210,89 @@ Sender UI applies deliveryStatus / conversation.delivered
 
 Active chat: `markDelivered` then `markRead` independently — delivered does not wait for read success. Backend `markRead` also advances delivered (read implies delivered).
 
-**Not implemented:** background/silent push delivery ack. **APNs acceptance ≠ delivered.**
+Delivery ACK is scheduled only after the inbound message has been applied to the messenger data layer, the local store write has succeeded, and the source provides contiguous coverage evidence. Foreground chat visibility is not required for delivered; read still requires opening/using the chat.
+
+PR20D2 separates:
+
+- **Applied local boundary:** highest inbound message seen locally in memory/cache.
+- **Proven safe boundary:** highest inbound boundary backed by authoritative coverage evidence.
+- **Pending / in-flight / confirmed:** network ACK lifecycle after a boundary is proven safe.
+
+Realtime, REST pages, pagination, and conversation previews can advance the applied local boundary but cannot directly call `PATCH /delivered`. They defer via diagnostics (`messengerDeliveryAckDeferredCoverage`) and rely on delta reconciliation. Authoritative global delta sync is the primary coverage proof.
+
+**Durable proven-safe boundary recovery (PR20D2):** the highest proven-safe boundary is persisted durably and account-scoped (`LocalMessengerPendingDeliveryReceipt`, key `ownerProfileID|conversationID`). The sync cursor advance and the boundary persist happen in a single atomic `ModelContext.save()` (`commitAuthoritativeSyncPage`), and the network ACK is scheduled only after that commit returns. On cold start, `ConversationDeliveryAckCoordinator.bootstrapPersistedBoundaries(ownerProfileID:…)` reloads the current owner's boundaries and replays the ACK without opening a chat. A successful backend ACK clears only the covered boundary (a strictly higher persisted boundary is retained and ACKed next). Backend duplicate ACK is a safe no-op (PR20D1), so replay after termination is safe.
+
+Current iOS apply paths:
+
+```text
+realtime message.created
+  → decode
+  → memory apply / dedup
+  → SwiftData message persist
+  → request coalesced delta reconciliation
+  → no direct delivery ACK
+
+delta sync message.created
+  → decode
+  → memory apply / dedup
+  → SwiftData message persist
+  → atomic commit: cursor advance + proven-safe boundary persist (one save)
+  → authoritative delivery ACK scheduled only after successful commit
+
+cold-start bootstrap (background warmup, no chat open)
+  → load durable pending boundaries for current owner
+  → re-check session generation + owner after await
+  → replay delivered ACK via existing pipeline
+  → successful ACK clears only the covered boundary
+
+REST messages refresh / startup preload / repair
+  → decode
+  → merge / dedup
+  → SwiftData message persist
+  → request coalesced delta reconciliation
+  → no direct delivery ACK
+
+conversation list REST refresh
+  → decode
+  → preview apply
+  → SwiftData conversation + last-message snapshot persist
+  → no delivery ACK candidate; preview is not message data-layer apply
+
+message fetch after list/cold-start/reconnect repair
+  → decode
+  → merge / dedup
+  → SwiftData message + attachment metadata persist
+  → request coalesced delta reconciliation
+  → no direct delivery ACK
+
+pagination / older messages
+  → decode
+  → merge / dedup
+  → SwiftData message + attachment metadata persist
+  → no delivery ACK candidate
+
+background remote notification
+  → parse route only
+  → no delivered ACK from payload alone
+  → silent-push fetch/apply callback is deferred to PR20D3
+```
+
+Background handling is best-effort and depends on iOS launching the app for a remote notification with the required APNs background delivery conditions. APNs acceptance, notification display, and notification tap are not delivered. Force-quit can prevent background execution. PR20D2 intentionally removed the incomplete background fetch ACK callback; hardened expiration-safe background ACK is PR20D3.
+
+Manual smoke checklist:
+
+```text
+1. A sends to B while B app is foreground on conversation list: B applies realtime/REST locally, delta reconciliation proves coverage, then B ACKs delivered without opening chat.
+2. A sends to B while B is in another chat: B ACKs delivered only after authoritative delta proof; read only advances if B opens A's chat.
+3. B receives realtime message while local persistence is forced to fail: no delivered ACK; diagnostic messengerDeliveryAckApplyFailed appears.
+4. B is offline during ACK send: pending ACK retries after network restore / app foreground.
+5. B logs out or switches account before retry: pending ACK is cleared and stale retry is ignored.
+6. B receives push in background: no ACK from payload alone; hardened background fetch/apply ACK is deferred to PR20D3.
+7. Durable recovery: B applies an inbound message via delta sync (boundary persisted), network is disabled before ACK, B is force-quit, network restored, B relaunched → pending boundary loads on cold start without opening the chat, ACK replays, A sees delivered. A subsequent relaunch after successful cleanup issues no ACK.
+8. Higher boundary: ACK C in flight, sync applies D, C succeeds → D remains pending and is ACKed next.
+9. Account switch: B has a pending ACK, logout, login D → B's ACK never sent with D's JWT; diagnostics contain no JWT/content.
+10. Upgrade existing install (schema v5 → v6): store opens without destructive recreation, conversations/messages/outbox/media survive, new pending-boundary storage works.
+```
 
 ---
 
@@ -248,17 +330,30 @@ IDs are truncated (8 hex chars + `...`). No JWT, bodies, or signed URLs.
 | `presenceEventReceived` | presence.changed received |
 | `presenceStateApplied` / `presenceStateIgnored` | store update outcome |
 | `presenceCacheLoaded` | reconnect preserve note |
-| `deliveryMessageObserved` | inbound message seen in data layer |
-| `deliveryAckScheduled` | ack path entered |
+| `messengerDeliveryAckDeferredCoverage` | local apply observed but source lacks coverage proof |
+| `messengerDeliveryAckScheduled` | proven safe boundary scheduled |
+| `messengerDeliveryAckBoundaryPersisted` | proven-safe boundary durably committed with cursor |
+| `messengerDeliveryAckBoundaryPersistenceFailed` | atomic cursor+boundary commit failed (page retryable) |
+| `messengerDeliveryAckBootstrapStarted` / `…Loaded` | cold-start recovery started / owner boundaries loaded |
+| `messengerDeliveryAckBootstrapScheduled` | recovered boundary re-scheduled for ACK |
+| `messengerDeliveryAckBootstrapIgnoredStaleSession` | bootstrap ignored (generation changed / already in flight / load failed) |
+| `messengerDeliveryAckPendingCleared` | durable boundary cleared after confirmed ACK / reset |
+| `messengerDeliveryAckPendingRetainedHigherBoundary` | higher persisted boundary retained over lower ACK |
+| `messengerDeliveryAckPendingCleanupFailed` | post-ACK durable cleanup failed (record may survive; duplicate replay is a safe no-op) |
+| `messengerDeliveryAckIgnoredWrongOwner` | boundary owner mismatched current session owner |
+| `deliveryMessageObserved` | legacy inbound message observation |
+| `deliveryAckScheduled` | legacy ack path entered |
 | existing `deliveredAckSent` / `Skipped` / `Failed` | REST ack result |
+
+Fields are privacy-safe: truncated conversation/message IDs, `count`, `reason`, `sessionGeneration`, `source`, `errorCategory`. Never: JWT/Authorization/Bearer, message body, caption, raw payload, device token, signed URL, storage key, absolute path, owner email/display name. The durable `key` is never logged in full.
 
 ---
 
 ## Known limitations (product / platform)
 
 1. **Background WebSocket:** default `messagesEnabled == false` disconnects WS in background → peer appears offline. Product policy undecided.
-2. **No silent push delivery ack:** no `didReceiveRemoteNotification` handler; APNs success ≠ delivered.
-3. **Foreground gate:** all delivery acks still require `UIApplication` active. Background ack is **PR20D2**.
+2. **No silent push delivery ack:** no active `didReceiveRemoteNotification` delivery ACK handler; APNs success ≠ delivered. Hardened background ACK is **PR20D3**.
+3. **Coverage gate:** delivered ACK requires authoritative delta proof or a durably persisted safe boundary recovery (PR20D2 cold-start bootstrap); local max message alone is not enough.
 4. **Presence not in REST/sync:** preserved reconnect state is provisional (90s TTL); full freshness is **PR20B/C**.
 5. **Single-instance in-memory presence:** no multi-node registry.
 6. **`lastSeenAt` ephemeral:** disconnect-time only; not persisted (PR20B).
@@ -286,11 +381,13 @@ IDs are truncated (8 hex chars + `...`). No JWT, bodies, or signed URLs.
 **Proven:**
 
 1. Every ack path gated on foreground `.active`.
-2. Sync delta applied messages **without** scheduling ack (fixed in PR20A for foreground sync).
+2. Sync delta applied messages **without** scheduling ack (fixed in PR20A for foreground sync, hardened in PR20D2 with coverage evidence).
 3. No background/silent push ack path.
-4. Chat open is **not** the only trigger (list REST + inactive realtime also ack), but all require foreground.
+4. Chat open is **not** the only trigger; inactive realtime/REST can trigger delta reconciliation, but direct delivered ACK requires authoritative proof.
 
-**Deferred:** PR20D2 background acknowledgements; PR20D1 backend hardening.
+**Shipped in PR20D2:** durable persisted proven-safe boundary recovery with atomic cursor+boundary commit and cold-start bootstrap.
+
+**Deferred:** PR20D3 background remote-notification acknowledgements (`AppDelegate` unchanged; incomplete callback not restored).
 
 ---
 

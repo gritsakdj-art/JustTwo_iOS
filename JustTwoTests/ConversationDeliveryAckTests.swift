@@ -7,6 +7,40 @@ import Testing
 @Suite("Conversation Delivery Ack Tests")
 struct ConversationDeliveryAckTests {
 
+    @Test("message receipt boundary orders by createdAt before UUID")
+    func receiptBoundaryOrdersByCreatedAtBeforeUUID() {
+        let older = MessageReceiptBoundary(
+            createdAt: Date(timeIntervalSince1970: 10),
+            messageID: UUID(uuidString: "ffffffff-ffff-ffff-ffff-ffffffffffff")!
+        )
+        let newer = MessageReceiptBoundary(
+            createdAt: Date(timeIntervalSince1970: 11),
+            messageID: UUID(uuidString: "00000000-0000-0000-0000-000000000000")!
+        )
+
+        #expect(older < newer)
+    }
+
+    @Test("message receipt boundary uses PostgreSQL UUID byte ordering")
+    func receiptBoundaryUsesPostgreSQLUUIDByteOrdering() {
+        let createdAt = Date(timeIntervalSince1970: 20)
+        let ids = [
+            "00000000-0000-0000-0000-000000000000",
+            "00000000-0000-0000-0000-000000000001",
+            "00000000-0000-0000-0000-0000000000ff",
+            "00000000-0000-0000-0000-000000000100",
+            "7fffffff-ffff-ffff-ffff-ffffffffffff",
+            "80000000-0000-0000-0000-000000000000",
+            "ffffffff-ffff-ffff-ffff-ffffffffffff"
+        ].map { UUID(uuidString: $0)! }
+
+        let boundaries = ids.map {
+            MessageReceiptBoundary(createdAt: createdAt, messageID: $0)
+        }
+
+        #expect(boundaries.sorted().map(\.messageID) == ids)
+    }
+
     @Test("read ack implies delivered boundary locally")
     func readAckImpliesDeliveredBoundaryLocally() {
         let coordinator = ConversationDeliveryAckCoordinator.makeForTesting()
@@ -40,8 +74,8 @@ struct ConversationDeliveryAckTests {
         #expect(!coordinator.shouldSendRead(conversationID: conversationID, messageID: messageID))
     }
 
-    @Test("conversation list load sends delivered ack for inbound last message")
-    func conversationListLoadSendsDeliveredAck() async throws {
+    @Test("conversation list preview does not send delivered ack for inbound last message")
+    func conversationListPreviewDoesNotSendDeliveredAck() async throws {
         let coordinator = ConversationDeliveryAckCoordinator.makeForTesting()
         var deliveredCalls: [(UUID, UUID)] = []
         coordinator.markDeliveredHandler = { conversationID, messageID in
@@ -59,6 +93,60 @@ struct ConversationDeliveryAckTests {
             currentProfileID: fixedCurrentProfileID(),
             session: makeAuthenticatedSession(),
             router: AppRouter.shared
+        )
+
+        #expect(deliveredCalls.isEmpty)
+    }
+
+    @Test("REST message page defers delivered ack until authoritative sync")
+    func restMessagePageDefersDeliveredAckUntilAuthoritativeSync() async throws {
+        let coordinator = ConversationDeliveryAckCoordinator.makeForTesting()
+        var deliveredCalls: [(UUID, UUID)] = []
+        coordinator.markDeliveredHandler = { conversationID, messageID in
+            deliveredCalls.append((conversationID, messageID))
+        }
+
+        let conversation = try makeConversationDTO(
+            conversationID: fixedConversationID(),
+            lastMessageSenderID: fixedOtherProfileID(),
+            lastMessageID: fixedMessageID()
+        )
+
+        await coordinator.acknowledgeDeliveredForConversations(
+            [conversation],
+            currentProfileID: fixedCurrentProfileID(),
+            session: makeAuthenticatedSession(),
+            router: AppRouter.shared
+        )
+
+        #expect(deliveredCalls.isEmpty)
+
+        let message = try makeMessageDTO(
+            id: fixedMessageID(),
+            conversationID: fixedConversationID(),
+            senderProfileID: fixedOtherProfileID()
+        )
+
+        await coordinator.acknowledgeDeliveredIfNeeded(
+            conversationID: fixedConversationID(),
+            message: message,
+            currentProfileID: fixedCurrentProfileID(),
+            session: makeAuthenticatedSession(),
+            router: AppRouter.shared,
+            source: "restMessages",
+            evidence: .partialRESTPage
+        )
+
+        #expect(deliveredCalls.isEmpty)
+
+        await coordinator.acknowledgeDeliveredIfNeeded(
+            conversationID: fixedConversationID(),
+            message: message,
+            currentProfileID: fixedCurrentProfileID(),
+            session: makeAuthenticatedSession(),
+            router: AppRouter.shared,
+            source: "deltaSync",
+            evidence: .authoritativeSync(fromRevision: 10, throughRevision: 12)
         )
 
         #expect(deliveredCalls.count == 1)
@@ -90,8 +178,8 @@ struct ConversationDeliveryAckTests {
         #expect(deliveredCalls == 0)
     }
 
-    @Test("duplicate list refresh does not repeat delivered ack")
-    func duplicateListRefreshDoesNotRepeatDeliveredAck() async throws {
+    @Test("duplicate list refresh never sends delivered ack from preview")
+    func duplicateListRefreshNeverSendsDeliveredAckFromPreview() async throws {
         let coordinator = ConversationDeliveryAckCoordinator.makeForTesting()
         var deliveredCalls = 0
         coordinator.markDeliveredHandler = { _, _ in
@@ -118,11 +206,11 @@ struct ConversationDeliveryAckTests {
             router: AppRouter.shared
         )
 
-        #expect(deliveredCalls == 1)
+        #expect(deliveredCalls == 0)
     }
 
-    @Test("realtime inactive conversation sends delivered ack")
-    func realtimeInactiveConversationSendsDeliveredAck() async throws {
+    @Test("realtime inactive conversation defers delivered ack without coverage proof")
+    func realtimeInactiveConversationDefersDeliveredAckWithoutCoverageProof() async throws {
         let coordinator = ConversationDeliveryAckCoordinator.makeForTesting()
         var deliveredCalls: [(UUID, UUID)] = []
         coordinator.markDeliveredHandler = { conversationID, messageID in
@@ -143,11 +231,11 @@ struct ConversationDeliveryAckTests {
             router: AppRouter.shared
         )
 
-        #expect(deliveredCalls.count == 1)
+        #expect(deliveredCalls.isEmpty)
     }
 
-    @Test("sync source schedules delivered ack without requiring chat open")
-    func syncSourceSchedulesDeliveredAckWithoutChatOpen() async throws {
+    @Test("authoritative sync schedules delivered ack without requiring chat open")
+    func authoritativeSyncSchedulesDeliveredAckWithoutChatOpen() async throws {
         let coordinator = ConversationDeliveryAckCoordinator.makeForTesting()
         var deliveredCalls: [(UUID, UUID)] = []
         coordinator.markDeliveredHandler = { conversationID, messageID in
@@ -166,7 +254,8 @@ struct ConversationDeliveryAckTests {
             currentProfileID: fixedCurrentProfileID(),
             session: makeAuthenticatedSession(),
             router: AppRouter.shared,
-            source: "sync"
+            source: "deltaSync",
+            evidence: .authoritativeSync(fromRevision: 20, throughRevision: 21)
         )
 
         #expect(deliveredCalls.count == 1)
@@ -194,7 +283,35 @@ struct ConversationDeliveryAckTests {
             currentProfileID: fixedCurrentProfileID(),
             session: makeAuthenticatedSession(),
             router: AppRouter.shared,
-            source: "sync"
+            source: "deltaSync",
+            evidence: .authoritativeSync(fromRevision: 20, throughRevision: 21)
+        )
+
+        #expect(deliveredCalls == 0)
+    }
+
+    @Test("pagination page never schedules delivered ack")
+    func paginationPageNeverSchedulesDeliveredAck() async throws {
+        let coordinator = ConversationDeliveryAckCoordinator.makeForTesting()
+        var deliveredCalls = 0
+        coordinator.markDeliveredHandler = { _, _ in
+            deliveredCalls += 1
+        }
+
+        let message = try makeMessageDTO(
+            id: fixedMessageID(),
+            conversationID: fixedConversationID(),
+            senderProfileID: fixedOtherProfileID()
+        )
+
+        await coordinator.acknowledgeDeliveredIfNeeded(
+            conversationID: fixedConversationID(),
+            message: message,
+            currentProfileID: fixedCurrentProfileID(),
+            session: makeAuthenticatedSession(),
+            router: AppRouter.shared,
+            source: "pagination",
+            evidence: .paginationPage
         )
 
         #expect(deliveredCalls == 0)

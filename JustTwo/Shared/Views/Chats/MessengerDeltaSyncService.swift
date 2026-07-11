@@ -20,7 +20,21 @@ final class MessengerDeltaSyncService {
     private(set) var lastFailureError: Error?
     private(set) var lastRunHadMorePages = false
 
+    #if DEBUG
+    /// When set, authoritative delivery ACK scheduling uses this coordinator instead of `.shared`.
+    var testingDeliveryAckCoordinator: ConversationDeliveryAckCoordinator?
+    #endif
+
     private let minimumInterval: TimeInterval = 3
+
+    private var localStore: MessengerLocalStore {
+        #if DEBUG
+        if let testingStore = MessengerMessageCacheService.testingStore {
+            return testingStore
+        }
+        #endif
+        return .shared
+    }
 
     init(
         syncState: MessengerSyncStateStore? = nil,
@@ -129,6 +143,7 @@ final class MessengerDeltaSyncService {
             while pageCount < MessengerSyncEngineLimits.maxPagesPerRun {
                 guard generation == sessionGeneration else { return false }
 
+                let pageStartRevision = cursor + 1
                 let page = try await MessengerSyncService.fetchSyncEvents(afterRevision: cursor)
                 MessengerDiagnostics.event(
                     .deltaSyncPageFetched,
@@ -144,7 +159,7 @@ final class MessengerDeltaSyncService {
 
                 try validateRevisionOrder(events: page.events, afterRevision: cursor)
 
-                try await apply(
+                let applyResult = try await apply(
                     events: page.events,
                     profileID: profileID,
                     session: session,
@@ -155,17 +170,56 @@ final class MessengerDeltaSyncService {
 
                 guard generation == sessionGeneration else { return false }
 
-                cursor = page.nextRevision
-                syncState.advance(to: cursor)
-                if let onGlobalCursorAdvanced {
-                    await onGlobalCursorAdvanced(cursor)
+                let nextCursor = page.nextRevision
+                let pageBoundaries = boundaries(from: applyResult.safeAckMessages)
+                let committedBoundaries: [UUID: MessageReceiptBoundary]
+                do {
+                    committedBoundaries = try await localStore.commitAuthoritativeSyncPage(
+                        ownerProfileID: profileID,
+                        advancedRevision: nextCursor,
+                        safeBoundaries: pageBoundaries
+                    )
+                } catch {
+                    syncState.unmarkRevisionsApplied(applyResult.newlyAppliedRevisions)
+                    MessengerDiagnostics.event(
+                        .messengerDeliveryAckBoundaryPersistenceFailed,
+                        metadata: [
+                            "reason": reason.rawValue,
+                            "phase": "commitAuthoritativeSyncPage",
+                            "errorCategory": MessengerDiagnostics.sanitizeError(error)
+                        ]
+                    )
+                    throw error
                 }
+
+                guard generation == sessionGeneration else { return false }
+
+                cursor = nextCursor
+                syncState.advance(to: cursor)
                 MessengerDiagnostics.event(
                     .deltaSyncCursorAdvanced,
                     metadata: [
                         "revision": "\(cursor)",
                         "reason": reason.rawValue
                     ]
+                )
+                if !committedBoundaries.isEmpty {
+                    MessengerDiagnostics.event(
+                        .messengerDeliveryAckBoundaryPersisted,
+                        metadata: [
+                            "count": "\(committedBoundaries.count)",
+                            "throughRevision": "\(cursor)"
+                        ]
+                    )
+                }
+
+                await scheduleAuthoritativeDeliveryAcks(
+                    committedBoundaries,
+                    profileID: profileID,
+                    session: session,
+                    router: router,
+                    fromRevision: pageStartRevision,
+                    throughRevision: cursor
                 )
 
                 pageCount += 1
@@ -227,12 +281,13 @@ final class MessengerDeltaSyncService {
             while pageCount < MessengerSyncEngineLimits.maxPagesPerRun {
                 guard generation == sessionGeneration else { return false }
 
+                let pageStartRevision = cursor + 1
                 let page = try await MessengerSyncService.fetchSyncEvents(
                     afterRevision: cursor,
                     conversationID: conversationID
                 )
 
-                try await apply(
+                let applyResult = try await apply(
                     events: page.events,
                     profileID: profileID,
                     session: session,
@@ -242,6 +297,34 @@ final class MessengerDeltaSyncService {
                 )
                 appliedEventCount += page.events.count
                 cursor = page.nextRevision
+                let pageBoundaries = boundaries(from: applyResult.safeAckMessages)
+                let committedBoundaries: [UUID: MessageReceiptBoundary]
+                do {
+                    committedBoundaries = try await localStore.commitAuthoritativeSyncPage(
+                        ownerProfileID: profileID,
+                        advancedRevision: nil,
+                        safeBoundaries: pageBoundaries
+                    )
+                } catch {
+                    syncState.unmarkRevisionsApplied(applyResult.newlyAppliedRevisions)
+                    MessengerDiagnostics.event(
+                        .messengerDeliveryAckBoundaryPersistenceFailed,
+                        metadata: [
+                            "reason": "conversationRepair",
+                            "phase": "commitAuthoritativeSyncPage",
+                            "errorCategory": MessengerDiagnostics.sanitizeError(error)
+                        ]
+                    )
+                    throw error
+                }
+                await scheduleAuthoritativeDeliveryAcks(
+                    committedBoundaries,
+                    profileID: profileID,
+                    session: session,
+                    router: router,
+                    fromRevision: pageStartRevision,
+                    throughRevision: cursor
+                )
                 pageCount += 1
 
                 if !page.hasMore {
@@ -313,7 +396,7 @@ final class MessengerDeltaSyncService {
         router: AppRouter,
         sessionGeneration: Int? = nil,
         requestConnectionEpoch: Int? = nil
-    ) async throws {
+    ) async throws -> [UUID: MessageDTO] {
         try await apply(
             events: events,
             profileID: profileID,
@@ -321,6 +404,124 @@ final class MessengerDeltaSyncService {
             router: router,
             sessionGeneration: sessionGeneration ?? self.sessionGeneration,
             requestConnectionEpoch: requestConnectionEpoch ?? PresenceStore.shared.currentRealtimeConnectionEpoch
+        ).safeAckMessages
+    }
+
+    private struct ApplyPageResult {
+        let safeAckMessages: [UUID: MessageDTO]
+        let newlyAppliedRevisions: Set<Int64>
+    }
+
+    private func apply(
+        events: [MessengerSyncEventDTO],
+        profileID: UUID,
+        session: SessionStore,
+        router: AppRouter,
+        sessionGeneration: Int,
+        requestConnectionEpoch: Int
+    ) async throws -> ApplyPageResult {
+        guard !events.isEmpty else { return ApplyPageResult(safeAckMessages: [:], newlyAppliedRevisions: []) }
+        guard sessionGeneration == self.sessionGeneration else {
+            return ApplyPageResult(safeAckMessages: [:], newlyAppliedRevisions: [])
+        }
+
+        MessengerDiagnostics.event(
+            .deltaSyncPageApplyStarted,
+            metadata: ["eventCount": "\(events.count)"]
+        )
+
+        let sorted = events.sorted { $0.revision < $1.revision }
+        let activeConversationID = activeChatViewModel()?.conversation.id
+        var safeAckMessagesByConversation: [UUID: MessageDTO] = [:]
+        var newlyAppliedRevisions: Set<Int64> = []
+
+        for event in sorted {
+            guard sessionGeneration == self.sessionGeneration else {
+                MessengerDiagnostics.event(
+                    .deltaSyncFailed,
+                    metadata: ["reason": "sessionResetDuringApply"]
+                )
+                return ApplyPageResult(safeAckMessages: [:], newlyAppliedRevisions: newlyAppliedRevisions)
+            }
+
+            if syncState.hasAppliedRevision(event.revision) {
+                MessengerDiagnostics.event(
+                    .deltaEventSkippedDuplicateRevision,
+                    conversationID: event.conversationID,
+                    messageID: event.messageID,
+                    metadata: [
+                        "revision": "\(event.revision)",
+                        "type": event.type.rawValue
+                    ]
+                )
+                continue
+            }
+
+            MessengerDiagnostics.event(
+                .deltaEventReceived,
+                conversationID: event.conversationID,
+                messageID: event.messageID,
+                clientMessageID: event.message?.clientMessageID,
+                metadata: [
+                    "revision": "\(event.revision)",
+                    "type": event.type.rawValue,
+                    "source": "delta"
+                ]
+            )
+
+            let ackCandidate = try await applyEvent(
+                event,
+                profileID: profileID,
+                activeConversationID: activeConversationID,
+                session: session,
+                router: router,
+                requestConnectionEpoch: requestConnectionEpoch
+            )
+            if let ackCandidate {
+                safeAckMessagesByConversation[event.conversationID] = highestMessage(
+                    safeAckMessagesByConversation[event.conversationID],
+                    ackCandidate
+                )
+            }
+            syncState.markRevisionApplied(event.revision)
+            newlyAppliedRevisions.insert(event.revision)
+
+            MessengerDiagnostics.event(
+                .deltaEventApplied,
+                conversationID: event.conversationID,
+                messageID: event.messageID,
+                clientMessageID: event.message?.clientMessageID,
+                metadata: [
+                    "revision": "\(event.revision)",
+                    "type": event.type.rawValue
+                ]
+            )
+        }
+
+        guard sessionGeneration == self.sessionGeneration else {
+            return ApplyPageResult(
+                safeAckMessages: safeAckMessagesByConversation,
+                newlyAppliedRevisions: newlyAppliedRevisions
+            )
+        }
+
+        MessengerDiagnostics.event(
+            .deltaSyncPageApplySucceeded,
+            metadata: ["eventCount": "\(sorted.count)"]
+        )
+
+        for conversationID in Set(sorted.map(\.conversationID)) {
+            guard sessionGeneration == self.sessionGeneration else {
+                return ApplyPageResult(
+                    safeAckMessages: safeAckMessagesByConversation,
+                    newlyAppliedRevisions: newlyAppliedRevisions
+                )
+            }
+            MessengerConversationNotification.postMessagesDidChange(conversationID: conversationID)
+        }
+        return ApplyPageResult(
+            safeAckMessages: safeAckMessagesByConversation,
+            newlyAppliedRevisions: newlyAppliedRevisions
         )
     }
 
@@ -377,94 +578,6 @@ final class MessengerDeltaSyncService {
         }
     }
 
-    private func apply(
-        events: [MessengerSyncEventDTO],
-        profileID: UUID,
-        session: SessionStore,
-        router: AppRouter,
-        sessionGeneration: Int,
-        requestConnectionEpoch: Int
-    ) async throws {
-        guard !events.isEmpty else { return }
-        guard sessionGeneration == self.sessionGeneration else { return }
-
-        MessengerDiagnostics.event(
-            .deltaSyncPageApplyStarted,
-            metadata: ["eventCount": "\(events.count)"]
-        )
-
-        let sorted = events.sorted { $0.revision < $1.revision }
-        let activeConversationID = activeChatViewModel()?.conversation.id
-
-        for event in sorted {
-            guard sessionGeneration == self.sessionGeneration else {
-                MessengerDiagnostics.event(
-                    .deltaSyncFailed,
-                    metadata: ["reason": "sessionResetDuringApply"]
-                )
-                return
-            }
-
-            if syncState.hasAppliedRevision(event.revision) {
-                MessengerDiagnostics.event(
-                    .deltaEventSkippedDuplicateRevision,
-                    conversationID: event.conversationID,
-                    messageID: event.messageID,
-                    metadata: [
-                        "revision": "\(event.revision)",
-                        "type": event.type.rawValue
-                    ]
-                )
-                continue
-            }
-
-            MessengerDiagnostics.event(
-                .deltaEventReceived,
-                conversationID: event.conversationID,
-                messageID: event.messageID,
-                clientMessageID: event.message?.clientMessageID,
-                metadata: [
-                    "revision": "\(event.revision)",
-                    "type": event.type.rawValue,
-                    "source": "delta"
-                ]
-            )
-
-            applyEvent(
-                event,
-                profileID: profileID,
-                activeConversationID: activeConversationID,
-                session: session,
-                router: router,
-                requestConnectionEpoch: requestConnectionEpoch
-            )
-            syncState.markRevisionApplied(event.revision)
-
-            MessengerDiagnostics.event(
-                .deltaEventApplied,
-                conversationID: event.conversationID,
-                messageID: event.messageID,
-                clientMessageID: event.message?.clientMessageID,
-                metadata: [
-                    "revision": "\(event.revision)",
-                    "type": event.type.rawValue
-                ]
-            )
-        }
-
-        guard sessionGeneration == self.sessionGeneration else { return }
-
-        MessengerDiagnostics.event(
-            .deltaSyncPageApplySucceeded,
-            metadata: ["eventCount": "\(sorted.count)"]
-        )
-
-        for conversationID in Set(sorted.map(\.conversationID)) {
-            guard sessionGeneration == self.sessionGeneration else { return }
-            MessengerConversationNotification.postMessagesDidChange(conversationID: conversationID)
-        }
-    }
-
     private func applyEvent(
         _ event: MessengerSyncEventDTO,
         profileID: UUID,
@@ -472,12 +585,12 @@ final class MessengerDeltaSyncService {
         session: SessionStore,
         router: AppRouter,
         requestConnectionEpoch: Int
-    ) {
+    ) async throws -> MessageDTO? {
         switch event.type {
         case .messageCreated, .messageEdited:
-            guard let message = event.message else { return }
+            guard let message = event.message else { return nil }
             logImageDeltaIfNeeded(event: event, message: message, phase: "received")
-            applyMessageSnapshot(
+            let ackCandidate = try await applyMessageSnapshot(
                 message,
                 conversationID: event.conversationID,
                 profileID: profileID,
@@ -504,11 +617,12 @@ final class MessengerDeltaSyncService {
                     eventType: event.type.rawValue
                 )
             }
+            return ackCandidate
 
         case .messageDeleted:
             if let message = event.message {
                 logImageDeltaIfNeeded(event: event, message: message, phase: "deleted")
-                applyMessageSnapshot(
+                _ = try await applyMessageSnapshot(
                     message,
                     conversationID: event.conversationID,
                     profileID: profileID,
@@ -540,8 +654,8 @@ final class MessengerDeltaSyncService {
             }
 
         case .reactionAdded, .reactionRemoved:
-            guard let message = event.message else { return }
-            applyMessageSnapshot(
+            guard let message = event.message else { return nil }
+            _ = try await applyMessageSnapshot(
                 message,
                 conversationID: event.conversationID,
                 profileID: profileID,
@@ -619,6 +733,7 @@ final class MessengerDeltaSyncService {
                 )
             }
         }
+        return nil
     }
 
     private func persistDeltaConversationCache(
@@ -643,7 +758,7 @@ final class MessengerDeltaSyncService {
         session: SessionStore,
         router: AppRouter,
         eventType: MessengerSyncEventType
-    ) {
+    ) async throws -> MessageDTO? {
         if activeConversationID == conversationID,
            let chat = activeChatViewModel() {
             let inserted = chat.applyRealtimeMessage(message, currentProfileID: profileID)
@@ -685,19 +800,16 @@ final class MessengerDeltaSyncService {
                     "target": "activeChat"
                 ]
             )
-            persistDeltaMessageCache(message, eventType: eventType.rawValue)
-            if eventType == .messageCreated {
-                // Active-chat path: apply completed above before scheduling ack.
-                scheduleDeliveryAckIfNeeded(
-                    message: message,
-                    conversationID: conversationID,
-                    profileID: profileID,
-                    session: session,
-                    router: router,
-                    source: "sync"
-                )
-            }
-            return
+            try await persistDeltaMessageCache(
+                message,
+                eventType: eventType.rawValue
+            )
+            return deliveryAckCandidate(
+                message: message,
+                conversationID: conversationID,
+                profileID: profileID,
+                eventType: eventType
+            )
         }
 
         let applied = messageCache.applyRealtimeMessage(
@@ -735,72 +847,92 @@ final class MessengerDeltaSyncService {
                 "target": "cache"
             ]
         )
-        persistDeltaMessageCache(message, eventType: eventType.rawValue)
-        if eventType == .messageCreated {
-            // Ack only after local apply/dedup attempt completed. Coordinator + backend
-            // keep boundary monotonic for duplicates.
-            scheduleDeliveryAckIfNeeded(
-                message: message,
-                conversationID: conversationID,
-                profileID: profileID,
-                session: session,
-                router: router,
-                source: "sync"
+        try await persistDeltaMessageCache(
+            message,
+            eventType: eventType.rawValue
+        )
+        return deliveryAckCandidate(
+            message: message,
+            conversationID: conversationID,
+            profileID: profileID,
+            eventType: eventType
+        )
+    }
+
+    private func persistDeltaMessageCache(
+        _ message: MessageDTO,
+        eventType: String
+    ) async throws {
+        let persisted = await MessengerMessageCacheService.persistDeltaMessage(message, eventType: eventType)
+        guard persisted else {
+            MessengerDiagnostics.event(
+                .messengerDeliveryAckApplyFailed,
+                conversationID: message.conversationID,
+                messageID: message.id,
+                metadata: ["source": "delta", "phase": "persistDeltaMessage"]
             )
+            throw MessengerSyncEngineError.applyFailed
         }
     }
 
-    private func scheduleDeliveryAckIfNeeded(
+    private func deliveryAckCandidate(
         message: MessageDTO,
         conversationID: UUID,
         profileID: UUID,
+        eventType: MessengerSyncEventType
+    ) -> MessageDTO? {
+        guard eventType == .messageCreated else { return nil }
+        guard message.conversationID == conversationID else { return nil }
+        guard message.deletedAt == nil else { return nil }
+        guard message.senderProfileID != profileID else { return nil }
+        guard message.kind == .text || message.kind == .image else { return nil }
+        guard MessageReceiptBoundary(message: message) != nil else { return nil }
+        return message
+    }
+
+    private func highestMessage(_ current: MessageDTO?, _ candidate: MessageDTO) -> MessageDTO {
+        guard let current else { return candidate }
+        guard let currentBoundary = MessageReceiptBoundary(message: current),
+              let candidateBoundary = MessageReceiptBoundary(message: candidate) else {
+            return current
+        }
+        return candidateBoundary > currentBoundary ? candidate : current
+    }
+
+    private func boundaries(from messagesByConversation: [UUID: MessageDTO]) -> [UUID: MessageReceiptBoundary] {
+        var result: [UUID: MessageReceiptBoundary] = [:]
+        for (conversationID, message) in messagesByConversation {
+            if let boundary = MessageReceiptBoundary(message: message) {
+                result[conversationID] = boundary
+            }
+        }
+        return result
+    }
+
+    private func scheduleAuthoritativeDeliveryAcks(
+        _ boundariesByConversation: [UUID: MessageReceiptBoundary],
+        profileID: UUID,
         session: SessionStore,
         router: AppRouter,
-        source: String
-    ) {
-        guard message.deletedAt == nil else { return }
-        guard message.senderProfileID != profileID else { return }
-        guard session.isFullyAuthenticated else {
-            MessengerDiagnostics.event(
-                .deliveredAckSkipped,
+        fromRevision: Int64,
+        throughRevision: Int64
+    ) async {
+        guard !boundariesByConversation.isEmpty else { return }
+        #if DEBUG
+        let coordinator = testingDeliveryAckCoordinator ?? ConversationDeliveryAckCoordinator.shared
+        #else
+        let coordinator = ConversationDeliveryAckCoordinator.shared
+        #endif
+        for (conversationID, boundary) in boundariesByConversation {
+            await coordinator.scheduleAuthoritativeBoundary(
                 conversationID: conversationID,
-                messageID: message.id,
-                metadata: ["reason": "unauthenticated", "source": source]
-            )
-            return
-        }
-
-        MessengerDiagnostics.event(
-            .deliveryMessageObserved,
-            conversationID: conversationID,
-            messageID: message.id,
-            metadata: [
-                "source": source,
-                "isAppForeground": "\(MessengerSessionSupport.isAppForegroundActive)"
-            ]
-        )
-        MessengerDiagnostics.event(
-            .deliveryAckScheduled,
-            conversationID: conversationID,
-            messageID: message.id,
-            metadata: ["source": source]
-        )
-
-        Task { @MainActor in
-            await ConversationDeliveryAckCoordinator.shared.acknowledgeDeliveredIfNeeded(
-                conversationID: conversationID,
-                message: message,
+                boundary: boundary,
                 currentProfileID: profileID,
                 session: session,
                 router: router,
-                source: source
+                source: "deltaSync",
+                evidence: .authoritativeSync(fromRevision: fromRevision, throughRevision: throughRevision)
             )
-        }
-    }
-
-    private func persistDeltaMessageCache(_ message: MessageDTO, eventType: String) {
-        Task {
-            await MessengerMessageCacheService.persistDeltaMessage(message, eventType: eventType)
         }
     }
 

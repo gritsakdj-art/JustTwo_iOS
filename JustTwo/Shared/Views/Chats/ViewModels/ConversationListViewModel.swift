@@ -292,20 +292,13 @@ final class ConversationListViewModel {
             requestConnectionEpoch: requestConnectionEpoch
         )
         bumpListContentGeneration()
-        let conversationsForAck = response.conversations
-        Task { @MainActor in
+        let persisted = await MessengerConversationCacheService.persistRESTConversations(response.conversations)
+        if !persisted {
             MessengerDiagnostics.event(
-                .messengerDeliveryAckScheduled,
-                metadata: ["source": "conversationListBatch", "count": "\(conversationsForAck.count)"]
-            )
-            await ConversationDeliveryAckCoordinator.shared.acknowledgeDeliveredForConversations(
-                conversationsForAck,
-                currentProfileID: profileID,
-                session: session,
-                router: router
+                .messengerDeliveryAckApplyFailed,
+                metadata: ["source": "conversationListBatch", "phase": "persistRESTConversations"]
             )
         }
-        await MessengerConversationCacheService.persistRESTConversations(response.conversations)
         syncMessengerBadge()
         didLoad = true
         lastNetworkRefreshAt = Date()

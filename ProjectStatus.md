@@ -355,6 +355,30 @@
 - **Manual smoke:** NOT RUN.
 - Out of scope: profile preview presence (PR25B), privacy hide-last-seen, new conversation details endpoint (deep-link gap).
 
+## 2026-07-11 (PR20D2)
+
+- Branch: `ios-messenger-delivery-acks-pr20d2`.
+- Fixed `AppDelegate.swift` unused-result warning by removing the incomplete background remote-notification ACK callback; hardened background ACK is deferred to PR20D3.
+- Added `MessageReceiptBoundary` ordering by `createdAt`, then PostgreSQL UUID byte ordering.
+- Added `DeliveryCoverageEvidence` and split delivered ACK state into applied local boundary, proven-safe boundary, pending, in-flight, and confirmed.
+- Conversation previews and pagination pages never schedule delivered ACK directly.
+- Realtime and REST message apply persist locally, then request delta reconciliation instead of ACKing the max local boundary.
+- Delta sync now schedules delivered ACK only after successful page apply, local persistence, and cursor advancement with `authoritativeSync` evidence.
+- Added diagnostics for deferred coverage and apply failures; coordinator preserves retry/generation guards.
+- **Durable proven-safe boundary recovery (closes the last PR20D2 blocker):**
+  - Added `LocalMessengerPendingDeliveryReceipt` SwiftData entity (account-scoped, unique `key = ownerProfileID|conversationID`; `key` never logged in full). Schema bumped v5 → v6 (additive; destructive recreate fallback documented).
+  - Added `MessengerLocalStore.commitAuthoritativeSyncPage(ownerProfileID:advancedRevision:safeBoundaries:)` — advances the global sync cursor and monotonically merges proven-safe boundaries in a **single `ModelContext.save()`**; the delivered ACK is scheduled only after the commit returns. Added `loadPendingDeliveryBoundaries`, `clearPendingDeliveryBoundary(through:)` (retains a strictly higher boundary), `clearPendingDeliveryBoundaries`.
+  - Delta sync + conversation repair now commit cursor+boundary atomically before scheduling ACKs; commit failure keeps the page retryable and does not advance the cursor or schedule an ACK.
+  - `ConversationDeliveryAckCoordinator.bootstrapPersistedBoundaries(ownerProfileID:…)` replays the current owner's persisted boundaries at cold start via `AppStartupCoordinator` background warmup — no chat open required; guarded by session generation + owner across awaits. Successful ACK clears only the covered boundary; cleanup failure never lowers confirmed state (safe duplicate replay).
+  - Logout wipes records via `resetAllMessengerData()` and bumps the coordinator generation; no JWT/token is ever persisted.
+  - Added diagnostics: `messengerDeliveryAckBoundaryPersisted/PersistenceFailed`, `…BootstrapStarted/Loaded/Scheduled/IgnoredStaleSession`, `…PendingRetainedHigherBoundary/PendingCleanupFailed`, `…IgnoredWrongOwner`.
+  - Added `DeliveryAckPersistenceTests` (process-recreation, higher-boundary survival, stale-failure suppression, account switch, stale bootstrap, cleanup-failure duplicate replay, store atomicity/monotonic merge/owner isolation).
+- Background remote-notification ACK remains PR20D3; `AppDelegate.swift` unchanged; incomplete callback not restored.
+- Tests: targeted messenger/presence + `DeliveryAckPersistenceTests` passed (132 tests across 10 suites in two runs; `-parallel-testing-enabled NO`).
+- Build: `xcodebuild -scheme JustTwo -destination 'generic/platform=iOS Simulator' -derivedDataPath /private/tmp/JustTwoDerivedData build` passed.
+- **Manual smoke:** NOT RUN (durable recovery, higher boundary, account switch, schema v5→v6 upgrade).
+- Deferred: expiration-safe background remote-notification ACK (PR20D3).
+
 ## Notes
 
 - Continue adding completed changes here after each meaningful update.

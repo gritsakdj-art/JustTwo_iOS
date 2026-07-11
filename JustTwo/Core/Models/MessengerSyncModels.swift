@@ -10,6 +10,20 @@ nonisolated struct MessengerSyncEventsResponse: Decodable, Sendable {
     let nextRevision: Int64
     let currentRevision: Int64
     let hasMore: Bool
+
+    #if DEBUG
+    init(
+        events: [MessengerSyncEventDTO],
+        nextRevision: Int64,
+        currentRevision: Int64? = nil,
+        hasMore: Bool
+    ) {
+        self.events = events
+        self.nextRevision = nextRevision
+        self.currentRevision = currentRevision ?? nextRevision
+        self.hasMore = hasMore
+    }
+    #endif
 }
 
 nonisolated struct MessengerSyncEventDTO: Decodable, Sendable, Identifiable {

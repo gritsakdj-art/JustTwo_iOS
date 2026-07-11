@@ -185,6 +185,7 @@ final class SessionStore {
 
         let sessionUserID = currentUser?.id
         realtimeClient.applicationDidBecomeActive()
+        ConversationDeliveryAckCoordinator.shared.retryPendingAcks(reason: "appForeground")
         syncPushRegistrationIfEligible()
 
         Task { @MainActor [weak self] in

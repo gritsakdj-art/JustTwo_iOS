@@ -14,6 +14,7 @@ enum AppModelContainerFactory {
             LocalMessengerSyncMetadata.self,
             LocalMessengerOutboxItem.self,
             LocalMessengerPendingMedia.self,
+            LocalMessengerPendingDeliveryReceipt.self,
         ])
 
         let storeURL = persistentStoreURL
@@ -24,7 +25,15 @@ enum AppModelContainerFactory {
         )
 
         do {
-            return try ModelContainer(for: schema, configurations: [configuration])
+            let container = try ModelContainer(for: schema, configurations: [configuration])
+            MessengerDiagnostics.event(
+                .messengerSwiftDataContainerOpened,
+                metadata: [
+                    "storeName": storeURL.lastPathComponent,
+                    "schemaVersion": "\(MessengerPersistence.schemaVersion)"
+                ]
+            )
+            return container
         } catch {
             MessengerDiagnostics.event(
                 .messengerSwiftDataContainerLoadFailed,

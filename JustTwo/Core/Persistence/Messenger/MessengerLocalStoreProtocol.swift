@@ -31,6 +31,36 @@ protocol MessengerLocalStoreProtocol: AnyObject {
     func upsertSyncMetadata(_ metadata: LocalMessengerSyncMetadataSnapshot) async throws
     func fetchSyncMetadata() async throws -> LocalMessengerSyncMetadataSnapshot?
 
+    /// Atomically advances the global sync cursor (when `advancedRevision != nil`)
+    /// and monotonically merges the owner-scoped proven-safe delivery boundaries
+    /// in a single `ModelContext.save()`. Returns the resulting highest persisted
+    /// boundary per committed conversation. If the save throws, neither the cursor
+    /// nor the boundaries are durably updated (the sync page stays retryable).
+    func commitAuthoritativeSyncPage(
+        ownerProfileID: UUID,
+        advancedRevision: Int64?,
+        safeBoundaries: [UUID: MessageReceiptBoundary]
+    ) async throws -> [UUID: MessageReceiptBoundary]
+
+    /// Loads the durable pending proven-safe delivery boundaries for `ownerProfileID`.
+    func loadPendingDeliveryBoundaries(
+        ownerProfileID: UUID
+    ) async throws -> [UUID: MessageReceiptBoundary]
+
+    /// Clears the pending boundary for a conversation only when the persisted
+    /// boundary is `<=` the acknowledged `boundary`. A strictly higher persisted
+    /// boundary is retained so a later trailing ACK still recovers after restart.
+    func clearPendingDeliveryBoundary(
+        ownerProfileID: UUID,
+        conversationID: UUID,
+        through boundary: MessageReceiptBoundary
+    ) async throws
+
+    /// Clears every pending boundary belonging to `ownerProfileID`.
+    func clearPendingDeliveryBoundaries(
+        ownerProfileID: UUID
+    ) async throws
+
     func updateAttachmentMediaCacheMetadata(
         attachmentID: String,
         variant: MessengerMediaVariant,
@@ -101,4 +131,24 @@ protocol MessengerLocalStoreProtocol: AnyObject {
     func clearPendingMedia() async throws
 
     func fetchPendingMediaRelativePaths() async throws -> Set<String>
+}
+
+/// Narrow persistence surface used by `ConversationDeliveryAckCoordinator` for
+/// cold-start bootstrap and post-ACK cleanup, so the coordinator stays decoupled
+/// from the full messenger local-store protocol and is easily faked in tests.
+@MainActor
+protocol ConversationDeliveryAckBoundaryStore: AnyObject {
+    func loadPendingDeliveryBoundaries(
+        ownerProfileID: UUID
+    ) async throws -> [UUID: MessageReceiptBoundary]
+
+    func clearPendingDeliveryBoundary(
+        ownerProfileID: UUID,
+        conversationID: UUID,
+        through boundary: MessageReceiptBoundary
+    ) async throws
+
+    func clearPendingDeliveryBoundaries(
+        ownerProfileID: UUID
+    ) async throws
 }

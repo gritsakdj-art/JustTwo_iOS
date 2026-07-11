@@ -2,7 +2,7 @@ import Foundation
 import SwiftData
 
 @MainActor
-final class MessengerLocalStore: MessengerLocalStoreProtocol {
+final class MessengerLocalStore: MessengerLocalStoreProtocol, ConversationDeliveryAckBoundaryStore {
     private static var configuredShared: MessengerLocalStore?
 
     static var shared: MessengerLocalStore {
@@ -57,6 +57,20 @@ final class MessengerLocalStore: MessengerLocalStoreProtocol {
         testingResumeUpsert = nil
         testingSuspendUpsertBeforeWrite = false
         testingOnUpsertSuspended = nil
+    }
+
+    /// When > 0, the next N `commitAuthoritativeSyncPage` calls throw before writing.
+    internal var testingCommitAuthoritativeSyncPageFailuresRemaining = 0
+
+    internal var testingSuspendCommitBeforeWrite = false
+    internal var testingOnCommitSuspended: (() -> Void)?
+    private var testingResumeCommit: CheckedContinuation<Void, Never>?
+
+    internal func testingResumeSuspendedCommitForTests() {
+        testingResumeCommit?.resume()
+        testingResumeCommit = nil
+        testingSuspendCommitBeforeWrite = false
+        testingOnCommitSuspended = nil
     }
 
     init(
@@ -306,6 +320,66 @@ final class MessengerLocalStore: MessengerLocalStoreProtocol {
     func fetchSyncMetadata() async throws -> LocalMessengerSyncMetadataSnapshot? {
         try await performSessionBoundOperation(operation: "fetchSyncMetadata") {
             try await backingStore.fetchSyncMetadata()
+        }
+    }
+
+    func commitAuthoritativeSyncPage(
+        ownerProfileID: UUID,
+        advancedRevision: Int64?,
+        safeBoundaries: [UUID: MessageReceiptBoundary]
+    ) async throws -> [UUID: MessageReceiptBoundary] {
+        try await performSessionBoundOperation(operation: "commitAuthoritativeSyncPage", isCacheWrite: true) {
+            let operationGeneration = self.sessionGeneration
+            if self.testingCommitAuthoritativeSyncPageFailuresRemaining > 0 {
+                self.testingCommitAuthoritativeSyncPageFailuresRemaining -= 1
+                throw MessengerLocalStoreError.storeUnavailable
+            }
+            if self.testingSuspendCommitBeforeWrite {
+                self.testingOnCommitSuspended?()
+                await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+                    self.testingResumeCommit = continuation
+                }
+            }
+            try self.validateSessionGeneration(
+                operationGeneration,
+                operation: "commitAuthoritativeSyncPage",
+                isCacheWrite: true
+            )
+            return try await self.backingStore.commitAuthoritativeSyncPage(
+                ownerProfileID: ownerProfileID,
+                advancedRevision: advancedRevision,
+                safeBoundaries: safeBoundaries
+            )
+        }
+    }
+
+    func loadPendingDeliveryBoundaries(
+        ownerProfileID: UUID
+    ) async throws -> [UUID: MessageReceiptBoundary] {
+        try await performSessionBoundOperation(operation: "loadPendingDeliveryBoundaries") {
+            try await backingStore.loadPendingDeliveryBoundaries(ownerProfileID: ownerProfileID)
+        }
+    }
+
+    func clearPendingDeliveryBoundary(
+        ownerProfileID: UUID,
+        conversationID: UUID,
+        through boundary: MessageReceiptBoundary
+    ) async throws {
+        try await performSessionBoundOperation(operation: "clearPendingDeliveryBoundary", isCacheWrite: true) {
+            try await backingStore.clearPendingDeliveryBoundary(
+                ownerProfileID: ownerProfileID,
+                conversationID: conversationID,
+                through: boundary
+            )
+        }
+    }
+
+    func clearPendingDeliveryBoundaries(
+        ownerProfileID: UUID
+    ) async throws {
+        try await performSessionBoundOperation(operation: "clearPendingDeliveryBoundaries", isCacheWrite: true) {
+            try await backingStore.clearPendingDeliveryBoundaries(ownerProfileID: ownerProfileID)
         }
     }
 
