@@ -23,7 +23,9 @@ struct AvatarCropEditorView: View {
     @State private var hasAppliedInitialTransform = false
     @State private var isSaving = false
 
-    private let cropSize: CGFloat = 280
+    private var cropSize: CGFloat {
+        min(280, UIScreen.main.bounds.width - AppSpacing.xl * 2 - AppSpacing.sm * 2)
+    }
 
     init(
         photoID: UUID? = nil,
@@ -42,15 +44,15 @@ struct AvatarCropEditorView: View {
     }
 
     var body: some View {
-        VStack(spacing: AppSpacing.xl) {
+        VStack(spacing: AppSpacing.lg) {
             header
             cropCard
             actionButtons
             Spacer(minLength: 0)
         }
         .padding(.horizontal, AppSpacing.xl)
-        .padding(.top, AppSpacing.lg)
-        .padding(.bottom, AppSpacing.xl)
+        .padding(.top, AppSpacing.sm)
+        .padding(.bottom, AppSpacing.lg)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .discoverShellBackground()
         .localizedNavigationTitle("profile.avatar_editor.title")
@@ -60,8 +62,13 @@ struct AvatarCropEditorView: View {
                 Button {
                     saveCroppedAvatar()
                 } label: {
-                    Image(systemName: "checkmark")
-                        .font(.system(size: 16, weight: .bold))
+                    if isSaving {
+                        ProgressView()
+                            .tint(Color.secondaryText)
+                    } else {
+                        Image(systemName: "checkmark")
+                            .font(.system(size: 16, weight: .bold))
+                    }
                 }
                 .accessibilityLabel(Text("profile.avatar_editor.save"))
                 .disabled(sourceImage == nil || isSaving)
@@ -83,6 +90,9 @@ struct AvatarCropEditorView: View {
             .font(Font.App.manrope(size: 15, weight: .medium))
             .foregroundStyle(Color.secondaryText)
             .multilineTextAlignment(.center)
+            .lineLimit(2)
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: .infinity)
             .padding(.horizontal, AppSpacing.sm)
     }
 
@@ -139,6 +149,8 @@ struct AvatarCropEditorView: View {
 
             if sourceImage != nil {
                 Button(role: .destructive) {
+                    let generator = UINotificationFeedbackGenerator()
+                    generator.notificationOccurred(.warning)
                     onDelete()
                     dismiss()
                 } label: {
@@ -202,6 +214,9 @@ struct AvatarCropEditorView: View {
                                 accumulatedOffset = offset
                             }
                             .highPriorityGesture(dragGesture.simultaneously(with: magnificationGesture))
+                            .onTapGesture(count: 2) {
+                                resetTransformsAnimated()
+                            }
 
                         cropOverlay(size: size)
                             .position(x: geo.size.width / 2, y: geo.size.height / 2)
@@ -221,31 +236,20 @@ struct AvatarCropEditorView: View {
 
     private func cropOverlay(size: CGFloat) -> some View {
         ZStack {
-            Rectangle()
-                .fill(Color.primaryText.opacity(0.42))
-                .mask {
-                    Rectangle()
-                        .overlay {
-                            Circle()
-                                .frame(width: size, height: size)
-                                .blendMode(.destinationOut)
-                        }
-                }
-                .compositingGroup()
-
-            Circle()
-                .stroke(Color.onAccentText.opacity(0.96), lineWidth: 2)
-                .frame(width: size, height: size)
-
             Circle()
                 .stroke(Color.brandPrimary.opacity(0.42), lineWidth: 6)
                 .blur(radius: 5)
                 .frame(width: size + 2, height: size + 2)
 
             Circle()
+                .stroke(Color.onAccentText.opacity(0.96), lineWidth: 2)
+                .frame(width: size, height: size)
+
+            Circle()
                 .strokeBorder(Color.onAccentText.opacity(0.35), lineWidth: 1)
                 .frame(width: size - 18, height: size - 18)
         }
+        .frame(width: size + 16, height: size + 16)
         .allowsHitTesting(false)
     }
 
@@ -326,7 +330,9 @@ struct AvatarCropEditorView: View {
 
     private func applySelectedImage(_ image: UIImage) {
         selectedItem = nil
-        sourceImage = image
+        withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
+            sourceImage = image
+        }
         didReplaceImage = true
         resetTransforms()
     }
@@ -349,6 +355,14 @@ struct AvatarCropEditorView: View {
         accumulatedOffset = .zero
         scale = 1
         accumulatedScale = 1
+    }
+
+    private func resetTransformsAnimated() {
+        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+            resetTransforms()
+        }
+        let generator = UIImpactFeedbackGenerator(style: .light)
+        generator.impactOccurred()
     }
 
     private func saveCroppedAvatar() {
@@ -382,6 +396,8 @@ struct AvatarCropEditorView: View {
             }
 
             await MainActor.run {
+                let generator = UINotificationFeedbackGenerator()
+                generator.notificationOccurred(.success)
                 onSave(
                     AvatarCropSaveResult(
                         imageData: imageData,

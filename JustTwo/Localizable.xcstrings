@@ -8148,43 +8148,43 @@
         "ar" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "اسحب لتحريك الصورة، واقرص للتكبير."
+            "value" : "اسحب واقرص — انقر مرتين لإعادة التعيين."
           }
         },
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ziehe zum Verschieben, ziehe mit zwei Fingern zum Zoomen."
+            "value" : "Ziehen und zoomen — doppeltippen zum Zurücksetzen."
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Drag to reposition, pinch to zoom."
+            "value" : "Pinch and drag — double-tap to reset."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Arrastra para mover, pellizca para ampliar."
+            "value" : "Arrastra y pellizca — doble toque para restablecer."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Fais glisser pour déplacer, pince pour zoomer."
+            "value" : "Fais glisser et pince — double appui pour réinitialiser."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Trascina per spostare, pizzica per ingrandire."
+            "value" : "Trascina e pizzica — doppio tocco per ripristinare."
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Перетаскивай фото и меняй масштаб щипком."
+            "value" : "Ущипни, потяни — двойной тап сбросит."
           }
         }
       }
@@ -8289,43 +8289,43 @@
         "ar" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "اختر صورة واضبط القص لملفك الشخصي."
+            "value" : "اختر صورة واضبط\nالقص لملفك الشخصي."
           }
         },
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Wähle ein Foto und passe den Ausschnitt für dein Profil an."
+            "value" : "Wähle ein Foto und passe\nden Ausschnitt für dein Profil an."
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Choose a photo and adjust the crop for your profile."
+            "value" : "Choose a photo and adjust\nthe crop for your profile."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Elige una foto y ajusta el recorte para tu perfil."
+            "value" : "Elige una foto y ajusta\nel recorte para tu perfil."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Choisis une photo et ajuste le cadrage pour ton profil."
+            "value" : "Choisis une photo et ajuste\nle cadrage pour ton profil."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Scegli una foto e regola il ritaglio per il tuo profilo."
+            "value" : "Scegli una foto e regola\nil ritaglio per il tuo profilo."
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Выбери фото и настрой кадрирование для профиля."
+            "value" : "Выбери фото и настрой\nкадрирование для профиля."
           }
         }
       }
