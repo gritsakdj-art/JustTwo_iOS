@@ -11,6 +11,7 @@ struct BaseTextField: View {
     var textContentType: UITextContentType? = nil
     var autocapitalization: TextInputAutocapitalization = .never
     var errorMessage: String? = nil
+    var icon: String? = nil
 
     @FocusState private var isFocused: Bool
     @State private var showPassword = false
@@ -22,6 +23,13 @@ struct BaseTextField: View {
                 .foregroundStyle(isFocused ? Color.brandPrimary : Color.secondaryText)
 
             HStack(spacing: 12) {
+                if let icon {
+                    Image(systemName: icon)
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(isFocused ? Color.brandPrimary : Color.secondaryText)
+                        .frame(width: 18)
+                }
+
                 Group {
                     if isSecure && !showPassword {
                         SecureField(String(localized: title), text: $text)
@@ -97,14 +105,16 @@ struct BaseTextField: View {
                 title: "auth.email",
                 text: .constant("hello@justtwo.app"),
                 keyboardType: .emailAddress,
-                textContentType: .emailAddress
+                textContentType: .emailAddress,
+                icon: "envelope.fill"
             )
 
             BaseTextField(
                 title: "auth.password",
                 text: .constant("secret123"),
                 isSecure: true,
-                textContentType: .password
+                textContentType: .password,
+                icon: "lock.fill"
             )
         }
         .padding(24)

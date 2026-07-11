@@ -4,6 +4,7 @@ struct AuthView: View {
     @Environment(SessionStore.self) private var session
     @Environment(AppRouter.self) private var router
     @State private var viewModel = AuthViewModel()
+    @State private var heartPulse = false
 
     var body: some View {
         GeometryReader { proxy in
@@ -37,9 +38,15 @@ struct AuthView: View {
                     Image(systemName: "heart.fill")
                         .font(.system(size: 17, weight: .bold))
                         .foregroundStyle(Color.onAccentText)
+                        .scaleEffect(heartPulse ? 1.0 : 0.8)
                 }
                 .frame(width: 44, height: 44)
                 .shadow(color: Color.brandPrimaryGlow.opacity(0.18), radius: 10, x: 0, y: 5)
+                .onAppear {
+                    withAnimation(.spring(response: 0.45, dampingFraction: 0.55).delay(0.1)) {
+                        heartPulse = true
+                    }
+                }
 
                 Text("app.name")
                     .font(Font.App.screenTitle)
@@ -61,7 +68,8 @@ struct AuthView: View {
                     text: $viewModel.email,
                     keyboardType: .emailAddress,
                     textContentType: .emailAddress,
-                    errorMessage: viewModel.emailValidationMessage
+                    errorMessage: viewModel.emailValidationMessage,
+                    icon: "envelope.fill"
                 )
 
                 BaseTextField(
@@ -69,7 +77,8 @@ struct AuthView: View {
                     text: $viewModel.password,
                     isSecure: true,
                     textContentType: viewModel.mode == .register ? .newPassword : .password,
-                    errorMessage: viewModel.passwordValidationMessage
+                    errorMessage: viewModel.passwordValidationMessage,
+                    icon: "lock.fill"
                 )
             }
 
@@ -81,23 +90,24 @@ struct AuthView: View {
                     .transition(.opacity.combined(with: .move(edge: .top)))
             }
 
-            if viewModel.mode == .login, viewModel.showForgotPasswordOption {
-                Button {
-                    viewModel.presentForgotPassword()
-                } label: {
-                    HStack(spacing: 8) {
-                        Image(systemName: "key.fill")
-                            .font(.system(size: 13, weight: .bold))
+            Button {
+                viewModel.presentForgotPassword()
+            } label: {
+                HStack(spacing: 8) {
+                    Image(systemName: "key.fill")
+                        .font(.system(size: 13, weight: .bold))
 
-                        Text("auth.forgot_password.link")
-                            .font(Font.App.footnote(weight: .semibold))
-                    }
-                    .foregroundStyle(Color.brandPrimary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                    Text("auth.forgot_password.link")
+                        .font(Font.App.footnote(weight: .semibold))
                 }
-                .buttonStyle(.spring(pressedScale: 0.96))
-                .transition(.opacity.combined(with: .move(edge: .top)))
+                .foregroundStyle(Color.brandPrimary)
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
+            .buttonStyle(.spring(pressedScale: 0.96))
+            .opacity(showForgotPassword ? 1 : 0)
+            .frame(maxHeight: showForgotPassword ? nil : 0)
+            .clipped()
+            .allowsHitTesting(showForgotPassword)
 
             PrimaryButton(
                 viewModel.mode == .login ? "auth.login" : "auth.register",
@@ -106,6 +116,11 @@ struct AuthView: View {
                 isDisabled: !viewModel.isValid
             ) {
                 viewModel.submit(using: session, router: router)
+            }
+
+            if viewModel.mode == .register {
+                termsDisclaimer
+                    .transition(.opacity.combined(with: .move(edge: .top)))
             }
 
             HStack(spacing: 6) {
@@ -130,16 +145,39 @@ struct AuthView: View {
         .background(Color.cardSurface.opacity(0.86), in: RoundedRectangle(cornerRadius: AppCornerRadius.card, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: AppCornerRadius.card, style: .continuous)
-                .stroke(Color.glassBorderHighlight.opacity(0.35), lineWidth: 1)
+                .stroke(
+                    LinearGradient(
+                        colors: [
+                            Color.brandPrimary.opacity(0.55),
+                            Color.brandPrimary.opacity(0.05)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 1.2
+                )
         }
         .shadow(color: Color.discoverCardShadow.opacity(0.16), radius: 24, x: 0, y: 14)
+        .animation(.spring(response: 0.35, dampingFraction: 0.82), value: viewModel.mode)
         .animation(.easeInOut(duration: 0.18), value: viewModel.errorMessage)
-        .animation(.easeInOut(duration: 0.18), value: viewModel.showForgotPasswordOption)
+        .animation(.easeInOut(duration: 0.2), value: showForgotPassword)
         .sheet(isPresented: $viewModel.isForgotPasswordSheetPresented) {
             forgotPasswordSheet
                 .presentationDetents([.height(390)])
                 .presentationDragIndicator(.visible)
         }
+    }
+
+    private var showForgotPassword: Bool {
+        viewModel.mode == .login && viewModel.showForgotPasswordOption
+    }
+
+    private var termsDisclaimer: some View {
+        Text("auth.terms_disclaimer")
+            .font(Font.App.footnote())
+            .foregroundStyle(Color.secondaryText)
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private var forgotPasswordSheet: some View {
@@ -199,6 +237,18 @@ struct AuthView: View {
     private var authBackground: some View {
         ZStack {
             Color.authBackgroundGradient.ignoresSafeArea()
+
+            Circle()
+                .fill(Color.brandPrimary.opacity(0.22))
+                .frame(width: 260, height: 260)
+                .blur(radius: 70)
+                .offset(x: -140, y: -220)
+
+            Circle()
+                .fill(Color.brandPrimaryGlow.opacity(0.18))
+                .frame(width: 220, height: 220)
+                .blur(radius: 60)
+                .offset(x: 160, y: 260)
 
             LinearGradient(
                 colors: [
