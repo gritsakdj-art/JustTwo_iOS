@@ -15,4 +15,18 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
     ) {
         PushRegistrationService.shared.handleDidFailToRegister(error: error)
     }
+
+    func application(
+        _ application: UIApplication,
+        didReceiveRemoteNotification userInfo: [AnyHashable: Any],
+        fetchCompletionHandler completionHandler: @escaping (UIBackgroundFetchResult) -> Void
+    ) {
+        let completion = BackgroundFetchCompletionToken(completionHandler)
+        Task {
+            await MessengerBackgroundSyncCoordinator.shared.handleRemoteNotification(
+                userInfo: userInfo,
+                completion: completion
+            )
+        }
+    }
 }

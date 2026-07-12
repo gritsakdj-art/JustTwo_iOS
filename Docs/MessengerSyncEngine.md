@@ -201,7 +201,11 @@ Forbidden: message body, caption, JWT, signed URLs, storage keys, absolute paths
 - Realtime does not advance persistent cursor (by design)
 - Durable persisted delivered-ACK recovery boundary shipped in PR20D2
   (`LocalMessengerPendingDeliveryReceipt`, atomic cursor+boundary commit, cold-start bootstrap)
-- Background remote-notification delivery ACK remains PR20D3 (not implemented; `AppDelegate` unchanged)
+- Background remote-notification wake + bounded sync shipped in PR20D3B
+  (`MessengerBackgroundSyncCoordinator`, `runGlobalSyncForBackground`, best-effort ACK flush).
+  Batch/cohort coalescing (late pushes form the next batch), single absolute deadline,
+  durable ACK bootstrap before flush, foreground-sync join — see
+  [MessengerBackgroundSync.md](MessengerBackgroundSync.md)
 - SwiftData schema bumped to v6 (additive entity); container has a destructive
   recreate fallback on load failure — an upgrade smoke test is required
 - Manual smoke required before release (status: NOT RUN)

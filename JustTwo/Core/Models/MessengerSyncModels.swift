@@ -90,6 +90,7 @@ enum MessengerDeltaSyncReason: String, Sendable {
     case realtimeReconnect
     case chatOpened
     case fullRefreshFallback
+    case backgroundPush
 }
 
 enum MessengerSyncLimits {

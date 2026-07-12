@@ -19,6 +19,8 @@ final class MessengerDeltaSyncService {
     var autoFullRefreshFallback = true
     private(set) var lastFailureError: Error?
     private(set) var lastRunHadMorePages = false
+    private(set) var lastRunAppliedEventCount = 0
+    private(set) var lastRunAdvancedRevision = false
 
     #if DEBUG
     /// When set, authoritative delivery ACK scheduling uses this coordinator instead of `.shared`.
@@ -136,6 +138,9 @@ final class MessengerDeltaSyncService {
         do {
             lastFailureError = nil
             lastRunHadMorePages = false
+            lastRunAppliedEventCount = 0
+            lastRunAdvancedRevision = false
+            let startingRevision = afterRevision
             let profileID = try await MessengerSessionSupport.resolveCurrentProfileID(session: session)
             var cursor = afterRevision
             var pageCount = 0
@@ -223,6 +228,8 @@ final class MessengerDeltaSyncService {
                 )
 
                 pageCount += 1
+                lastRunAppliedEventCount += page.events.count
+                lastRunAdvancedRevision = cursor > startingRevision
 
                 if !page.hasMore {
                     return true
@@ -535,7 +542,7 @@ final class MessengerDeltaSyncService {
 
     private func shouldThrottle(reason: MessengerDeltaSyncReason) -> Bool {
         switch reason {
-        case .realtimeReconnect, .bootstrap, .fullRefreshFallback:
+        case .realtimeReconnect, .bootstrap, .fullRefreshFallback, .backgroundPush:
             return false
         case .appForeground, .chatOpened:
             guard let lastSyncStartedAt else { return false }

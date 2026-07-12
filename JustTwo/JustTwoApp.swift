@@ -15,6 +15,9 @@ struct JustTwoApp: App {
         PushRegistrationService.shared.configure()
         AppBuildEnvironment.beginTestFlightResolutionIfNeeded()
         MessengerLocalStore.configureShared(modelContainer: sharedModelContainer)
+        Task {
+            await MessengerBackgroundSyncCoordinator.shared.markDependenciesReady()
+        }
         #if DEBUG
         MainThreadHangDiagnostics.start()
         #endif

@@ -130,6 +130,7 @@ Startup preload skip uses message timeline only. Chat open may also skip on memo
 - Freshness uses conversation `lastMessageAt` from list preview; rare clock/skew edge cases may trigger extra REST.
 - `NetworkPathMonitor` offline skip requires at least one path update; until then requests fail gracefully on error.
 - Stale local cache + background REST may briefly show older messages until refresh completes (realtime can still patch).
+- PR20D3B background push wake applies message metadata only (no full image bytes); authoritative boundaries persist via existing atomic commit.
 
 ### Manual smoke
 

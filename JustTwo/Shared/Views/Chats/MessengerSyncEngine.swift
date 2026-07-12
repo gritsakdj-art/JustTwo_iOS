@@ -16,6 +16,7 @@ final class MessengerSyncEngine {
     private var sessionGeneration = 0
     private var isGlobalSyncInFlight = false
     private var pendingGlobalSync = false
+    private var backgroundSyncWaiters: [CheckedContinuation<MessengerSyncRunResult, Never>] = []
     private var failureCount = 0
     private var scheduledBackoffTask: Task<Void, Never>?
     private var networkHandlerID: UUID?
@@ -228,11 +229,14 @@ final class MessengerSyncEngine {
                 if state == .syncing {
                     transition(to: .idle)
                 }
-                if pendingGlobalSync {
+                if pendingGlobalSync, reason != .backgroundPush {
                     pendingGlobalSync = false
                     Task {
                         await self.runGlobalSync(reason: .appForeground, session: session, router: router)
                     }
+                }
+                if !backgroundSyncWaiters.isEmpty {
+                    fulfillBackgroundSyncWaiters(with: makeSyncRunResult())
                 }
             }
         }
@@ -309,6 +313,31 @@ final class MessengerSyncEngine {
         )
     }
 
+    /// Background-capable global sync used by PR20D3B push wake reconciliation.
+    /// Coalesces with an in-flight foreground sync and performs at most one trailing cycle.
+    func runGlobalSyncForBackground(
+        session: SessionStore,
+        router: AppRouter
+    ) async -> MessengerSyncRunResult {
+        if isGlobalSyncInFlight {
+            return await withCheckedContinuation { continuation in
+                backgroundSyncWaiters.append(continuation)
+            }
+        }
+
+        await runGlobalSync(reason: .backgroundPush, session: session, router: router)
+        var result = makeSyncRunResult()
+
+        if pendingGlobalSync {
+            pendingGlobalSync = false
+            await runGlobalSync(reason: .backgroundPush, session: session, router: router)
+            result = mergeSyncRunResults(result, makeSyncRunResult())
+        }
+
+        fulfillBackgroundSyncWaiters(with: result)
+        return result
+    }
+
     func reset() {
         sessionGeneration += 1
         scheduledBackoffTask?.cancel()
@@ -317,6 +346,7 @@ final class MessengerSyncEngine {
         debouncedNetworkTask = nil
         isGlobalSyncInFlight = false
         pendingGlobalSync = false
+        backgroundSyncWaiters.removeAll()
         failureCount = 0
         transition(to: .idle)
         deltaSync.reset()
@@ -329,6 +359,13 @@ final class MessengerSyncEngine {
 
     internal func transitionForTests(_ newState: MessengerSyncEngineState) {
         transition(to: newState)
+    }
+
+    internal func mergeSyncRunResultsForTests(
+        _ first: MessengerSyncRunResult,
+        _ second: MessengerSyncRunResult
+    ) -> MessengerSyncRunResult {
+        mergeSyncRunResults(first, second)
     }
 
     private func validatePersistedCursorAgainstServer() async {
@@ -589,5 +626,69 @@ final class MessengerSyncEngine {
 
     private func durationMilliseconds(since startedAt: Date) -> Int {
         Int(Date().timeIntervalSince(startedAt) * 1000)
+    }
+
+    private func makeSyncRunResult() -> MessengerSyncRunResult {
+        let applied = deltaSync.lastRunAppliedEventCount
+        let advanced = deltaSync.lastRunAdvancedRevision
+        let pendingAckCount = ConversationDeliveryAckCoordinator.shared.pendingDeliveryAckCountForTests
+
+        if let error = deltaSync.lastFailureError {
+            return .failed(MessengerDiagnostics.sanitizeError(error))
+        }
+
+        let didApply = applied > 0 || advanced
+        let outcome: MessengerBackgroundSyncRunOutcome = didApply
+            ? .newData(
+                appliedEventCount: applied,
+                advancedRevision: advanced,
+                pendingDeliveryAckCount: pendingAckCount
+            )
+            : .noData
+
+        return MessengerSyncRunResult(
+            outcome: outcome,
+            didApplyChanges: didApply,
+            appliedEventCount: applied,
+            advancedRevision: advanced,
+            pendingDeliveryAckCount: pendingAckCount
+        )
+    }
+
+    private func mergeSyncRunResults(
+        _ first: MessengerSyncRunResult,
+        _ second: MessengerSyncRunResult
+    ) -> MessengerSyncRunResult {
+        if case .failed(let reason) = first.outcome { return .failed(reason) }
+        if case .failed(let reason) = second.outcome { return .failed(reason) }
+
+        let applied = first.appliedEventCount + second.appliedEventCount
+        let advanced = first.advancedRevision || second.advancedRevision
+        let pending = max(first.pendingDeliveryAckCount, second.pendingDeliveryAckCount)
+        let didApply = first.didApplyChanges || second.didApplyChanges
+
+        let outcome: MessengerBackgroundSyncRunOutcome = didApply
+            ? .newData(
+                appliedEventCount: applied,
+                advancedRevision: advanced,
+                pendingDeliveryAckCount: pending
+            )
+            : .noData
+
+        return MessengerSyncRunResult(
+            outcome: outcome,
+            didApplyChanges: didApply,
+            appliedEventCount: applied,
+            advancedRevision: advanced,
+            pendingDeliveryAckCount: pending
+        )
+    }
+
+    private func fulfillBackgroundSyncWaiters(with result: MessengerSyncRunResult) {
+        let waiters = backgroundSyncWaiters
+        backgroundSyncWaiters.removeAll()
+        for waiter in waiters {
+            waiter.resume(returning: result)
+        }
     }
 }

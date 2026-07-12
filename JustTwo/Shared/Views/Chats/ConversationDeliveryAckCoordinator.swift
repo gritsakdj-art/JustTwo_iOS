@@ -51,6 +51,120 @@ final class ConversationDeliveryAckCoordinator {
         ConversationDeliveryAckCoordinator()
     }
 
+    internal var sessionGenerationForTests: Int {
+        sessionGeneration
+    }
+
+    internal var pendingDeliveryAckCountForTests: Int {
+        pendingEnvelopeByConversation.count
+    }
+
+    #if DEBUG
+    /// Schedules an authoritative boundary using the shared session/router on the
+    /// main actor. Used by background-push pipeline tests to prove the ACK boundary
+    /// originates from sync state, never from the push payload messageID.
+    internal func scheduleAuthoritativeBoundaryForTesting(
+        conversationID: UUID,
+        messageID: UUID,
+        profileID: UUID
+    ) async {
+        await scheduleAuthoritativeBoundary(
+            conversationID: conversationID,
+            boundary: MessageReceiptBoundary(createdAt: Date(), messageID: messageID),
+            currentProfileID: profileID,
+            session: SessionStore.shared,
+            router: AppRouter.shared,
+            source: "backgroundPushTest",
+            evidence: .persistedSafeBoundary
+        )
+    }
+    #endif
+
+    /// Best-effort bounded flush of durable pending delivery ACKs (PR20D3B).
+    /// Does not create duplicate in-flight requests and retains pending state on failure.
+    func flushPendingAcknowledgements(
+        ownerProfileID: UUID,
+        deadline: ContinuousClock.Instant,
+        sessionGeneration generation: Int
+    ) async -> DeliveryAckFlushResult {
+        let clock = ContinuousClock()
+        var attempted = 0
+        var succeeded = 0
+        var deferred = 0
+
+        MessengerDiagnostics.event(
+            .messengerBackgroundAckFlushStarted,
+            metadata: ["pendingCount": "\(pendingEnvelopeByConversation.count)"]
+        )
+
+        if clock.now >= deadline, !pendingEnvelopeByConversation.isEmpty {
+            MessengerDiagnostics.event(
+                .messengerBackgroundAckFlushDeferred,
+                metadata: ["reason": "deadline", "deferredCount": "\(pendingEnvelopeByConversation.count)"]
+            )
+            return DeliveryAckFlushResult(
+                attemptedCount: 0,
+                succeededCount: 0,
+                deferredCount: pendingEnvelopeByConversation.count,
+                expired: true
+            )
+        }
+
+        let conversationIDs = pendingEnvelopeByConversation.keys.sorted { $0.uuidString < $1.uuidString }
+        for conversationID in conversationIDs {
+            if clock.now >= deadline {
+                MessengerDiagnostics.event(
+                    .messengerBackgroundAckFlushDeferred,
+                    metadata: ["reason": "deadline", "deferredCount": "\(pendingEnvelopeByConversation.count)"]
+                )
+                return DeliveryAckFlushResult(
+                    attemptedCount: attempted,
+                    succeededCount: succeeded,
+                    deferredCount: pendingEnvelopeByConversation.count,
+                    expired: true
+                )
+            }
+
+            guard generation == sessionGeneration else {
+                MessengerDiagnostics.event(
+                    .messengerBackgroundSessionStale,
+                    metadata: ["phase": "ackFlush"]
+                )
+                break
+            }
+
+            guard let envelope = pendingEnvelopeByConversation[conversationID],
+                  envelope.currentProfileID == ownerProfileID else {
+                continue
+            }
+
+            attempted += 1
+            await sendPendingIfPossible(conversationID: conversationID)
+
+            if pendingEnvelopeByConversation[conversationID] == nil {
+                succeeded += 1
+            } else {
+                deferred += 1
+            }
+        }
+
+        MessengerDiagnostics.event(
+            .messengerBackgroundAckFlushCompleted,
+            metadata: [
+                "attemptedCount": "\(attempted)",
+                "succeededCount": "\(succeeded)",
+                "deferredCount": "\(deferred)"
+            ]
+        )
+
+        return DeliveryAckFlushResult(
+            attemptedCount: attempted,
+            succeededCount: succeeded,
+            deferredCount: deferred,
+            expired: false
+        )
+    }
+
     func reset() {
         sessionGeneration += 1
         bootstrapInFlight = false

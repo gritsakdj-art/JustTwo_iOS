@@ -272,12 +272,16 @@ pagination / older messages
   → no delivery ACK candidate
 
 background remote notification
-  → parse route only
-  → no delivered ACK from payload alone
-  → silent-push fetch/apply callback is deferred to PR20D3
+  → parse wake hint (event == message.created)
+  → bounded session recovery
+  → MessengerSyncEngine.runGlobalSyncForBackground (authoritative PR20D2 pipeline)
+  → proven-safe boundary persisted durably
+  → best-effort delivered ACK flush
+  → UIBackgroundFetchResult exactly once
+  → push messageID is never ACKed directly
 ```
 
-Background handling is best-effort and depends on iOS launching the app for a remote notification with the required APNs background delivery conditions. APNs acceptance, notification display, and notification tap are not delivered. Force-quit can prevent background execution. PR20D2 intentionally removed the incomplete background fetch ACK callback; hardened expiration-safe background ACK is PR20D3.
+Background handling is best-effort and depends on iOS launching the app for a remote notification with the required APNs background delivery conditions. APNs acceptance, notification display, and notification tap are not delivery evidence. Force-quit can prevent background execution. See [MessengerBackgroundSync.md](MessengerBackgroundSync.md).
 
 Manual smoke checklist:
 
@@ -287,7 +291,7 @@ Manual smoke checklist:
 3. B receives realtime message while local persistence is forced to fail: no delivered ACK; diagnostic messengerDeliveryAckApplyFailed appears.
 4. B is offline during ACK send: pending ACK retries after network restore / app foreground.
 5. B logs out or switches account before retry: pending ACK is cleared and stale retry is ignored.
-6. B receives push in background: no ACK from payload alone; hardened background fetch/apply ACK is deferred to PR20D3.
+6. B receives push in background: wake hint triggers bounded sync; delivered ACK only after authoritative delta proof (not from payload messageID).
 7. Durable recovery: B applies an inbound message via delta sync (boundary persisted), network is disabled before ACK, B is force-quit, network restored, B relaunched → pending boundary loads on cold start without opening the chat, ACK replays, A sees delivered. A subsequent relaunch after successful cleanup issues no ACK.
 8. Higher boundary: ACK C in flight, sync applies D, C succeeds → D remains pending and is ACKed next.
 9. Account switch: B has a pending ACK, logout, login D → B's ACK never sent with D's JWT; diagnostics contain no JWT/content.
@@ -341,6 +345,14 @@ IDs are truncated (8 hex chars + `...`). No JWT, bodies, or signed URLs.
 | `messengerDeliveryAckPendingRetainedHigherBoundary` | higher persisted boundary retained over lower ACK |
 | `messengerDeliveryAckPendingCleanupFailed` | post-ACK durable cleanup failed (record may survive; duplicate replay is a safe no-op) |
 | `messengerDeliveryAckIgnoredWrongOwner` | boundary owner mismatched current session owner |
+| `messengerBackgroundPushReceived` / `…Ignored` / `…Malformed` | background wake hint received / rejected |
+| `messengerBackgroundSyncQueued` / `…Started` / `…Coalesced` / `…TrailingRequested` | background sync lifecycle |
+| `messengerBackgroundSyncNextBatchQueued` | late push (after trailing started) assigned to the next batch cohort |
+| `messengerBackgroundSyncBatchStarted` / `…BatchExpired` | batch drain start / next batch expired before it could run |
+| `messengerBackgroundSyncCompleted` / `…Failed` / `…Expired` | background sync outcome |
+| `messengerBackgroundAckFlushStarted` / `…Completed` / `…Deferred` | bounded ACK flush |
+| `messengerBackgroundCompletionCalled` / `…DuplicateIgnored` | exactly-once fetch completion |
+| `messengerBackgroundSessionStale` / `…DependenciesUnavailable` | session/generation or readiness guards |
 | `deliveryMessageObserved` | legacy inbound message observation |
 | `deliveryAckScheduled` | legacy ack path entered |
 | existing `deliveredAckSent` / `Skipped` / `Failed` | REST ack result |
@@ -352,7 +364,7 @@ Fields are privacy-safe: truncated conversation/message IDs, `count`, `reason`, 
 ## Known limitations (product / platform)
 
 1. **Background WebSocket:** default `messagesEnabled == false` disconnects WS in background → peer appears offline. Product policy undecided.
-2. **No silent push delivery ack:** no active `didReceiveRemoteNotification` delivery ACK handler; APNs success ≠ delivered. Hardened background ACK is **PR20D3**.
+2. **Background push is best-effort:** PR20D3B wake sync is not guaranteed (force quit, throttling, no execution budget). Foreground/cold-start fallback remains required.
 3. **Coverage gate:** delivered ACK requires authoritative delta proof or a durably persisted safe boundary recovery (PR20D2 cold-start bootstrap); local max message alone is not enough.
 4. **Presence not in REST/sync:** preserved reconnect state is provisional (90s TTL); full freshness is **PR20B/C**.
 5. **Single-instance in-memory presence:** no multi-node registry.
@@ -382,12 +394,12 @@ Fields are privacy-safe: truncated conversation/message IDs, `count`, `reason`, 
 
 1. Every ack path gated on foreground `.active`.
 2. Sync delta applied messages **without** scheduling ack (fixed in PR20A for foreground sync, hardened in PR20D2 with coverage evidence).
-3. No background/silent push ack path.
+3. Background push wake (PR20D3B) schedules delivered ACK only through authoritative delta sync — never from push `messageID`.
 4. Chat open is **not** the only trigger; inactive realtime/REST can trigger delta reconciliation, but direct delivered ACK requires authoritative proof.
 
 **Shipped in PR20D2:** durable persisted proven-safe boundary recovery with atomic cursor+boundary commit and cold-start bootstrap.
 
-**Deferred:** PR20D3 background remote-notification acknowledgements (`AppDelegate` unchanged; incomplete callback not restored).
+**Shipped in PR20D3B:** best-effort background wake sync + bounded ACK flush — see [MessengerBackgroundSync.md](MessengerBackgroundSync.md).
 
 ---
 

@@ -379,6 +379,27 @@
 - **Manual smoke:** NOT RUN (durable recovery, higher boundary, account switch, schema v5→v6 upgrade).
 - Deferred: expiration-safe background remote-notification ACK (PR20D3).
 
+## 2026-07-12 (PR20D3B)
+
+- Branch: `ios-messenger-background-push-pr20d3b` (stacked on `main` with PR20D2 at `ccf4fd9`).
+- Added best-effort background messenger sync after hybrid/silent pushes (backend PR20D3A contract).
+- `AppDelegate` forwards `didReceiveRemoteNotification:fetchCompletionHandler:` to `MessengerBackgroundSyncCoordinator` (thin adapter; no messenger business logic).
+- `PushNotificationPayloadParser.parseWakeIntent` requires `event == message.created`; `conversationID`/`messageID` are routing hints only.
+- `MessengerSyncEngine.runGlobalSyncForBackground` reuses authoritative PR20D2 delta pipeline; max one active + one trailing sync per coalesced batch.
+- `ConversationDeliveryAckCoordinator.flushPendingAcknowledgements` provides bounded best-effort ACK after apply.
+- `BackgroundFetchCompletionToken` guarantees exactly-once `UIBackgroundFetchResult`.
+- Background path never calls `markRead`; no image byte download.
+- Docs: `Docs/MessengerBackgroundSync.md` + related updates.
+- **PR20D3B correctness hardening:**
+  - Reworked coalescing into batch/cohort model: a push arriving after the trailing cycle starts forms the **next batch** (never falsely completed by the current batch); max one active + one trailing per batch; continuous pushes never create a sync storm.
+  - Separate completion cohorts (`currentBatch`/`pendingBatch`); waiters finished once with their batch's shared result.
+  - Single **absolute deadline** per callback shared across dependency readiness, session prep, active/trailing sync, and ACK flush; promoted next batch keeps its own later deadline.
+  - Durable ACK bootstrap (`bootstrapPersistedBoundaries`) runs before the ACK flush on cold background launch (owner-scoped, generation-guarded, no chat open required).
+  - Injectable `MessengerBackgroundCycleRunning` seam enables deterministic end-to-end concurrency/session/deadline tests without the network.
+  - Proven: push `messageID` is never used as the ACK boundary; ACK failure after apply returns `.newData` and retains durable pending; dependency timeout fails once without a cycle; late `markDependenciesReady` does not resurrect an expired callback.
+  - No `beginBackgroundTask` (callback lifetime + absolute deadline suffice).
+- **Manual smoke:** NOT RUN (requires staging PR20D3A + physical device).
+
 ## Notes
 
 - Continue adding completed changes here after each meaningful update.

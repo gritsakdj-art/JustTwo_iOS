@@ -364,6 +364,28 @@ enum MessengerDiagnosticEvent: String, Sendable {
     case messengerDeliveryAckApplyFailed
     case messengerDeliveryAckBackgroundPushReceived
     case messengerDeliveryAckBackgroundPushSkipped
+
+    case messengerBackgroundPushReceived
+    case messengerBackgroundPushIgnored
+    case messengerBackgroundPushMalformed
+    case messengerBackgroundSyncQueued
+    case messengerBackgroundSyncStarted
+    case messengerBackgroundSyncCoalesced
+    case messengerBackgroundSyncTrailingRequested
+    case messengerBackgroundSyncNextBatchQueued
+    case messengerBackgroundSyncBatchStarted
+    case messengerBackgroundSyncBatchExpired
+    case messengerBackgroundSyncCompleted
+    case messengerBackgroundSyncFailed
+    case messengerBackgroundSyncExpired
+    case messengerBackgroundAckFlushStarted
+    case messengerBackgroundAckFlushCompleted
+    case messengerBackgroundAckFlushDeferred
+    case messengerBackgroundCompletionCalled
+    case messengerBackgroundCompletionDuplicateIgnored
+    case messengerBackgroundSessionStale
+    case messengerBackgroundDependenciesUnavailable
+
     case messengerDeliveryAckDeferredCoverage
     case messengerDeliveryAckDeferredRevisionGap
     case messengerDeliveryAckBoundaryPersisted

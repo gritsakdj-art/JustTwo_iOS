@@ -107,7 +107,7 @@ Same as PR16–PR17: diagnostics and UI must not expose secrets or message conte
 
 - “Updated X min ago” only when `lastSuccessfulSyncAt` exists; shown subtly in chats list diagnostics path.
 - Per-chat cache flag in diagnostics is list-scoped only unless chat is open.
-- PR20D2 delivered ACK hardening does not treat offline push/background payloads as delivered; background ACK remains PR20D3.
+- PR20D3B adds best-effort background wake sync after hybrid/silent pushes; push payload is not delivery evidence. See [MessengerBackgroundSync.md](MessengerBackgroundSync.md).
 - PR20D2 persists the proven-safe delivery boundary durably (account-scoped, atomic with the sync cursor), so a pending delivered ACK survives process termination and offline periods: it is replayed on cold-start bootstrap once the network is back, without opening a chat. Duplicate replay is a safe backend no-op (PR20D1).
 - If boundary persistence fails (including repair path) or a required message apply fails mid-page, no ACK is scheduled and the page/repair remains retryable; offline bootstrap loads pending boundaries but defers network ACK until connectivity returns.
 - UI tests not included; presentation mapping covered in `MessengerOfflineUXTests`.
