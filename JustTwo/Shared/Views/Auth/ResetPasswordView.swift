@@ -11,6 +11,7 @@ struct ResetPasswordView: View {
     @State private var didComplete = false
     @State private var statusMessage: String?
     @State private var errorMessage: String?
+    @State private var successPulse = false
 
     init(token: String) {
         _resetToken = State(initialValue: token)
@@ -19,6 +20,18 @@ struct ResetPasswordView: View {
     init(initialErrorMessage: String) {
         _resetToken = State(initialValue: nil)
         _errorMessage = State(initialValue: initialErrorMessage)
+    }
+
+    private enum HeaderState {
+        case key
+        case error
+        case success
+    }
+
+    private var headerState: HeaderState {
+        if didComplete { return .success }
+        if resetToken == nil, errorMessage != nil { return .error }
+        return .key
     }
 
     var body: some View {
@@ -37,24 +50,34 @@ struct ResetPasswordView: View {
             }
             .scrollDismissesKeyboard(.interactively)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(Color.authBackgroundGradient.ignoresSafeArea())
+            .background(resetBackground)
             .hideKeyboardOnTap()
         }
         .navigationBarBackButtonHidden()
+        .onChange(of: didComplete) { _, newValue in
+            guard newValue else { return }
+            successPulse = false
+            withAnimation(.spring(response: 0.45, dampingFraction: 0.55).delay(0.05)) {
+                successPulse = true
+            }
+        }
     }
 
     private var header: some View {
         VStack(spacing: AppSpacing.sm) {
             ZStack {
                 Circle()
-                    .fill(didComplete ? Color.discoverSelectedGradient : Color.brandPrimaryGradient)
+                    .fill(headerCircleFill)
 
-                Image(systemName: didComplete ? "checkmark" : "key.fill")
+                Image(systemName: headerIconName)
                     .font(.system(size: 30, weight: .semibold))
                     .foregroundStyle(Color.onAccentText)
+                    .contentTransition(.symbolEffect(.replace))
+                    .scaleEffect(didComplete ? (successPulse ? 1.0 : 0.75) : 1.0)
             }
             .frame(width: 78, height: 78)
             .shadow(color: Color.brandPrimaryGlow.opacity(0.22), radius: 18, x: 0, y: 10)
+            .animation(.spring(response: 0.5, dampingFraction: 0.75), value: headerState)
 
             Text("reset_password.title")
                 .font(Font.App.screenTitle)
@@ -66,6 +89,22 @@ struct ResetPasswordView: View {
                 .foregroundStyle(Color.secondaryText)
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private var headerIconName: String {
+        switch headerState {
+        case .success: return "checkmark"
+        case .error: return "exclamationmark.triangle.fill"
+        case .key: return "key.fill"
+        }
+    }
+
+    private var headerCircleFill: AnyShapeStyle {
+        switch headerState {
+        case .success: return AnyShapeStyle(Color.discoverSelectedGradient)
+        case .error: return AnyShapeStyle(Color.error.opacity(0.9))
+        case .key: return AnyShapeStyle(Color.brandPrimaryGradient)
         }
     }
 
@@ -105,7 +144,17 @@ struct ResetPasswordView: View {
         .background(Color.cardSurface.opacity(0.86), in: RoundedRectangle(cornerRadius: AppCornerRadius.card, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: AppCornerRadius.card, style: .continuous)
-                .stroke(Color.glassBorderHighlight.opacity(0.35), lineWidth: 1)
+                .stroke(
+                    LinearGradient(
+                        colors: [
+                            Color.brandPrimary.opacity(0.55),
+                            Color.brandPrimary.opacity(0.05)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 1.2
+                )
         }
         .shadow(color: Color.discoverCardShadow.opacity(0.16), radius: 24, x: 0, y: 14)
         .animation(.easeInOut(duration: 0.18), value: errorMessage)
@@ -120,7 +169,8 @@ struct ResetPasswordView: View {
                 text: $newPassword,
                 isSecure: true,
                 textContentType: .newPassword,
-                errorMessage: newPasswordValidationMessage
+                errorMessage: newPasswordValidationMessage,
+                icon: "lock.fill"
             )
 
             BaseTextField(
@@ -128,15 +178,19 @@ struct ResetPasswordView: View {
                 text: $confirmPassword,
                 isSecure: true,
                 textContentType: .newPassword,
-                errorMessage: confirmPasswordValidationMessage
+                errorMessage: confirmPasswordValidationMessage,
+                icon: "lock.rotation"
             )
 
             messageBlock
+                .padding(.top, 6)
         }
     }
 
     private var messageBlock: some View {
-        VStack(spacing: AppSpacing.sm) {
+        let hasContent = statusMessage != nil || errorMessage != nil
+
+        return VStack(spacing: AppSpacing.sm) {
             if let statusMessage {
                 Text(statusMessage)
                     .font(Font.App.footnote(weight: .semibold))
@@ -155,6 +209,30 @@ struct ResetPasswordView: View {
             }
         }
         .frame(minHeight: 28)
+        .padding(.vertical, hasContent ? 10 : 0)
+        .padding(.horizontal, hasContent ? 12 : 0)
+        .background(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill((statusMessage != nil ? Color.brandPrimary : Color.error).opacity(hasContent ? 0.08 : 0))
+        )
+    }
+
+    private var resetBackground: some View {
+        ZStack {
+            Color.authBackgroundGradient.ignoresSafeArea()
+
+            Circle()
+                .fill(Color.brandPrimary.opacity(0.22))
+                .frame(width: 260, height: 260)
+                .blur(radius: 70)
+                .offset(x: -140, y: -220)
+
+            Circle()
+                .fill(Color.brandPrimaryGlow.opacity(0.18))
+                .frame(width: 220, height: 220)
+                .blur(radius: 60)
+                .offset(x: 160, y: 260)
+        }
     }
 
     private var canSubmit: Bool {
@@ -188,7 +266,9 @@ struct ResetPasswordView: View {
                 newPassword = ""
                 confirmPassword = ""
                 session.clearSession()
-                didComplete = true
+                withAnimation(.easeInOut(duration: 0.18)) {
+                    didComplete = true
+                }
                 statusMessage = String(localized: "reset_password.success")
 
                 try? await Task.sleep(nanoseconds: 1_100_000_000)
