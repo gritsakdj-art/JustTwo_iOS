@@ -114,6 +114,7 @@ final class SessionStore {
             await PushRegistrationService.shared.unregisterCurrentDevice(accessToken: pushUnregisterToken)
         }
         PushRegistrationService.shared.resetSessionState()
+        NotificationPreferencesSync.shared.resetSyncedState()
 
         MessengerRealtimeCoordinator.shared.stop()
         ConversationDeliveryAckCoordinator.shared.reset()
@@ -173,6 +174,11 @@ final class SessionStore {
                 return
             }
             await PushRegistrationService.shared.syncCurrentTokenIfPossible(userID: sessionUserID)
+            guard self.isFullyAuthenticated,
+                  self.currentUser?.id == sessionUserID else {
+                return
+            }
+            NotificationPreferencesSync.shared.syncFromLocalPreferences()
         }
     }
 

@@ -138,11 +138,30 @@ final class ChatViewModel {
         return nil
     }
 
+    @ObservationIgnored private var resolvedFirstUnreadMessageID: UUID?
+    @ObservationIgnored private var didResolveFirstUnread = false
+
     var firstUnreadMessageID: UUID? {
+        // The separator must stay anchored to the message that was first unread
+        // when the chat opened. Recomputing `messages.count - initialUnreadCount`
+        // on every access would shift the anchor forward as the user sends replies
+        // (or new messages arrive), attaching the banner to their own messages and
+        // never letting it disappear until the chat is reopened.
+        if didResolveFirstUnread {
+            guard let id = resolvedFirstUnreadMessageID,
+                  messages.contains(where: { $0.id == id }) else {
+                return nil
+            }
+            return id
+        }
+
         guard initialUnreadCount > 0, !messages.isEmpty else { return nil }
         let index = max(0, messages.count - initialUnreadCount)
         guard messages.indices.contains(index) else { return nil }
-        return messages[index].id
+        let id = messages[index].id
+        resolvedFirstUnreadMessageID = id
+        didResolveFirstUnread = true
+        return id
     }
 
     var lastReadMessageIDForInitialScroll: UUID? {

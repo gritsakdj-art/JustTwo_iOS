@@ -43,7 +43,7 @@ struct GeneralSettingsView: View {
         .localizedNavigationTitle("profile.menu.general_settings")
         .toolbarBackground(.hidden, for: .navigationBar)
         .task {
-            authorizationStatus = await MessengerNotificationService.shared.authorizationStatus()
+            await reconcileNotificationPermission()
             await AppBuildEnvironment.refreshTestFlightStatus()
             showsInternalDiagnostics = AppBuildEnvironment.showsInternalDiagnostics
             await refreshMediaCacheInventory()
@@ -51,6 +51,11 @@ struct GeneralSettingsView: View {
         .onReceive(NotificationCenter.default.publisher(for: .appBuildEnvironmentDidUpdate)) { _ in
             showsInternalDiagnostics = AppBuildEnvironment.showsInternalDiagnostics
         }
+        #if canImport(UIKit)
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in
+            Task { await reconcileNotificationPermission() }
+        }
+        #endif
         .alert(Text("settings.diagnostics.alert.title"), isPresented: $isDiagnosticsAlertPresented) {
             Button("common.done", role: .cancel) {}
         } message: {
@@ -176,9 +181,12 @@ struct GeneralSettingsView: View {
                     isToggleDisabled: isRequestingPermission
                 )
                 .onChange(of: messagesEnabled) { _, isEnabled in
-                    guard isEnabled else { return }
-                    Task {
-                        await handleMessagesToggleEnabled()
+                    if isEnabled {
+                        Task {
+                            await handleMessagesToggleEnabled()
+                        }
+                    } else {
+                        NotificationPreferencesSync.shared.syncFromLocalPreferences()
                     }
                 }
 
@@ -191,6 +199,9 @@ struct GeneralSettingsView: View {
                     isOn: $messagePreviewEnabled,
                     isToggleDisabled: !messagesEnabled || isRequestingPermission
                 )
+                .onChange(of: messagePreviewEnabled) { _, _ in
+                    NotificationPreferencesSync.shared.syncFromLocalPreferences()
+                }
             }
             .background(Color.cardSurface, in: RoundedRectangle(cornerRadius: AppCornerRadius.card, style: .continuous))
             .overlay(
@@ -337,6 +348,17 @@ struct GeneralSettingsView: View {
         isRequestingPermission = true
         defer { isRequestingPermission = false }
 
+        let currentStatus = await MessengerNotificationService.shared.authorizationStatus()
+
+        // Notifications were disabled in iOS Settings: the OS won't show the prompt
+        // again, so send the user to Settings and keep the toggle off until granted.
+        if currentStatus == .denied {
+            authorizationStatus = currentStatus
+            messagesEnabled = false
+            openSystemNotificationSettings()
+            return
+        }
+
         let granted = await MessengerNotificationService.shared.requestAuthorization()
         authorizationStatus = await MessengerNotificationService.shared.authorizationStatus()
 
@@ -345,9 +367,42 @@ struct GeneralSettingsView: View {
             let router = AppRouter.shared
             session.connectRealtimeIfEligible()
             ConversationListViewModel.shared.activateRealtime(session: session, router: router)
+            session.syncPushRegistrationIfEligible()
+            NotificationPreferencesSync.shared.syncFromLocalPreferences()
         } else {
             messagesEnabled = false
         }
+    }
+
+    /// Keeps the local toggle in sync with the system authorization status (e.g.
+    /// when the user changed the permission in iOS Settings), then reflects the
+    /// resulting state to the backend so APNs push content matches.
+    private func reconcileNotificationPermission() async {
+        let status = await MessengerNotificationService.shared.authorizationStatus()
+        authorizationStatus = status
+
+        let systemAllowsNotifications: Bool
+        switch status {
+        case .authorized, .provisional, .ephemeral:
+            systemAllowsNotifications = true
+        case .denied, .notDetermined:
+            systemAllowsNotifications = false
+        @unknown default:
+            systemAllowsNotifications = false
+        }
+
+        if messagesEnabled && !systemAllowsNotifications {
+            messagesEnabled = false
+        }
+
+        NotificationPreferencesSync.shared.syncFromLocalPreferences()
+    }
+
+    private func openSystemNotificationSettings() {
+        #if canImport(UIKit)
+        guard let url = URL(string: UIApplication.openSettingsURLString) else { return }
+        UIApplication.shared.open(url)
+        #endif
     }
 
     private var pickerDivider: some View {

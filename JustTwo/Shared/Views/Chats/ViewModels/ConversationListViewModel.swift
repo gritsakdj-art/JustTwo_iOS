@@ -537,7 +537,13 @@ final class ConversationListViewModel {
             merged = incoming.replacingActivity(unreadCount: 0)
         } else if let index = conversations.firstIndex(where: { $0.id == dto.id }) {
             let existing = conversations[index]
-            let unreadCount = max(existing.unreadCount, incoming.unreadCount)
+            let existingAt = existing.lastMessageAt ?? .distantPast
+            let incomingAt = incoming.lastMessageAt ?? .distantPast
+            // Same recency guard as the REST merge: a stale delta snapshot must not
+            // resurrect an unread count the user already cleared by reading the chat.
+            let unreadCount = incomingAt > existingAt
+                ? incoming.unreadCount
+                : existing.unreadCount
             merged = incoming.replacingActivity(unreadCount: unreadCount)
         } else {
             merged = incoming
@@ -573,7 +579,13 @@ final class ConversationListViewModel {
 
             let existingAt = existingPreview.lastMessageAt ?? .distantPast
             let restAt = restPreview.lastMessageAt ?? .distantPast
-            let unreadCount = max(existingPreview.unreadCount, restPreview.unreadCount)
+            // Only adopt the REST unread count when REST has a strictly newer last
+            // message. On a tie (same last message) or when local is newer, keep the
+            // local count so a stale server unread — e.g. a read receipt that hasn't
+            // propagated yet — cannot resurrect messages the user already read.
+            let unreadCount = restAt > existingAt
+                ? restPreview.unreadCount
+                : existingPreview.unreadCount
 
             guard existingAt > restAt else {
                 return restPreview.replacingActivity(unreadCount: unreadCount)
