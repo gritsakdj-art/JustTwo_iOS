@@ -29,6 +29,7 @@ struct LocalConversationSnapshot: Sendable, Equatable, Identifiable {
     let lastMessageSenderProfileID: String?
     let lastMessageCreatedAt: Date?
     let lastMessageDeletedAt: Date?
+    let lastMessageDeliveryStatus: String?
     let lastSyncedAt: Date?
     let localUpdatedAt: Date
 }

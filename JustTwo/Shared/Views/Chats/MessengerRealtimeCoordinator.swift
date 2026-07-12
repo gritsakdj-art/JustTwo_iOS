@@ -47,6 +47,11 @@ final class MessengerRealtimeCoordinator {
     ) {
         conversationListViewModel = viewModel
         updateContext(session: session, router: router)
+        MessengerRealtimeReceiptCoordinator.shared.configure(
+            conversationList: viewModel,
+            session: session,
+            router: router
+        )
         startListeningIfNeeded()
         scheduleConnectAndSyncSubscriptions()
     }
@@ -113,6 +118,12 @@ final class MessengerRealtimeCoordinator {
         }
     }
 
+    #if DEBUG
+    func testingHandle(_ event: RealtimeEvent, context: RealtimeConnectionContext) {
+        handle(event, context: context)
+    }
+    #endif
+
     func stop() {
         eventTask?.cancel()
         eventTask = nil
@@ -136,6 +147,11 @@ final class MessengerRealtimeCoordinator {
     private func updateContext(session: SessionStore, router: AppRouter) {
         self.session = session
         self.router = router
+        MessengerRealtimeReceiptCoordinator.shared.configure(
+            conversationList: conversationListViewModel,
+            session: session,
+            router: router
+        )
     }
 
     private func scheduleConnectAndSyncSubscriptions() {
@@ -500,77 +516,17 @@ final class MessengerRealtimeCoordinator {
     }
 
     private func handleConversationRead(_ payload: ConversationReadPayload, conversationID: UUID) {
-        Task { [weak self] in
-            guard let self else { return }
-            let profileID = await self.currentProfileID()
-
-            await MainActor.run {
-                _ = self.conversationListViewModel?.applyRealtimeConversationRead(
-                    conversationID: conversationID,
-                    profileID: payload.profileID,
-                    currentProfileID: profileID
-                )
-
-                guard payload.profileID != profileID else { return }
-                let result = self.applyToActiveConversation(
-                    conversationID: conversationID,
-                    viaViewModel: { chat in
-                        chat.applyDeliveryStatus(
-                            .read,
-                            messageID: payload.messageID,
-                            cutoffDate: payload.lastReadAt
-                        )
-                    },
-                    viaCache: {
-                        MessageCacheStore.shared.applyDeliveryStatus(
-                            conversationID: conversationID,
-                            status: .read,
-                            messageID: payload.messageID,
-                            cutoffDate: payload.lastReadAt
-                        )
-                    }
-                )
-                NetworkDebug.log(
-                    result.applied
-                        ? "Messenger realtime conversation.read applied (\(result.path))"
-                        : "Messenger realtime conversation.read ignored (\(result.path))"
-                )
-            }
-        }
+        MessengerRealtimeReceiptCoordinator.shared.handleConversationRead(
+            conversationID: conversationID,
+            payload: payload
+        )
     }
 
     private func handleConversationDelivered(_ payload: ConversationDeliveredPayload, conversationID: UUID) {
-        Task { [weak self] in
-            guard let self else { return }
-            let profileID = await self.currentProfileID()
-
-            await MainActor.run {
-                guard payload.profileID != profileID else { return }
-                let result = self.applyToActiveConversation(
-                    conversationID: conversationID,
-                    viaViewModel: { chat in
-                        chat.applyDeliveryStatus(
-                            .delivered,
-                            messageID: payload.messageID,
-                            cutoffDate: payload.lastDeliveredAt
-                        )
-                    },
-                    viaCache: {
-                        MessageCacheStore.shared.applyDeliveryStatus(
-                            conversationID: conversationID,
-                            status: .delivered,
-                            messageID: payload.messageID,
-                            cutoffDate: payload.lastDeliveredAt
-                        )
-                    }
-                )
-                NetworkDebug.log(
-                    result.applied
-                        ? "Messenger realtime conversation.delivered applied (\(result.path))"
-                        : "Messenger realtime conversation.delivered ignored (\(result.path))"
-                )
-            }
-        }
+        MessengerRealtimeReceiptCoordinator.shared.handleConversationDelivered(
+            conversationID: conversationID,
+            payload: payload
+        )
     }
 
     private func handleConversationUpdated(_ payload: ConversationUpdatedPayload) {

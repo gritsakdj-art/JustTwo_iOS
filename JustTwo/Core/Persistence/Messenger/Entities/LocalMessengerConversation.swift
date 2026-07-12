@@ -23,6 +23,7 @@ final class LocalMessengerConversation {
     var lastMessageSenderProfileID: String?
     var lastMessageCreatedAt: Date?
     var lastMessageDeletedAt: Date?
+    var lastMessageDeliveryStatus: String?
     var lastSyncedAt: Date?
     var localUpdatedAt: Date
 
@@ -47,6 +48,7 @@ final class LocalMessengerConversation {
         lastMessageSenderProfileID: String?,
         lastMessageCreatedAt: Date?,
         lastMessageDeletedAt: Date?,
+        lastMessageDeliveryStatus: String? = nil,
         lastSyncedAt: Date?,
         localUpdatedAt: Date
     ) {
@@ -70,6 +72,7 @@ final class LocalMessengerConversation {
         self.lastMessageSenderProfileID = lastMessageSenderProfileID
         self.lastMessageCreatedAt = lastMessageCreatedAt
         self.lastMessageDeletedAt = lastMessageDeletedAt
+        self.lastMessageDeliveryStatus = lastMessageDeliveryStatus
         self.lastSyncedAt = lastSyncedAt
         self.localUpdatedAt = localUpdatedAt
     }

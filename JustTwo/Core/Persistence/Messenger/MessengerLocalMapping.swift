@@ -31,6 +31,7 @@ enum MessengerLocalMapping {
             lastMessageSenderProfileID: lastMessage?.senderProfileID.uuidString,
             lastMessageCreatedAt: lastMessage?.createdAt,
             lastMessageDeletedAt: lastMessage?.deletedAt,
+            lastMessageDeliveryStatus: lastMessage?.deliveryStatus?.rawValue,
             lastSyncedAt: syncedAt,
             localUpdatedAt: syncedAt
         )
@@ -185,6 +186,7 @@ enum MessengerLocalMapping {
             lastMessageSenderProfileID: entity.lastMessageSenderProfileID,
             lastMessageCreatedAt: entity.lastMessageCreatedAt,
             lastMessageDeletedAt: entity.lastMessageDeletedAt,
+            lastMessageDeliveryStatus: entity.lastMessageDeliveryStatus,
             lastSyncedAt: entity.lastSyncedAt,
             localUpdatedAt: entity.localUpdatedAt
         )
@@ -295,6 +297,7 @@ enum MessengerLocalMapping {
         target.lastMessageSenderProfileID = message.senderProfileID.uuidString
         target.lastMessageCreatedAt = message.createdAt
         target.lastMessageDeletedAt = message.deletedAt
+        target.lastMessageDeliveryStatus = message.deliveryStatus?.rawValue
         target.lastSyncedAt = syncedAt
         target.localUpdatedAt = syncedAt
     }
@@ -325,6 +328,7 @@ enum MessengerLocalMapping {
         target.lastMessageSenderProfileID = source.lastMessageSenderProfileID
         target.lastMessageCreatedAt = source.lastMessageCreatedAt
         target.lastMessageDeletedAt = source.lastMessageDeletedAt
+        target.lastMessageDeliveryStatus = source.lastMessageDeliveryStatus
         target.lastSyncedAt = source.lastSyncedAt
         target.localUpdatedAt = source.localUpdatedAt
     }

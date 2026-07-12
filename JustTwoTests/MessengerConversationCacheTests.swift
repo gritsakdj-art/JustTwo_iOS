@@ -258,6 +258,7 @@ private extension MessengerConversationCacheTests {
                 lastMessageSenderProfileID: nil,
                 lastMessageCreatedAt: nil,
                 lastMessageDeletedAt: nil,
+                lastMessageDeliveryStatus: nil,
                 lastSyncedAt: lastSeen,
                 localUpdatedAt: lastSeen
             )

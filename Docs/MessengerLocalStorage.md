@@ -179,6 +179,7 @@ Chat screen opens from local cached messages when available, then REST remains a
 - Delta `message.created` / `message.edited` / `message.deleted` persist via `MessengerMessageCacheService`.
 - Delta reactions persist when event includes full `MessageDTO` snapshot.
 - Delta `conversation.read` / `conversation.delivered` persist receipts (monotonic).
+- PR20D4B: realtime/delta receipt events also route through `MessengerRealtimeReceiptCoordinator` and `applyRealtimeReceipt(...)` so Chats list + open chat share one canonical local apply path.
 - Realtime `message.created` / `message.edited` / `message.deleted` persist to local DB.
 - PR20D2: local persistence records the applied message but is not sufficient delivery coverage proof by itself. Realtime/REST/pagination paths never call delivered ACK directly.
 - **Limitation:** realtime `reaction.added` / `reaction.removed` without full `MessageDTO` update in-memory UI only; local DB is repaired on next delta/REST refresh.

@@ -466,6 +466,39 @@ final class ConversationListViewModel {
     }
 
     @discardableResult
+    func applyRealtimeOutgoingDeliveryStatus(
+        conversationID: UUID,
+        deliveryStatus: MessageDeliveryStatus,
+        ownerProfileID: UUID
+    ) -> Bool {
+        guard let index = conversations.firstIndex(where: { $0.id == conversationID }) else {
+            return false
+        }
+
+        let preview = conversations[index]
+        guard preview.lastSenderName == String(localized: "chats.you") else {
+            return false
+        }
+
+        let currentRank = preview.lastOutgoingDeliveryStatus?.rank ?? MessageDeliveryStatus.sent.rank
+        guard deliveryStatus.rank > currentRank else {
+            return false
+        }
+
+        conversations[index] = preview.replacingActivity(
+            lastOutgoingDeliveryStatus: deliveryStatus
+        )
+        bumpListContentGeneration()
+        Task {
+            await MessengerConversationCacheService.persistOutgoingDeliveryStatus(
+                conversationID: conversationID,
+                deliveryStatus: deliveryStatus
+            )
+        }
+        return true
+    }
+
+    @discardableResult
     func applyRealtimeConversationRead(
         conversationID: UUID,
         profileID: UUID,
@@ -613,4 +646,10 @@ final class ConversationListViewModel {
     private func syncMessengerBadge() {
         MessengerBadgeStore.shared.setUnreadCount(totalUnreadCount)
     }
+
+    #if DEBUG
+    func testingReplaceConversations(_ conversations: [ChatConversationPreview]) {
+        self.conversations = conversations
+    }
+    #endif
 }

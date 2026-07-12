@@ -401,6 +401,19 @@ enum MessengerDiagnosticEvent: String, Sendable {
     case messengerReadAckSucceeded
     case messengerReadAckFailed
 
+    case messengerRealtimeReceiptReceived
+    case messengerRealtimeReceiptDecoded
+    case messengerRealtimeReceiptApplied
+    case messengerRealtimeReceiptNoop
+    case messengerRealtimeReceiptStale
+    case messengerRealtimeReceiptTargetMissing
+    case messengerRealtimeReceiptRepairScheduled
+    case messengerRealtimeReceiptRepairCoalesced
+    case messengerRealtimeReceiptRepairCompleted
+    case messengerRealtimeReceiptApplyFailed
+    case messengerRealtimeReceiptSessionStale
+    case messengerRealtimeReceiptPreviewUpdated
+
     case messengerMediaDiskCacheLookupStarted
     case messengerMediaDiskCacheHit
     case messengerMediaDiskCacheMiss

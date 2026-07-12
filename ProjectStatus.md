@@ -400,6 +400,18 @@
   - No `beginBackgroundTask` (callback lifetime + absolute deadline suffice).
 - **Manual smoke:** NOT RUN (requires staging PR20D3A + physical device).
 
+## 2026-07-12 (PR20D4B)
+
+- Branch: `ios-messenger-realtime-receipts-pr20d4b` (from `main` at `8a6781d`; PR20D3B already merged).
+- Added global realtime receipt reconciliation for `conversation.delivered` / `conversation.read`.
+- `MessengerRealtimeReceiptCoordinator` is the single canonical applier for realtime and delta receipt events.
+- `MessengerLocalStore.applyRealtimeReceipt(...)` atomically updates participant receipt boundaries, outgoing message `deliveryStatus`, and cached conversation preview delivery status.
+- `ChatsView` now shows outgoing receipt ticks via `ChatConversationPreview.lastOutgoingDeliveryStatus`.
+- `PrivateChatView` refreshes from shared cache notifications; removed duplicate view-specific receipt apply path in `MessengerRealtimeCoordinator`.
+- Missing boundary targets schedule one coalesced global delta repair; no outbound ACK loop.
+- Docs: `Docs/MessengerRealtimeReceipts.md` + related updates.
+- **Manual smoke:** NOT RUN (requires staging PR20D4A + physical device).
+
 ## Notes
 
 - Continue adding completed changes here after each meaningful update.

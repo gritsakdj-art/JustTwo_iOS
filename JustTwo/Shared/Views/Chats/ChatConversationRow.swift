@@ -103,7 +103,10 @@ struct ChatConversationRow: View {
                         .opacity(0)
                 }
 
-                if isUnread {
+                if let status = conversation.lastOutgoingDeliveryStatus,
+                   conversation.lastSenderName == String(localized: "chats.you") {
+                    ConversationRowDeliveryReceiptView(status: status)
+                } else if isUnread {
                     Text("\(conversation.unreadCount)")
                         .font(Font.App.manrope(size: 12, weight: .heavy))
                         .foregroundStyle(Color.onAccentText)
@@ -208,6 +211,24 @@ struct ChatConversationRow: View {
             return date.formatted(.dateTime.weekday(.abbreviated))
         }
         return date.formatted(.dateTime.day().month(.abbreviated))
+    }
+}
+
+private struct ConversationRowDeliveryReceiptView: View {
+    let status: MessageDeliveryStatus
+
+    var body: some View {
+        HStack(spacing: -4) {
+            Image(systemName: "checkmark")
+                .font(.system(size: 9, weight: .semibold))
+            if status != .sent {
+                Image(systemName: "checkmark")
+                    .font(.system(size: 9, weight: .semibold))
+            }
+        }
+        .foregroundStyle(status == .read ? Color.discoverVioletLight : Color.secondaryText.opacity(0.75))
+        .frame(width: status == .sent ? 10 : 14, height: 10, alignment: .trailing)
+        .accessibilityHidden(true)
     }
 }
 

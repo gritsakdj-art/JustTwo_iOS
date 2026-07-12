@@ -226,6 +226,18 @@ final class MessengerLocalStore: MessengerLocalStoreProtocol, ConversationDelive
         }
     }
 
+    func patchConversationOutgoingDeliveryStatus(
+        conversationID: UUID,
+        deliveryStatus: MessageDeliveryStatus
+    ) async throws {
+        try await performSessionBoundOperation(operation: "patchConversationOutgoingDeliveryStatus") {
+            try await backingStore.patchConversationOutgoingDeliveryStatus(
+                conversationID: conversationID,
+                deliveryStatus: deliveryStatus
+            )
+        }
+    }
+
     func upsertLastMessageSnapshot(_ message: MessageDTO) async throws {
         try await performSessionBoundOperation(operation: "upsertLastMessageSnapshot") {
             try await backingStore.upsertLastMessageSnapshot(message)
@@ -302,6 +314,24 @@ final class MessengerLocalStore: MessengerLocalStoreProtocol, ConversationDelive
                 "hasReadAt": receipt.readAt == nil ? "false" : "true"
             ]
         )
+    }
+
+    func applyRealtimeReceipt(
+        ownerProfileID: UUID,
+        conversationID: UUID,
+        participantProfileID: UUID,
+        kind: MessengerReceiptKind,
+        boundaryMessageID: UUID
+    ) async throws -> MessengerReceiptApplyResult {
+        try await performSessionBoundOperation(operation: "applyRealtimeReceipt") {
+            try await backingStore.applyRealtimeReceipt(
+                ownerProfileID: ownerProfileID,
+                conversationID: conversationID,
+                participantProfileID: participantProfileID,
+                kind: kind,
+                boundaryMessageID: boundaryMessageID
+            )
+        }
     }
 
     func upsertSyncMetadata(_ metadata: LocalMessengerSyncMetadataSnapshot) async throws {

@@ -163,6 +163,16 @@ struct MessengerOutboxTests {
 
     @Test
     func createTextOutboxItemPrecedesInMemoryRegistration() async throws {
+        let previousToken = APIAuth.accessToken
+        defer {
+            if let previousToken {
+                try? APIAuth.save(token: previousToken)
+            } else {
+                APIAuth.clear()
+            }
+        }
+        APIAuth.clear()
+
         let store = makeStore()
         MessengerOutbox.shared.clear()
 
@@ -447,6 +457,45 @@ struct MessengerOutboxTests {
     @Test
     func missingPendingMediaBlocksAutomaticRetry() {
         #expect(MessengerOutboxErrorCode.missingPendingMedia.blocksAutomaticRetry)
+    }
+
+    @Test
+    func unrelatedReceiptEventDoesNotMutateOptimisticOutboxMessage() async throws {
+        MessengerOutbox.shared.clear()
+        MessengerRealtimeReceiptCoordinator.shared.reset()
+
+        let cache = MessageCacheStore.shared
+        cache.reset()
+
+        let clientID = "client-unrelated-receipt"
+        let optimistic = ChatMessage.optimisticOutgoing(
+            clientMessageID: clientID,
+            body: "Still sending",
+            replyPreview: nil,
+            createdAt: .now
+        ).replacingLocalSendState(.sending)
+
+        cache.insertOptimisticMessage(optimistic, for: conversationID)
+        #expect(cache.messages(for: conversationID)?.first?.localSendState == .sending)
+
+        let unrelatedServerMessageID = UUID()
+        MessengerRealtimeReceiptCoordinator.shared.testingSetOwnerProfileID(UUID())
+        MessengerRealtimeReceiptCoordinator.shared.handleConversationDelivered(
+            conversationID: conversationID,
+            payload: ConversationDeliveredPayload(
+                profileID: UUID(),
+                lastDeliveredAt: Date(),
+                messageID: unrelatedServerMessageID
+            ),
+            source: "test"
+        )
+        await MessengerRealtimeReceiptCoordinator.shared.testingDrainApplies()
+
+        let cached = try #require(cache.messages(for: conversationID)?.first)
+        #expect(cached.clientMessageID == clientID)
+        #expect(cached.localSendState == .sending)
+        #expect(cached.deliveryStatus == nil)
+        #expect(MessengerOutbox.shared.entry(for: clientID) == nil)
     }
 
     @Test

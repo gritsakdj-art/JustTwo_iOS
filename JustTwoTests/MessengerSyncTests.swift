@@ -313,6 +313,7 @@ struct MessengerDeltaDiagnosticsTests {
     }
 }
 
+@Suite(.serialized)
 @MainActor
 struct MessengerDeltaSyncBehaviorTests {
 
@@ -329,6 +330,8 @@ struct MessengerDeltaSyncBehaviorTests {
 
     @Test
     func deltaReceiptApplyUpdatesCacheWithoutNetworkWrites() async throws {
+        MessengerRealtimeReceiptCoordinator.shared.reset()
+
         let store = MessengerSyncStateStore.shared
         store.reset()
         let cache = MessageCacheStore.shared
@@ -362,6 +365,25 @@ struct MessengerDeltaSyncBehaviorTests {
         )
         cache.setMessages([outgoing], for: conversationID)
 
+        try await MessengerLocalStore.shared.upsertConversations([makeReceiptTestConversation(
+            conversationID: conversationID,
+            messageID: messageID,
+            senderID: senderID,
+            recipientID: recipientID
+        )])
+        try await MessengerLocalStore.shared.upsertMessages([makeReceiptTestMessage(
+            conversationID: conversationID,
+            messageID: messageID,
+            senderID: senderID
+        )], conversationID: conversationID)
+
+        MessengerRealtimeReceiptCoordinator.shared.configure(
+            conversationList: list,
+            session: nil,
+            router: AppRouter.shared
+        )
+        MessengerRealtimeReceiptCoordinator.shared.testingSetOwnerProfileID(senderID)
+
         let event = try decodeSyncEvent(
             revision: 501,
             type: "conversation.delivered",
@@ -379,10 +401,111 @@ struct MessengerDeltaSyncBehaviorTests {
             session: SessionStore.shared,
             router: AppRouter.shared
         )
+        await MessengerRealtimeReceiptCoordinator.shared.testingDrainApplies()
 
         let updated = try #require(cache.messages(for: conversationID)?.first)
         #expect(updated.deliveryStatus == .delivered)
         #expect(store.hasAppliedRevision(501))
+    }
+
+    @Test
+    func receiptCoordinatorResetLeavesUnrelatedDeltaSyncRequestCountStable() async throws {
+        MessengerRealtimeReceiptCoordinator.shared.reset()
+        MessengerRealtimeReceiptCoordinator.shared.testingSetOwnerProfileID(UUID())
+        MessengerRealtimeReceiptCoordinator.shared.handleConversationDelivered(
+            conversationID: UUID(),
+            payload: ConversationDeliveredPayload(
+                profileID: UUID(),
+                lastDeliveredAt: Date(),
+                messageID: UUID()
+            ),
+            source: "test"
+        )
+        await MessengerRealtimeReceiptCoordinator.shared.testingDrainApplies()
+
+        MessengerRealtimeReceiptCoordinator.shared.reset()
+
+        let store = MessengerSyncStateStore.shared
+        store.reset()
+        let cache = MessageCacheStore.shared
+        cache.reset()
+        let list = ConversationListViewModel.shared
+        list.reset()
+
+        let service = MessengerDeltaSyncService(
+            syncState: store,
+            messageCache: cache,
+            conversationList: list
+        )
+
+        let conversationID = UUID()
+        let messageID = UUID()
+        let senderID = UUID()
+        let recipientID = UUID()
+        let deliveredAt = Date(timeIntervalSince1970: 2_000)
+
+        cache.setMessages(
+            [
+                ChatMessage(
+                    id: messageID,
+                    displayText: "hello",
+                    rawBody: "hello",
+                    createdAt: Date(timeIntervalSince1970: 1_000),
+                    isMine: true,
+                    isDeleted: false,
+                    isEdited: false,
+                    replyPreview: nil,
+                    reactions: [],
+                    deliveryStatus: .sent
+                )
+            ],
+            for: conversationID
+        )
+
+        try await MessengerLocalStore.shared.upsertConversations([makeReceiptTestConversation(
+            conversationID: conversationID,
+            messageID: messageID,
+            senderID: senderID,
+            recipientID: recipientID
+        )])
+        try await MessengerLocalStore.shared.upsertMessages([makeReceiptTestMessage(
+            conversationID: conversationID,
+            messageID: messageID,
+            senderID: senderID
+        )], conversationID: conversationID)
+
+        MessengerRealtimeReceiptCoordinator.shared.reset()
+        MessengerRealtimeReceiptCoordinator.shared.configure(
+            conversationList: list,
+            session: nil,
+            router: AppRouter.shared
+        )
+        MessengerRealtimeReceiptCoordinator.shared.testingSetOwnerProfileID(senderID)
+
+        let event = try decodeSyncEvent(
+            revision: 502,
+            type: "conversation.delivered",
+            conversationID: conversationID,
+            messageID: messageID,
+            actorProfileID: recipientID,
+            receiptProfileID: recipientID,
+            deliveredAt: deliveredAt,
+            readAt: nil
+        )
+
+        try await service.applyEventsForTesting(
+            [event],
+            profileID: senderID,
+            session: SessionStore.shared,
+            router: AppRouter.shared
+        )
+        await MessengerRealtimeReceiptCoordinator.shared.testingDrainApplies()
+
+        let updated = try #require(cache.messages(for: conversationID)?.first)
+        #expect(updated.deliveryStatus == .delivered)
+        #expect(store.hasAppliedRevision(502))
+        #expect(MessengerRealtimeReceiptCoordinator.shared.testingPendingRepairHintCount == 0)
+        #expect(!MessengerRealtimeReceiptCoordinator.shared.testingIsApplyInFlight)
     }
 
     @Test
@@ -526,5 +649,78 @@ struct MessengerDeltaSyncBehaviorTests {
         """.data(using: .utf8)!
 
         return try JSONDecoder.justTwoAPI.decode(MessengerSyncEventDTO.self, from: json)
+    }
+
+    private func makeReceiptTestConversation(
+        conversationID: UUID,
+        messageID: UUID,
+        senderID: UUID,
+        recipientID: UUID
+    ) -> ConversationDTO {
+        try! JSONCoding.decoder.decode(ConversationDTO.self, from: Data("""
+        {
+          "id": "\(conversationID.uuidString)",
+          "type": "direct",
+          "status": "active",
+          "connectionID": null,
+          "otherParticipant": {
+            "profile": {
+              "id": "\(recipientID.uuidString)",
+              "displayName": "Recipient",
+              "bio": null,
+              "city": null,
+              "primaryPhoto": null
+            },
+            "role": "member",
+            "joinedAt": "2026-06-26T13:18:31Z",
+            "lastReadAt": null,
+            "lastDeliveredAt": null
+          },
+          "lastMessage": {
+            "id": "\(messageID.uuidString)",
+            "conversationID": "\(conversationID.uuidString)",
+            "senderProfileID": "\(senderID.uuidString)",
+            "kind": "text",
+            "body": "hello",
+            "attachments": [],
+            "replyTo": null,
+            "reactions": [],
+            "deliveryStatus": "sent",
+            "clientMessageID": "client-1",
+            "createdAt": "2026-06-26T13:18:31Z",
+            "editedAt": null,
+            "deletedAt": null
+          },
+          "unreadCount": 0,
+          "lastReadAt": null,
+          "lastMessageAt": "2026-06-26T13:18:31Z",
+          "createdAt": "2026-06-26T13:18:31Z",
+          "updatedAt": "2026-06-26T13:18:31Z"
+        }
+        """.utf8))
+    }
+
+    private func makeReceiptTestMessage(
+        conversationID: UUID,
+        messageID: UUID,
+        senderID: UUID
+    ) -> MessageDTO {
+        try! JSONCoding.decoder.decode(MessageDTO.self, from: Data("""
+        {
+          "id": "\(messageID.uuidString)",
+          "conversationID": "\(conversationID.uuidString)",
+          "senderProfileID": "\(senderID.uuidString)",
+          "kind": "text",
+          "body": "hello",
+          "attachments": [],
+          "replyTo": null,
+          "reactions": [],
+          "deliveryStatus": "sent",
+          "clientMessageID": "client-1",
+          "createdAt": "2026-06-26T13:18:31Z",
+          "editedAt": null,
+          "deletedAt": null
+        }
+        """.utf8))
     }
 }

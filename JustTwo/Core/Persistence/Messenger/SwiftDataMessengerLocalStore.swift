@@ -94,6 +94,29 @@ final class SwiftDataMessengerLocalStore: MessengerLocalStoreProtocol {
         try context.save()
     }
 
+    func patchConversationOutgoingDeliveryStatus(
+        conversationID: UUID,
+        deliveryStatus: MessageDeliveryStatus
+    ) async throws {
+        let context = modelContext
+        let syncedAt = Date()
+        let conversationKey = conversationID.uuidString
+
+        guard let existing = try fetchConversationEntity(id: conversationKey, context: context) else {
+            return
+        }
+
+        let current = existing.lastMessageDeliveryStatus
+            .flatMap(MessageDeliveryStatus.init(rawValue:))
+        guard deliveryStatus.rank > (current?.rank ?? MessageDeliveryStatus.sent.rank) else {
+            return
+        }
+
+        existing.lastMessageDeliveryStatus = deliveryStatus.rawValue
+        existing.localUpdatedAt = syncedAt
+        try context.save()
+    }
+
     func upsertLastMessageSnapshot(_ message: MessageDTO) async throws {
         try await upsertMessages([message], conversationID: message.conversationID)
     }
@@ -218,6 +241,168 @@ final class SwiftDataMessengerLocalStore: MessengerLocalStoreProtocol {
         }
 
         try context.save()
+    }
+
+    func applyRealtimeReceipt(
+        ownerProfileID: UUID,
+        conversationID: UUID,
+        participantProfileID: UUID,
+        kind: MessengerReceiptKind,
+        boundaryMessageID: UUID
+    ) async throws -> MessengerReceiptApplyResult {
+        let context = modelContext
+        let syncedAt = Date()
+        let conversationKey = conversationID.uuidString
+
+        guard try fetchConversationEntity(id: conversationKey, context: context) != nil else {
+            return .targetMissing()
+        }
+
+        guard let boundaryMessage = try fetchMessageEntity(
+            id: boundaryMessageID.uuidString,
+            context: context
+        ) else {
+            return .targetMissing()
+        }
+
+        let incomingBoundary = MessageReceiptBoundary(
+            createdAt: boundaryMessage.createdAt,
+            messageID: boundaryMessageID
+        )
+
+        let receiptID = MessengerLocalMapping.receiptIdentity(
+            conversationID: conversationKey,
+            profileID: participantProfileID.uuidString
+        )
+
+        let receiptEntity: LocalMessengerReceipt
+        if let existing = try fetchReceiptEntity(id: receiptID, context: context) {
+            receiptEntity = existing
+        } else {
+            let created = LocalMessengerReceipt(
+                id: receiptID,
+                conversationID: conversationKey,
+                profileID: participantProfileID.uuidString,
+                lastDeliveredAt: nil,
+                lastReadAt: nil,
+                lastDeliveredMessageID: nil,
+                lastReadMessageID: nil,
+                localUpdatedAt: syncedAt
+            )
+            context.insert(created)
+            receiptEntity = created
+        }
+
+        let existingBoundary = MessengerReceiptBoundaryMath.boundary(from: receiptEntity, kind: kind)
+        guard MessengerReceiptBoundaryMath.shouldAdvance(
+            incoming: incomingBoundary,
+            over: existingBoundary
+        ) else {
+            return .noop
+        }
+
+        switch kind {
+        case .delivered:
+            receiptEntity.lastDeliveredAt = incomingBoundary.createdAt
+            receiptEntity.lastDeliveredMessageID = incomingBoundary.messageID.uuidString
+        case .read:
+            receiptEntity.lastReadAt = incomingBoundary.createdAt
+            receiptEntity.lastReadMessageID = incomingBoundary.messageID.uuidString
+            if let deliveredBoundary = MessengerReceiptBoundaryMath.boundary(
+                from: receiptEntity,
+                kind: .delivered
+            ) {
+                if incomingBoundary > deliveredBoundary {
+                    receiptEntity.lastDeliveredAt = incomingBoundary.createdAt
+                    receiptEntity.lastDeliveredMessageID = incomingBoundary.messageID.uuidString
+                }
+            } else {
+                receiptEntity.lastDeliveredAt = incomingBoundary.createdAt
+                receiptEntity.lastDeliveredMessageID = incomingBoundary.messageID.uuidString
+            }
+        }
+        receiptEntity.localUpdatedAt = syncedAt
+
+        var updatedMessageCount = 0
+        var previewDeliveryStatus: MessageDeliveryStatus?
+        var updatedConversationPreview = false
+
+        let isCounterpartyReceipt = participantProfileID != ownerProfileID
+        if isCounterpartyReceipt {
+            let messages = try fetchOutgoingMessages(
+                conversationID: conversationKey,
+                ownerProfileID: ownerProfileID,
+                context: context
+            )
+
+            for message in messages {
+                guard MessengerReceiptBoundaryMath.messageQualifiesForReceipt(
+                    senderProfileID: message.senderProfileID,
+                    ownerProfileID: ownerProfileID,
+                    deletedAt: message.deletedAt,
+                    localState: message.localState,
+                    messageCreatedAt: message.createdAt,
+                    boundary: incomingBoundary
+                ) else {
+                    continue
+                }
+
+                let current = message.deliveryStatus.flatMap(MessageDeliveryStatus.init(rawValue:))
+                guard let upgraded = MessengerReceiptBoundaryMath.upgradedStatus(
+                    current: current,
+                    applying: kind
+                ) else {
+                    continue
+                }
+
+                message.deliveryStatus = upgraded.rawValue
+                message.localUpdatedAt = syncedAt
+                updatedMessageCount += 1
+            }
+
+            if let conversationEntity = try fetchConversationEntity(id: conversationKey, context: context),
+               conversationEntity.lastMessageSenderProfileID == ownerProfileID.uuidString,
+               let lastCreatedAt = conversationEntity.lastMessageCreatedAt,
+               lastCreatedAt <= incomingBoundary.createdAt {
+                let currentPreview = conversationEntity.lastMessageDeliveryStatus
+                    .flatMap(MessageDeliveryStatus.init(rawValue:))
+                if let upgraded = MessengerReceiptBoundaryMath.upgradedStatus(
+                    current: currentPreview,
+                    applying: kind
+                ) {
+                    conversationEntity.lastMessageDeliveryStatus = upgraded.rawValue
+                    conversationEntity.localUpdatedAt = syncedAt
+                    previewDeliveryStatus = upgraded
+                    updatedConversationPreview = true
+                }
+            }
+        }
+
+        try context.save()
+
+        return MessengerReceiptApplyResult(
+            didAdvanceParticipantBoundary: true,
+            updatedMessageCount: updatedMessageCount,
+            updatedConversationPreview: updatedConversationPreview,
+            targetMessageFound: true,
+            requiresSyncRepair: false,
+            previewDeliveryStatus: previewDeliveryStatus
+        )
+    }
+
+    private func fetchOutgoingMessages(
+        conversationID: String,
+        ownerProfileID: UUID,
+        context: ModelContext
+    ) throws -> [LocalMessengerMessage] {
+        let ownerKey = ownerProfileID.uuidString
+        let descriptor = FetchDescriptor<LocalMessengerMessage>(
+            predicate: #Predicate { message in
+                message.conversationID == conversationID
+                    && message.senderProfileID == ownerKey
+            }
+        )
+        return try context.fetch(descriptor)
     }
 
     func upsertSyncMetadata(_ metadata: LocalMessengerSyncMetadataSnapshot) async throws {

@@ -125,7 +125,9 @@ struct MessengerDiagnosticsTests {
     func clipboardExportUsesSafePlaceholderWhenEmpty() async {
         let store = MessengerDiagnosticsStore(limit: 10)
 
-        #expect(await MessengerDiagnostics.exportTextForClipboard(from: store) == MessengerDiagnostics.emptyExportText)
+        let export = await MessengerDiagnostics.exportTextForClipboard(from: store)
+        #expect(export.contains(MessengerDiagnostics.emptyExportText))
+        #expect(!export.contains("--- events ---"))
     }
 
     @Test

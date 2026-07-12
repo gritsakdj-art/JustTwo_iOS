@@ -115,6 +115,7 @@ final class SessionStore {
         }
         PushRegistrationService.shared.resetSessionState()
         NotificationPreferencesSync.shared.resetSyncedState()
+        MessengerRealtimeReceiptCoordinator.shared.reset()
 
         MessengerRealtimeCoordinator.shared.stop()
         ConversationDeliveryAckCoordinator.shared.reset()

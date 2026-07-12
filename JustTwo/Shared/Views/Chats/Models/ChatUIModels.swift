@@ -400,6 +400,31 @@ struct ChatConversationPreview: Identifiable, Equatable, Hashable {
     let lastSenderName: String?
     let lastMessageAt: Date?
     let unreadCount: Int
+    let lastOutgoingDeliveryStatus: MessageDeliveryStatus?
+
+    init(
+        id: UUID,
+        title: String,
+        otherParticipantProfileID: UUID?,
+        avatarURL: URL?,
+        avatarPhotoID: UUID?,
+        lastMessageText: String?,
+        lastSenderName: String?,
+        lastMessageAt: Date?,
+        unreadCount: Int,
+        lastOutgoingDeliveryStatus: MessageDeliveryStatus? = nil
+    ) {
+        self.id = id
+        self.title = title
+        self.otherParticipantProfileID = otherParticipantProfileID
+        self.avatarURL = avatarURL
+        self.avatarPhotoID = avatarPhotoID
+        self.lastMessageText = lastMessageText
+        self.lastSenderName = lastSenderName
+        self.lastMessageAt = lastMessageAt
+        self.unreadCount = unreadCount
+        self.lastOutgoingDeliveryStatus = lastOutgoingDeliveryStatus
+    }
 }
 
 extension ChatConversationPreview {
@@ -408,7 +433,8 @@ extension ChatConversationPreview {
         lastSenderName: String? = nil,
         lastMessageAt: Date? = nil,
         unreadCount: Int? = nil,
-        otherParticipantProfileID: UUID? = nil
+        otherParticipantProfileID: UUID? = nil,
+        lastOutgoingDeliveryStatus: MessageDeliveryStatus? = nil
     ) -> ChatConversationPreview {
         ChatConversationPreview(
             id: id,
@@ -419,7 +445,8 @@ extension ChatConversationPreview {
             lastMessageText: lastMessageText ?? self.lastMessageText,
             lastSenderName: lastSenderName ?? self.lastSenderName,
             lastMessageAt: lastMessageAt ?? self.lastMessageAt,
-            unreadCount: max(0, unreadCount ?? self.unreadCount)
+            unreadCount: max(0, unreadCount ?? self.unreadCount),
+            lastOutgoingDeliveryStatus: lastOutgoingDeliveryStatus ?? self.lastOutgoingDeliveryStatus
         )
     }
 }
@@ -449,8 +476,24 @@ enum ChatUIMapping {
                 otherName: otherName
             ),
             lastMessageAt: conversation.lastMessageAt ?? conversation.lastMessage?.createdAt,
-            unreadCount: conversation.unreadCount
+            unreadCount: conversation.unreadCount,
+            lastOutgoingDeliveryStatus: outgoingDeliveryStatus(
+                from: conversation.lastMessage,
+                currentProfileID: currentProfileID
+            )
         )
+    }
+
+    private static func outgoingDeliveryStatus(
+        from message: MessageDTO?,
+        currentProfileID: UUID
+    ) -> MessageDeliveryStatus? {
+        guard let message,
+              message.senderProfileID == currentProfileID,
+              message.deletedAt == nil else {
+            return nil
+        }
+        return message.deliveryStatus ?? .sent
     }
 
     static func conversationPreview(
@@ -477,8 +520,28 @@ enum ChatUIMapping {
                 otherName: otherName
             ),
             lastMessageAt: snapshot.lastMessageAt ?? snapshot.lastMessageCreatedAt,
-            unreadCount: snapshot.unreadCount
+            unreadCount: snapshot.unreadCount,
+            lastOutgoingDeliveryStatus: cachedOutgoingDeliveryStatus(
+                from: snapshot,
+                currentProfileID: currentProfileID
+            )
         )
+    }
+
+    private static func cachedOutgoingDeliveryStatus(
+        from snapshot: LocalConversationSnapshot,
+        currentProfileID: UUID
+    ) -> MessageDeliveryStatus? {
+        guard let senderID = snapshot.lastMessageSenderProfileID,
+              UUID(uuidString: senderID) == currentProfileID,
+              snapshot.lastMessageDeletedAt == nil else {
+            return nil
+        }
+        if let statusString = snapshot.lastMessageDeliveryStatus,
+           let status = MessageDeliveryStatus(rawValue: statusString) {
+            return status
+        }
+        return .sent
     }
 
     private static func cachedLastMessagePreview(from snapshot: LocalConversationSnapshot) -> String? {

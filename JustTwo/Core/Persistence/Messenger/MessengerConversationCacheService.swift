@@ -133,6 +133,38 @@ enum MessengerConversationCacheService {
         }
     }
 
+    static func persistOutgoingDeliveryStatus(
+        conversationID: UUID,
+        deliveryStatus: MessageDeliveryStatus
+    ) async {
+        guard MessengerLocalStorageFeatureFlags.isCachedConversationListEnabled else { return }
+
+        let startedAt = Date()
+        do {
+            try await localStore.patchConversationOutgoingDeliveryStatus(
+                conversationID: conversationID,
+                deliveryStatus: deliveryStatus
+            )
+            MessengerDiagnostics.event(
+                .messengerConversationCacheRealtimeApplied,
+                conversationID: conversationID,
+                metadata: diagnosticMetadata(
+                    source: .realtime,
+                    eventType: "conversation.receiptPreview",
+                    startedAt: startedAt,
+                    hasLastMessage: true
+                )
+            )
+        } catch {
+            logUpsertFailed(
+                error: error,
+                source: .realtime,
+                startedAt: startedAt,
+                eventType: "conversation.receiptPreview"
+            )
+        }
+    }
+
     static func persistRealtimeConversationUpdated(
         conversationID: UUID,
         lastMessageAt: Date?

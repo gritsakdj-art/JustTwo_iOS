@@ -1204,6 +1204,53 @@ final class MessageCacheStore {
         return true
     }
 
+    @discardableResult
+    func mergeDeliveryStatusesFromLocal(
+        conversationID: UUID,
+        ownerProfileID: UUID
+    ) async -> Bool {
+        guard var entry = entries[conversationID] else { return false }
+
+        let snapshots: [LocalMessageSnapshot]
+        do {
+            snapshots = try await MessengerLocalStore.shared.fetchLocalMessages(
+                conversationID: conversationID,
+                limit: 500,
+                before: nil
+            )
+        } catch {
+            return false
+        }
+
+        let statusByID = Dictionary(
+            uniqueKeysWithValues: snapshots.compactMap { snapshot -> (UUID, MessageDeliveryStatus)? in
+                guard snapshot.senderProfileID == ownerProfileID.uuidString,
+                      let id = UUID(uuidString: snapshot.id),
+                      let statusString = snapshot.deliveryStatus,
+                      let status = MessageDeliveryStatus(rawValue: statusString) else {
+                    return nil
+                }
+                return (id, status)
+            }
+        )
+
+        var didUpdate = false
+        for index in entry.messages.indices {
+            let message = entry.messages[index]
+            guard let incoming = statusByID[message.id] else { continue }
+            let updated = message.replacingDeliveryStatus(incoming)
+            guard updated != message else { continue }
+            entry.messages[index] = updated
+            didUpdate = true
+        }
+
+        guard didUpdate else { return false }
+        entry.loadedAt = .now
+        entries[conversationID] = entry
+        notifyMessagesDidChange(conversationID: conversationID)
+        return true
+    }
+
     private func shouldApplyReceipt(
         to message: ChatMessage,
         messageID: UUID?,

@@ -993,28 +993,32 @@ final class MessengerDeltaSyncService {
         activeConversationID: UUID?
     ) {
         guard let receipt = event.receipt else { return }
-        guard receipt.profileID != profileID else {
-            _ = conversationList.applyRealtimeConversationRead(
-                conversationID: event.conversationID,
-                profileID: receipt.profileID,
-                currentProfileID: profileID
-            )
-            return
-        }
-
-        let cutoffDate = status == .read ? receipt.readAt : receipt.deliveredAt
         let messageID = receipt.messageID ?? event.messageID
+        guard let messageID else { return }
 
-        if activeConversationID == event.conversationID,
-           let chat = activeChatViewModel() {
-            _ = chat.applyDeliveryStatus(status, messageID: messageID, cutoffDate: cutoffDate)
-        } else {
-            _ = messageCache.applyDeliveryStatus(
+        switch status {
+        case .read:
+            MessengerRealtimeReceiptCoordinator.shared.handleConversationRead(
                 conversationID: event.conversationID,
-                status: status,
-                messageID: messageID,
-                cutoffDate: cutoffDate
+                payload: ConversationReadPayload(
+                    profileID: receipt.profileID,
+                    lastReadAt: receipt.readAt,
+                    messageID: messageID
+                ),
+                source: "delta"
             )
+        case .delivered:
+            MessengerRealtimeReceiptCoordinator.shared.handleConversationDelivered(
+                conversationID: event.conversationID,
+                payload: ConversationDeliveredPayload(
+                    profileID: receipt.profileID,
+                    lastDeliveredAt: receipt.deliveredAt,
+                    messageID: messageID
+                ),
+                source: "delta"
+            )
+        case .sent:
+            return
         }
 
         MessengerDiagnostics.event(
@@ -1034,6 +1038,8 @@ final class MessengerDeltaSyncService {
                 )
             }
         }
+        _ = activeConversationID
+        _ = profileID
     }
 
     private func logImageDeltaIfNeeded(

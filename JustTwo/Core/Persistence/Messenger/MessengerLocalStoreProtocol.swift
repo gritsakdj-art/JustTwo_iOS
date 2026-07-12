@@ -12,6 +12,11 @@ protocol MessengerLocalStoreProtocol: AnyObject {
         lastMessageAt: Date?,
         unreadCount: Int?
     ) async throws
+
+    func patchConversationOutgoingDeliveryStatus(
+        conversationID: UUID,
+        deliveryStatus: MessageDeliveryStatus
+    ) async throws
     func upsertLastMessageSnapshot(_ message: MessageDTO) async throws
 
     func upsertMessages(
@@ -27,6 +32,17 @@ protocol MessengerLocalStoreProtocol: AnyObject {
     func markMessageDeleted(messageID: UUID, deletedAt: Date?) async throws
     func upsertReactions(from message: MessageDTO) async throws
     func applyReceipt(_ receipt: MessengerReceiptDTO) async throws
+
+    /// Applies a realtime `conversation.delivered` / `conversation.read` boundary
+    /// monotonically against local participant receipt state and outgoing message
+    /// delivery statuses. One atomic `ModelContext.save()` per successful apply.
+    func applyRealtimeReceipt(
+        ownerProfileID: UUID,
+        conversationID: UUID,
+        participantProfileID: UUID,
+        kind: MessengerReceiptKind,
+        boundaryMessageID: UUID
+    ) async throws -> MessengerReceiptApplyResult
 
     func upsertSyncMetadata(_ metadata: LocalMessengerSyncMetadataSnapshot) async throws
     func fetchSyncMetadata() async throws -> LocalMessengerSyncMetadataSnapshot?
