@@ -101,8 +101,8 @@ final class PushRegistrationService: NSObject, PushRegistrationServicing {
         )
 
         Task { @MainActor [weak self] in
-            let sessionUserID = SessionStore.shared.currentUser?.id
-            guard SessionStore.shared.isFullyAuthenticated,
+            guard let sessionUserID = SessionStore.shared.currentUser?.id,
+                  SessionStore.shared.isFullyAuthenticated,
                   SessionStore.shared.currentUser?.id == sessionUserID else {
                 return
             }

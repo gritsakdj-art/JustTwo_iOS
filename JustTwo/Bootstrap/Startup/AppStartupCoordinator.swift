@@ -166,10 +166,10 @@ final class AppStartupCoordinator {
         MessengerDiagnostics.event(.startupConversationAvatarsDeferred)
 
         await withTaskGroup(of: Void.self) { group in
-            group.addTask {
+            group.addTask { @MainActor in
                 await ProfilePhotosStartupLoader.shared.loadIfNeeded(force: force)
             }
-            group.addTask {
+            group.addTask { @MainActor in
                 await ConversationsStartupLoader.shared.refreshNetworkIfNeeded(
                     session: session,
                     router: router,

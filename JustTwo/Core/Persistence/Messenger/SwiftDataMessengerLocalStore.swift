@@ -775,21 +775,31 @@ final class SwiftDataMessengerLocalStore: MessengerLocalStoreProtocol {
         try context.save()
     }
 
+    private func deletePendingMediaFileAsync(relativePath: String) {
+        Task.detached(priority: .utility) {
+            MessengerPendingMediaStore.delete(relativePath: relativePath)
+        }
+    }
+
     func deleteOutboxItem(clientMessageID: String) async throws {
         let context = modelContext
         guard let entity = try fetchOutboxEntity(clientMessageID: clientMessageID, context: context) else {
             return
         }
+        var relativePathToDelete: String?
         if let pendingMediaID = entity.pendingMediaID,
            let media = try fetchPendingMediaEntity(pendingMediaID: pendingMediaID, context: context) {
-            MessengerPendingMediaStore.delete(relativePath: media.localRelativePath)
+            relativePathToDelete = media.localRelativePath
             context.delete(media)
         } else if let media = try fetchPendingMediaEntity(clientMessageID: clientMessageID, context: context) {
-            MessengerPendingMediaStore.delete(relativePath: media.localRelativePath)
+            relativePathToDelete = media.localRelativePath
             context.delete(media)
         }
         context.delete(entity)
         try context.save()
+        if let relativePathToDelete {
+            deletePendingMediaFileAsync(relativePath: relativePathToDelete)
+        }
     }
 
     func deleteOutboxItems(conversationID: UUID) async throws {
@@ -911,9 +921,10 @@ final class SwiftDataMessengerLocalStore: MessengerLocalStoreProtocol {
         guard let entity = try fetchPendingMediaEntity(clientMessageID: clientMessageID, context: context) else {
             return
         }
-        MessengerPendingMediaStore.delete(relativePath: entity.localRelativePath)
+        let relativePath = entity.localRelativePath
         context.delete(entity)
         try context.save()
+        deletePendingMediaFileAsync(relativePath: relativePath)
     }
 
     func clearPendingMedia() async throws {

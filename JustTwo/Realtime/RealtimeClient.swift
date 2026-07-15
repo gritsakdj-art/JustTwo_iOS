@@ -27,6 +27,7 @@ final class RealtimeClient {
     private var pendingUnsubscribeConversationIDs: Set<UUID> = []
     private var keepaliveTask: Task<Void, Never>?
     private var needsForegroundReconnect = false
+    private var socketGeneration = 0
 
     private let backgroundKeepaliveInterval: TimeInterval = 20
 
@@ -54,7 +55,7 @@ final class RealtimeClient {
             object: nil,
             queue: .main
         ) { [weak self] _ in
-            MainActor.assumeIsolated {
+            Task { @MainActor in
                 self?.handleNetworkingSessionsReset()
             }
         }
@@ -96,12 +97,14 @@ final class RealtimeClient {
         )
 
         let socket = sessionProvider().webSocketTask(with: request)
+        socketGeneration += 1
+        let generation = socketGeneration
         task = socket
         let connectionContext = RealtimeTransportGuard.beginConnection(presenceStore: .shared)
         receiveConnectionContext = connectionContext
         socket.resume()
 
-        startReceiveLoop(for: socket, context: connectionContext)
+        startReceiveLoop(for: socket, context: connectionContext, generation: generation)
     }
 
     func connectIfPossible() async {
@@ -152,27 +155,29 @@ final class RealtimeClient {
     func subscribe(conversationID: UUID) async throws {
         pendingUnsubscribeConversationIDs.remove(conversationID)
 
-        guard let task else {
+        guard let task, case .connected = state else {
             pendingSubscribeConversationIDs.insert(conversationID)
             NetworkDebug.log("Realtime subscribe queued until connected: \(conversationID)")
             throw RealtimeClientError.notConnected
         }
 
         pendingSubscribeConversationIDs.remove(conversationID)
-        try await send(.subscribe(conversationID: conversationID), using: task)
+        let generation = socketGeneration
+        try await send(.subscribe(conversationID: conversationID), using: task, generation: generation)
     }
 
     func unsubscribe(conversationID: UUID) async throws {
         pendingSubscribeConversationIDs.remove(conversationID)
 
-        guard let task else {
+        guard let task, case .connected = state else {
             pendingUnsubscribeConversationIDs.insert(conversationID)
             NetworkDebug.log("Realtime unsubscribe queued until connected: \(conversationID)")
             throw RealtimeClientError.notConnected
         }
 
         pendingUnsubscribeConversationIDs.remove(conversationID)
-        try await send(.unsubscribe(conversationID: conversationID), using: task)
+        let generation = socketGeneration
+        try await send(.unsubscribe(conversationID: conversationID), using: task, generation: generation)
     }
 
     func sendTypingStarted(conversationID: UUID) async throws {
@@ -188,19 +193,39 @@ final class RealtimeClient {
             throw RealtimeClientError.notConnected
         }
 
-        try await send(message, using: task)
+        let generation = socketGeneration
+        try await send(message, using: task, generation: generation)
     }
 
-    private func send(_ message: RealtimeClientMessageDTO, using task: URLSessionWebSocketTask) async throws {
+    private func send(
+        _ message: RealtimeClientMessageDTO,
+        using task: URLSessionWebSocketTask,
+        generation: Int
+    ) async throws {
+        guard socketGeneration == generation, self.task === task else {
+            throw RealtimeClientError.notConnected
+        }
+
         let data = try JSONCoding.encoder.encode(message)
         guard let text = String(data: data, encoding: .utf8) else {
             throw RealtimeClientError.encodingFailed
         }
 
         do {
+            guard socketGeneration == generation, self.task === task else {
+                throw RealtimeClientError.notConnected
+            }
             try await task.send(.string(text))
+            guard socketGeneration == generation, self.task === task else {
+                NetworkDebug.log("Realtime send completed for stale socket: \(message.type)")
+                return
+            }
             NetworkDebug.log("Realtime send succeeded: \(message.type)")
         } catch {
+            if socketGeneration != generation || self.task !== task || explicitDisconnect || isDisconnectingExplicitly {
+                NetworkDebug.log("Realtime send ignored for stale/disconnecting socket: \(message.type)")
+                throw RealtimeClientError.notConnected
+            }
             NetworkDebug.logError(error, prefix: "Realtime send failed")
             scheduleReconnectIfNeeded()
             throw error
@@ -209,7 +234,8 @@ final class RealtimeClient {
 
     private func startReceiveLoop(
         for socket: URLSessionWebSocketTask,
-        context: RealtimeConnectionContext
+        context: RealtimeConnectionContext,
+        generation: Int
     ) {
         receiveTask?.cancel()
         receiveTask = Task { [weak self, weak socket] in
@@ -218,13 +244,28 @@ final class RealtimeClient {
             while !Task.isCancelled {
                 do {
                     let message = try await socket.receive()
+                    let isCurrentSocket = await MainActor.run { [weak self] in
+                        guard let self else { return false }
+                        return self.socketGeneration == generation && self.task === socket
+                    }
+                    guard isCurrentSocket else {
+                        NetworkDebug.log("Realtime receive ignored for stale socket generation=\(generation)")
+                        return
+                    }
                     await self?.handle(message, context: context)
                 } catch is CancellationError {
                     return
                 } catch {
-                    guard let self else { return }
-                    await MainActor.run {
-                        self.handleReceiveError(error)
+                    let shouldHandleError = await MainActor.run { [weak self] in
+                        guard let self else { return false }
+                        return self.socketGeneration == generation && self.task === socket
+                    }
+                    guard shouldHandleError else {
+                        NetworkDebug.log("Realtime receive error ignored for stale socket generation=\(generation)")
+                        return
+                    }
+                    await MainActor.run { [weak self] in
+                        self?.handleReceiveError(error)
                     }
                     return
                 }
@@ -326,6 +367,7 @@ final class RealtimeClient {
     }
 
     private func disconnect(shouldReconnect: Bool) {
+        socketGeneration += 1
         explicitDisconnect = !shouldReconnect
         isDisconnectingExplicitly = !shouldReconnect
         reconnectTask?.cancel()
@@ -337,8 +379,9 @@ final class RealtimeClient {
         receiveConnectionContext = nil
         RealtimeTransportGuard.invalidateActiveConnection()
 
-        task?.cancel(with: .normalClosure, reason: nil)
+        let oldTask = task
         task = nil
+        oldTask?.cancel(with: .normalClosure, reason: nil)
         pendingSubscribeConversationIDs.removeAll()
         pendingUnsubscribeConversationIDs.removeAll()
 
@@ -470,27 +513,38 @@ final class RealtimeClient {
     }
 
     private func flushPendingSubscriptions() async {
-        guard let task else { return }
+        guard let task, case .connected = state else { return }
 
+        let generation = socketGeneration
         let subscribeIDs = pendingSubscribeConversationIDs
         let unsubscribeIDs = pendingUnsubscribeConversationIDs
         pendingSubscribeConversationIDs.removeAll()
         pendingUnsubscribeConversationIDs.removeAll()
 
         for conversationID in unsubscribeIDs {
+            guard socketGeneration == generation, self.task === task else {
+                pendingUnsubscribeConversationIDs.insert(conversationID)
+                return
+            }
             do {
-                try await send(.unsubscribe(conversationID: conversationID), using: task)
+                try await send(.unsubscribe(conversationID: conversationID), using: task, generation: generation)
                 NetworkDebug.log("Realtime flushed queued unsubscribe: \(conversationID)")
             } catch {
+                pendingUnsubscribeConversationIDs.insert(conversationID)
                 NetworkDebug.logError(error, prefix: "Realtime flushed unsubscribe failed")
             }
         }
 
         for conversationID in subscribeIDs {
+            guard socketGeneration == generation, self.task === task else {
+                pendingSubscribeConversationIDs.insert(conversationID)
+                return
+            }
             do {
-                try await send(.subscribe(conversationID: conversationID), using: task)
+                try await send(.subscribe(conversationID: conversationID), using: task, generation: generation)
                 NetworkDebug.log("Realtime flushed queued subscribe: \(conversationID)")
             } catch {
+                pendingSubscribeConversationIDs.insert(conversationID)
                 NetworkDebug.logError(error, prefix: "Realtime flushed subscribe failed")
             }
         }

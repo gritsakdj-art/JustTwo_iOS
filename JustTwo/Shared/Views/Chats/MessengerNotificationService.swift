@@ -90,7 +90,7 @@ final class MessengerNotificationService {
                 PayloadKey.messageID: messageID.uuidString
             ]
 
-            if let attachment = Self.makeAvatarAttachment(photoID: avatarPhotoID) {
+            if let attachment = await Self.makeAvatarAttachment(photoID: avatarPhotoID) {
                 content.attachments = [attachment]
             }
 
@@ -138,12 +138,18 @@ final class MessengerNotificationService {
         return content
     }
 
-    static func makeAvatarAttachment(photoID: UUID?) -> UNNotificationAttachment? {
+    static func makeAvatarAttachment(photoID: UUID?) async -> UNNotificationAttachment? {
         guard let photoID,
-              let image = ChatPartnerAvatarCache.image(for: photoID),
-              let data = image.jpegData(compressionQuality: 0.9) else {
+              let image = ChatPartnerAvatarCache.image(for: photoID) else {
             return nil
         }
+
+        let sendable = SendableUIImage(image: image)
+        let data = await Task.detached(priority: .utility) {
+            sendable.image.jpegData(compressionQuality: 0.9)
+        }.value
+
+        guard let data else { return nil }
 
         let url = FileManager.default.temporaryDirectory
             .appendingPathComponent("notification-avatar-\(photoID.uuidString).jpg")
@@ -158,5 +164,9 @@ final class MessengerNotificationService {
         } catch {
             return nil
         }
+    }
+
+    private struct SendableUIImage: @unchecked Sendable {
+        let image: UIImage
     }
 }

@@ -754,20 +754,24 @@ struct ProfileSettingsView: View {
 
     private func deleteAccount() {
         let password = deletePassword
-        guard !password.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, !isDeletingAccount else { return }
+        guard let requestUserID = session.currentUser?.id,
+              !password.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+              !isDeletingAccount else { return }
 
         isDeletingAccount = true
         deleteAccountErrorMessage = nil
 
-        Task {
+        Task { @MainActor in
+            defer { isDeletingAccount = false }
             do {
                 _ = try await AuthService.deleteAccount(password: password)
+                guard session.currentUser?.id == requestUserID else { return }
                 deletePassword = ""
                 session.clearSession()
                 router.resetTo(.auth)
             } catch let error as NetworkError {
+                guard session.currentUser?.id == requestUserID else { return }
                 deletePassword = ""
-
                 if error.shouldClearSession {
                     session.clearSession()
                     router.resetTo(.auth)
@@ -777,11 +781,10 @@ struct ProfileSettingsView: View {
                     deleteAccountErrorMessage = error.userMessage
                 }
             } catch {
+                guard session.currentUser?.id == requestUserID else { return }
                 deletePassword = ""
                 deleteAccountErrorMessage = error.localizedDescription
             }
-
-            isDeletingAccount = false
         }
     }
 }

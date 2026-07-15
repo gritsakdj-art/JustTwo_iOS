@@ -61,13 +61,18 @@ final class InvitePreviewViewModel {
 
     func accept(session: SessionStore, router: AppRouter) async {
         guard case .loaded(let content) = state else { return }
+        guard let requestUserID = session.currentUser?.id else { return }
+        let requestToken = token
         state = .accepting
         statusMessage = nil
 
         do {
             let requestConnectionEpoch = PresenceStore.shared.currentRealtimeConnectionEpoch
-            let response = try await InviteService.acceptInvite(token: token)
+            let response = try await InviteService.acceptInvite(token: requestToken)
             let profileID = try await MessengerSessionSupport.resolveCurrentProfileID(session: session)
+            guard token == requestToken,
+                  session.isFullyAuthenticated,
+                  session.currentUser?.id == requestUserID else { return }
             PresenceStore.shared.applyFromConversation(
                 response.conversation,
                 source: .rest,
@@ -80,15 +85,16 @@ final class InvitePreviewViewModel {
             )
             router.openChatAfterInviteAccept(conversation)
         } catch let error as NetworkError {
+            guard token == requestToken else { return }
             if error.shouldClearSession {
                 session.clearSession()
                 router.resetTo(.auth)
                 return
             }
-
             state = .loaded(content)
             statusMessage = InviteErrorMapper.acceptMessage(for: error)
         } catch {
+            guard token == requestToken else { return }
             state = .loaded(content)
             statusMessage = error.localizedDescription
         }
@@ -96,13 +102,19 @@ final class InvitePreviewViewModel {
 
     func block(session: SessionStore, router: AppRouter) async {
         guard case .loaded(let content) = state else { return }
+        guard let requestUserID = session.currentUser?.id else { return }
+        let requestToken = token
         statusMessage = nil
 
         do {
             _ = try await ProfileBlockService.blockProfile(profileID: content.inviterProfileID)
+            guard token == requestToken,
+                  session.isFullyAuthenticated,
+                  session.currentUser?.id == requestUserID else { return }
             state = .blocked
             router.dismissInvitePreview()
         } catch let error as NetworkError {
+            guard token == requestToken else { return }
             if error.shouldClearSession {
                 session.clearSession()
                 router.resetTo(.auth)
@@ -110,6 +122,7 @@ final class InvitePreviewViewModel {
             }
             statusMessage = error.userMessage
         } catch {
+            guard token == requestToken else { return }
             statusMessage = error.localizedDescription
         }
     }

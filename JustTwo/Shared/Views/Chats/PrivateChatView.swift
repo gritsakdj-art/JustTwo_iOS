@@ -29,6 +29,7 @@ struct PrivateChatView: View {
     @State private var isNearBottom = false
     @State private var shouldStickToBottom = true
     @State private var isScrollingToBottom = false
+    @State private var didUserScrollAwayFromBottom = false
     @State private var didTriggerOlderLoadForCurrentTopReach = false
     @State private var initialPositioningTask: Task<Void, Never>?
     @State private var initialPositioningGeneration = 0
@@ -343,16 +344,13 @@ struct PrivateChatView: View {
                         Color.clear
                             .frame(height: 1)
                             .id(Self.bottomAnchorID)
+                            .onScrollVisibilityChange(threshold: 0.01) { isVisible in
+                                updateBottomProximity(isVisible)
+                            }
                     }
                     .padding(.horizontal, 12)
                     .padding(.top, 8)
                 }
-                .contentShape(Rectangle())
-                .simultaneousGesture(
-                    TapGesture().onEnded {
-                        dismissKeyboard()
-                    }
-                )
                 .scrollDismissesKeyboard(.interactively)
                 .scrollBounceBehavior(.always, axes: .vertical)
                 .scrollIndicators(.hidden)
@@ -424,11 +422,11 @@ struct PrivateChatView: View {
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: .chatImageBubbleDidRender)) { _ in
-            guard didCompleteInitialPositioning, shouldStickToBottom || isNearBottom else { return }
+            guard didCompleteInitialPositioning, shouldStickToBottom else { return }
             imageLayoutScrollTask?.cancel()
             imageLayoutScrollTask = Task { @MainActor in
                 await Task.yield()
-                guard !Task.isCancelled, shouldStickToBottom || isNearBottom else { return }
+                guard !Task.isCancelled, shouldStickToBottom else { return }
                 scrollToBottom(animated: false)
             }
         }
@@ -466,7 +464,9 @@ struct PrivateChatView: View {
     }
 
     private var shouldShowScrollDownButton: Bool {
-        didCompleteInitialPositioning && !viewModel.messages.isEmpty && !isNearBottom
+        didCompleteInitialPositioning
+            && !viewModel.messages.isEmpty
+            && (didUserScrollAwayFromBottom || !isNearBottom)
     }
 
     private var shouldAutoScrollToNewLatestMessage: Bool {
@@ -522,15 +522,19 @@ struct PrivateChatView: View {
 
         if isAtBottom {
             isScrollingToBottom = false
+            didUserScrollAwayFromBottom = false
             markStuckToBottom()
         } else if !isScrollingToBottom {
             shouldStickToBottom = false
+            didUserScrollAwayFromBottom = true
         }
     }
 
     private func markStuckToBottom() {
         isNearBottom = true
         shouldStickToBottom = true
+        didUserScrollAwayFromBottom = false
+        isScrollingToBottom = false
     }
 
     @ViewBuilder
@@ -570,9 +574,6 @@ struct PrivateChatView: View {
             if isLastMessage {
                 row
                     .padding(.bottom, Self.bottomClearance)
-                    .onScrollVisibilityChange(threshold: Self.bottomVisibilityThreshold) { isVisible in
-                        updateBottomProximity(isVisible)
-                    }
             } else {
                 row
             }
@@ -1042,7 +1043,7 @@ struct PrivateChatView: View {
         scrollTask = Task { @MainActor in
             defer {
                 scrollTask = nil
-                if isScrollingToBottom, !isNearBottom {
+                if requestGeneration == scrollRequestGeneration {
                     isScrollingToBottom = false
                 }
             }
@@ -1104,12 +1105,10 @@ struct PrivateChatView: View {
 
     private func handleKeyboardVisibilityChange() {
         guard !usesPreviewData, didCompleteInitialPositioning else { return }
-        guard shouldStickToBottom || isNearBottom else { return }
+        guard shouldStickToBottom else { return }
 
         keyboardVisibilityScrollTask?.cancel()
         keyboardVisibilityScrollTask = Task { @MainActor in
-            // ждём, пока SwiftUI применит новый keyboard-safe-area инсет и
-            // пересчитает фрейм VStack, иначе scrollTo сработает по старой геометрии
             for delay: UInt64 in [16, 60, 150] {
                 try? await Task.sleep(for: .milliseconds(delay))
                 guard !Task.isCancelled else { return }
