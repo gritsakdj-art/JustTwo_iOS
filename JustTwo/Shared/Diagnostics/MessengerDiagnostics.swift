@@ -481,14 +481,8 @@ enum MessengerDiagnostics {
 
         NetworkDebug.log("Messenger diagnostic \(entry.exportLine)")
 
-        if Thread.isMainThread {
-            MainActor.assumeIsolated {
-                MessengerDiagnosticsStore.shared.append(entry)
-            }
-        } else {
-            Task { @MainActor in
-                MessengerDiagnosticsStore.shared.append(entry)
-            }
+        Task { @MainActor in
+            MessengerDiagnosticsStore.shared.append(entry)
         }
     }
 

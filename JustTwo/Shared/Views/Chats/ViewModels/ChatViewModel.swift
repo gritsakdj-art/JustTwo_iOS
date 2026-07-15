@@ -494,7 +494,7 @@ final class ChatViewModel {
                   notifiedConversationID == conversationID else {
                 return
             }
-            MainActor.assumeIsolated {
+            Task { @MainActor in
                 self?.handleCacheNotification()
             }
         }

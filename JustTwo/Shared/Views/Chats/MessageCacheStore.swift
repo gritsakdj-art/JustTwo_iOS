@@ -914,6 +914,7 @@ final class MessageCacheStore {
         for conversationID: UUID,
         marksRecentPageLoaded: Bool = true
     ) {
+        let startedAt = Date()
         let existingEntry = entries[conversationID]
         let existingMessages = existingEntry?.messages ?? []
         var preservedDeleteCount = 0
@@ -1013,6 +1014,11 @@ final class MessageCacheStore {
                 ]
             )
         }
+        let durationMs = Int(Date().timeIntervalSince(startedAt) * 1000)
+        if durationMs > 30 {
+            NetworkDebug.log("MessageCacheStore.mergeLoadedMessages slow: \(durationMs)ms count=\(loadedMessages.count)")
+        }
+
         MessengerDiagnostics.event(
             .cacheMergeCompleted,
             conversationID: conversationID,
@@ -1022,7 +1028,8 @@ final class MessageCacheStore {
                 "resultCount": "\(merged.count)",
                 "preservedDeleteCount": "\(preservedDeleteCount)",
                 "preservedEditCount": "\(preservedEditCount)",
-                "preservedReceiptCount": "\(preservedReceiptCount)"
+                "preservedReceiptCount": "\(preservedReceiptCount)",
+                "durationMs": "\(durationMs)"
             ]
         )
 

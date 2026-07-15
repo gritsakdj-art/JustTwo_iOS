@@ -88,8 +88,8 @@ final class PushNotificationRoutingCoordinator {
             return
         }
 
-        Task {
-            await apply(route: route, routeKey: routeKey, router: router, session: session)
+        Task { @MainActor [weak self] in
+            await self?.apply(route: route, routeKey: routeKey, router: router, session: session)
         }
     }
 

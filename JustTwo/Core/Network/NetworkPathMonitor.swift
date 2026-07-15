@@ -51,16 +51,24 @@ final class NetworkPathMonitor {
     }
 
     fileprivate func handlePathUpdate(_ path: NWPath) {
+        let previousSignature = lastSignature
+        let previousSatisfied = isNetworkSatisfied
         hasReceivedPathUpdate = true
         isNetworkSatisfied = path.status == .satisfied
 
         let signature = Self.signature(for: path)
-        defer { lastSignature = signature }
+        lastSignature = signature
 
-        guard let lastSignature, lastSignature != signature else { return }
-
-        NetworkDebug.log("Network path changed \(lastSignature) → \(signature)")
-        handlers.values.forEach { $0() }
+        if let previousSignature {
+            guard previousSignature != signature else { return }
+            NetworkDebug.log("Network path changed \(previousSignature) → \(signature)")
+            handlers.values.forEach { $0() }
+        } else {
+            NetworkDebug.log("Network path initial \(signature)")
+            if previousSatisfied != isNetworkSatisfied {
+                handlers.values.forEach { $0() }
+            }
+        }
     }
 
     private static func signature(for path: NWPath) -> String {

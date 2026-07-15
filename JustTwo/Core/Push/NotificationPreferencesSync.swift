@@ -21,6 +21,7 @@ final class NotificationPreferencesSync {
     private var lastSyncedSnapshot: Snapshot?
     private var isSyncing = false
     private var hasPendingResync = false
+    private var sessionGeneration = 0
 
     /// Sends the current local preferences to the backend. Deduplicates identical
     /// consecutive syncs unless `force` is set.
@@ -33,12 +34,16 @@ final class NotificationPreferencesSync {
     /// Clears the cached synced state so the next sync always hits the network.
     /// Call on logout so a different account re-syncs from scratch.
     func resetSyncedState() {
+        sessionGeneration += 1
         lastSyncedSnapshot = nil
+        hasPendingResync = false
     }
 
     private func performSync(force: Bool) async {
-        guard SessionStore.shared.isFullyAuthenticated else { return }
+        guard SessionStore.shared.isFullyAuthenticated,
+              let userID = SessionStore.shared.currentUser?.id else { return }
 
+        let generation = sessionGeneration
         let snapshot = Snapshot(
             messagesEnabled: MessageNotificationPreferences.messagesEnabled,
             messagePreviewEnabled: MessageNotificationPreferences.messagePreviewEnabled
@@ -54,7 +59,7 @@ final class NotificationPreferencesSync {
         isSyncing = true
         defer {
             isSyncing = false
-            if hasPendingResync {
+            if hasPendingResync, generation == sessionGeneration {
                 hasPendingResync = false
                 Task { @MainActor [weak self] in
                     await self?.performSync(force: false)
@@ -71,6 +76,12 @@ final class NotificationPreferencesSync {
             _ = try await NetworkExecutor.shared.send(
                 UpdateNotificationPreferencesRequest(bodyValue: body)
             )
+            guard generation == sessionGeneration,
+                  SessionStore.shared.isFullyAuthenticated,
+                  SessionStore.shared.currentUser?.id == userID else {
+                NetworkDebug.log("Notification preferences sync response ignored: stale session")
+                return
+            }
             lastSyncedSnapshot = snapshot
             NetworkDebug.log(
                 "Notification preferences synced messages=\(snapshot.messagesEnabled) preview=\(snapshot.messagePreviewEnabled)"
