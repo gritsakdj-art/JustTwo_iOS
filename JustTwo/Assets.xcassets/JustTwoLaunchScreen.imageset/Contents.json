@@ -1,7 +1,7 @@
 {
   "images" : [
     {
-      "filename" : "JustTwo_launchscreen_light.png",
+      "filename" : "JustTwo_launchscreen_light.jpg",
       "idiom" : "universal"
     },
     {
@@ -11,7 +11,7 @@
           "value" : "dark"
         }
       ],
-      "filename" : "JustTwo_launchscreen_dark.png",
+      "filename" : "JustTwo_launchscreen_dark.jpg",
       "idiom" : "universal"
     }
   ],

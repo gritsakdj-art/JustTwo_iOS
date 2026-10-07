@@ -412,6 +412,15 @@
 - Docs: `Docs/MessengerRealtimeReceipts.md` + related updates.
 - **Manual smoke:** NOT RUN (requires staging PR20D4A + physical device).
 
+## 2026-10-08 (Asset size reduction)
+
+- Reduced repository asset payload from **9.6 MB to 1.2 MB (−87%)** without visible quality loss.
+- Converted the three mock profile photos (`emma_profile`, `mark_profile`, `elizabeth_profile`) from 24-bit PNG to JPEG q90 (4:4:4 chroma) — 2300/1912/1924 KB → 316/196/232 KB; PSNR 41.9–44.5 dB.
+- Converted both launch screens (`JustTwo_launchscreen_dark`, `JustTwo_launchscreen_light`) from PNG to JPEG q92 — 1416/1172 KB → 112/100 KB; PSNR 45.9/47.3 dB.
+- Re-compressed `AppIcon/JustTwoIcon.png` as an optimized 256-color PNG (App Store requires a PNG app icon, so JPEG was not an option) — 1116 KB → 284 KB.
+- Updated `Contents.json` filenames in all affected image sets; no Swift changes required (`Image(name)` resolves the asset regardless of file format).
+- Verified 1:1 crops (gradients, type, skin tones) show no banding or blocking; all asset catalog references resolve with no orphaned files.
+
 ## Notes
 
 - Continue adding completed changes here after each meaningful update.
